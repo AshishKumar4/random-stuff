@@ -159,6 +159,7 @@ def main():
     ap.add_argument('--no-sep', action='store_true')
     ap.add_argument('--no-asr', action='store_true')
     a = ap.parse_args()
+    a.audio = os.path.abspath(a.audio)
     out = a.out or os.path.splitext(a.audio)[0] + '_analysis'
     os.makedirs(out, exist_ok=True)
     t0 = time.time()

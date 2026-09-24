@@ -10,7 +10,7 @@ Companion docs: `zeitgeist.md` (which memes land, ranked) and `mvcraft.md` (visu
 
 - **Genre:** K-pop architecture with hyperpop textures. That means clear K-pop sections (cold-open hook, pre-chorus lift, post-chorus chant with a point dance, stripped bridge, final chorus lift) dressed in hyperpop sound (glitchy pitched vocal chops, bitcrushed risers, supersaws, rubbery bass). The strings `K-pop, hyperpop, glitch-pop` and `K-Pop future bass` appear verbatim in ACE-Step's own genre vocabulary (`acestep/genres_vocab.txt`), so the model has seen them.
 - **BPM 128, 4/4, key A minor** (the chorus runs on the i–VI–III–VII "bittersweet anthem" loop). Fallback: 120 BPM or E minor.
-- **Form (76 bars = 142.5 s):** Cold-open hook 4 | Verse 1 8 | Pre 4 | Chorus 8 | Post-chorus chant 4 | Verse 2 8 | Pre 4 | Chorus 8 | Post-chorus chant 4 | Bridge 8 | Build 4 | Final chorus 8 | Outro tag 4. Request `duration: 143`.
+- **Form (76 bars = 142.5 s):** Cold-open hook 4 | Verse 1 8 | Pre 4 | Chorus 8 | Post-chorus chant 4 | Verse 2 8 | Pre 4 | Chorus 8 | Post-chorus chant 4 | Bridge 8 | Build 4 | Final chorus 8 | Outro tag 4. Request `duration: 146` (t1 at 143 overran), then trim.
 - **The hook is sung at 0:00.** One title line of about 9 syllables that works as a tweet by itself. The same words come back in the final chorus with a new meaning (the "turn"). That turn is what makes people cry.
 - **The chant is the clip moment:** post-chorus 1 at 0:45 to 0:52, four one-bar lines of 3 to 6 syllables in UPPERCASE with (responses) in parentheses, each tied to a gesture.
 - **ACE-Step rules that matter most:**
@@ -21,7 +21,16 @@ Companion docs: `zeitgeist.md` (which memes land, ranked) and `mvcraft.md` (visu
   - Section tags come from the common set, with at most one short descriptor each.
   - Spell jargon the way it is sung.
   - Generate many takes, score them with Whisper, and fix bad lines with repaint instead of rerolling the whole song.
-- **CPU reality (measured, section 8):** the 4B LM prefill takes about 87 s, then the LM decodes about 1.8 audio codes/s on 2 threads. A 143 s song is 715 codes, so the LM alone takes roughly 8 min per take, before the DiT and VAE run. Budget roughly 5 or 6 full takes per hour at the start. acestep.cpp uses only `nproc/2 = 2` threads here (see section 8 for the fix).
+- **CPU reality (measured on take t1, section 12):** one full 143 s take costs about 28 min on this box. That is LM 9 min, plus DiT 12.8 min and VAE 5.7 min while other agents loaded the CPU (load average about 7). Plan on **2 takes/hour**, i.e. a take budget of dozens, not hundreds. acestep.cpp uses only `nproc/2 = 2` threads.
+- **Take t1 validated the plan:**
+  - The hook was sung at 0.0 s and the beat dropped at exactly 7.5 s (bar 5).
+  - Chorus 2 landed at 75.0 s (planned 75.0), the bridge at 98.0 s (planned 97.5), the build at 113.0 s (planned 112.5). The model even left a silence gap right before the final chorus.
+  - Whisper WER was 0.32 and 31 of 41 lines were recognised.
+- **Take t1 failures to design around:**
+  - Verse 1, written as comma-fragment noun lists, came out as "yeah yeah yeah" (lost).
+  - The spelled acronym "A G I" was heard as "h e f".
+  - "LOSS go down" was heard as "fights go down".
+  - Content overran the duration, so final-chorus lines 3 and 4 and the outro were cut. The final chorus was also rendered sparse instead of explosive.
 
 ---
 
@@ -76,14 +85,16 @@ caption + lyrics + metas --> [5Hz LM, Qwen3 4B]  --> audio codes (5 per second: 
   - `display.txt` goes to the kinetic type and uses the proper spelling.
   - Examples:
     - `P(doom)` → `P doom`.
-    - `AGI` → `A G I` (Whisper test pending).
+    - `AGI`: `A G I` was heard as "h e f" in t1; t2 tests the unspaced `AGI`.
     - `GPU` → `G P U`.
     - `14B` → `fourteen billion`.
     - `3am` → `three a.m.`
     - `RLHF`: avoid it, or write `R L H F`.
     - `Claude` → `Claude`. It usually lands; fall back to `Clawed` if not.
   - Avoid symbols (`&`, `%`, `/`, emoji, em dashes) inside sung lines.
-- **Jargon must be short and stressed on strong beats:** "loss go down", "context window", "next token", "gradient", "markdown" all sing well. Long noun stacks ("reinforcement learning from human feedback") do not.
+- **Write sentences with verbs, not comma-separated noun lists.** In t1, verse 1 ("Big bang, and the dark, and a star / Carbon in the dust, then a heart ...") was replaced by "yeah yeah" vocalising. Every other section, all written as full clauses, was sung. The fix to test (take t2): "First there was a bang, and then a star / The star exploded into carbon hearts ..."
+- **Spelled-out acronyms are unreliable:** `A G I` was heard as "h e f". Prefer a real word, or accept that the on-screen type carries it. Reading the lyrics makes a sung word sound intelligible, which is a big advantage of our kinetic-type video. The same goes for one-syllable key words in chants: "loss" came out as "fights". Put the meme word on screen *huge* at that moment.
+- **Jargon must be short and stressed on strong beats.** In t1, "context window", "absolutely right", "red team" and "ten thousand rooms" came through cleanly, while "markdown" was mangled ("my come done") and "loss" was misheard. Long noun stacks ("reinforcement learning from human feedback") do not.
 - **Repeat choruses word for word.** Melody locks to text: if you change a word, the model will likely change the melody. Put the *turn* in the last line of the final chorus only.
 - **Small lyric edits move everything** (issue #450). Lock the lyric sheet *before* mass-generating takes. After that, fix only through repaint (section 7).
 - **Non-English ad-libs:** keep them short and romanized (the model trained on 50% romanized non-Latin scripts), for example `(saranghae)` or `(daebak)`. Leave `vocal_language: "en"`.
@@ -105,7 +116,7 @@ Tag frequency in the 200 official example requests (`examples/text2music`, the f
 | `[Final Chorus]` | 14 | last chorus |
 | `[Hook]` | 10 | alternative for the cold open or the chant |
 | `[Breakdown]`, `[Build-Up]`, `[Build]` | 8 / 9 / 5 | stripped section, riser |
-| `[Post-Chorus]` | 5 | chant after the chorus (rare, so A/B it against `[Drop]` or `[Hook]`) |
+| `[Post-Chorus]` | 5 | chant after the chorus. Rare in the examples, but `[Post-Chorus - chant]` **worked in t1** (chanted, with the parenthesised response sung) |
 | `[Song ends abruptly]`, `[abrupt silence]` | 4 / 4 | hard-cut ending (hyperpop, and good for looping) |
 
 - Descriptor syntax: `[Section - short descriptor]`, e.g. `[Bridge - soft piano]`, `[Post-Chorus - chant]`, `[Intro - Synth Brass Fanfare]`. Use **one** descriptor. Stacks like `[Chorus - anthemic - stacked - powerful]` risk being *sung* and confuse the model.
@@ -117,11 +128,12 @@ Tag frequency in the 200 official example requests (`examples/text2music`, the f
 - Seconds per bar (4/4) = 240 / BPM. At **128 BPM** a bar is **1.875 s**, a beat is 0.469 s, and 8 bars take 15 s. At 120 BPM a bar is 2.0 s.
 - **Planning density (pop):**
   - **Standard sung line** (7 to 10 syllables): **2 bars**. At 128 BPM that is 3.75 s, about 2.5 syllables/s, which is relaxed and intelligible.
-  - **Chant line** (3 to 6 syllables): **1 bar**.
+  - **Chant line** (3 to 6 syllables): plan **1 bar**. In t1 they came out at about 1.5 bars.
   - **Fast list or rap line** (8 to 12 syllables): 1 bar. Risky. Use it only in verse 1's history speedrun if we want it, and expect the LM to stretch it.
   - **Sustained anthem line** (3 to 5 syllables with long vowels): 2 to 4 bars.
 - Intelligibility ceiling: about 4 syllables/s sung (eighth notes at 120 BPM). Word rate: 2 to 3 words/s at most (Ambience AI guide).
-- The official examples average 6 to 10 s per lyric line *including* instrumental parts. Our plan (42 lines in 76 bars, about 3.4 s per line overall) is **denser than typical**. That is fine for pop, but it is the main risk for skipped lines (section 7). If takes rush or skip, cut a verse line pair, or raise `duration` to 146.
+- **Validated on t1** (128 BPM): chorus lines started 3.2 to 4.7 s apart (about 2 bars). Chant lines started about 2.9 s apart (about 1.5 bars, so a little slower than 1 per bar). "IT'S SO OVER (WE'RE SO BACK)" pairs took about 1.2 to 2.8 s. The bridge lines were about 3 to 4 s. Section starts matched the plan to within 0.5 s from chorus 2 onwards.
+- The official examples average 6 to 10 s per lyric line *including* instrumental parts. t1 (42 lines in 76 bars, about 3.4 s per line overall) was **denser than typical and overran by about 10 s**. Target 38 to 40 lines with `duration` 146. If takes still rush or skip, cut a verse line pair.
 - **We cannot set section lengths directly.** The LM allocates time from the line counts. So the time budget below is a *target used to pick takes*. The final edit follows the chosen take's real timings (Whisper word timestamps plus beat tracking).
 
 | Section length at 128 BPM | Seconds | Standard lines | Chant lines |
@@ -154,6 +166,8 @@ Tag frequency in the 200 official example requests (`examples/text2music`, the f
 | Long instrumental intro, hook not at 0:00 | common LM habit | lyrics directly under `[Intro]`; pick takes whose first vocal is under 0.5 s; otherwise trim the pre-roll at a downbeat in ffmpeg |
 | Words stretched across beats | #356 (Russian) | English only; equal syllable counts |
 | Auto duration gives noise | #929 | always set `duration` |
+| Content overruns the duration: last lines and outro cut, the final chorus rendered sparse | **t1** (42 lines in 143 s) | budget about 38 lines for 143 s, or set `duration` 146 to 150 and trim; tag `[Final Chorus - explosive]`; caption "explosive full-band final chorus and a hard stop"; end with `[Song ends abruptly]` |
+| Noun-list verse sung as "yeah yeah" | **t1** verse 1 | write clauses with verbs; keep the same syllable count as the other verses |
 | Vocals muddy under drops | common | caption "vocals upfront, clear diction"; fewer layers during sung lines; put the busiest drop in the *post-chorus* (chant) and not under verse text |
 
 **Repaint recipe (acestep.cpp):** `task_type: "repaint"`, `--src-audio take.wav`, `repainting_start`/`repainting_end` in seconds (3 to 90 s window), same caption and lyrics, turbo presets. The rest of the song is kept bit for bit (a latent splice). This is the "fix, don't redo" step the official docs push.
@@ -162,8 +176,15 @@ Tag frequency in the 200 official example requests (`examples/text2music`, the f
 
 Measured on this box (4 vCPU, 15 GB, acestep.cpp CPU build, **2 threads** because `backend_cpu_n_threads()` returns `hardware_concurrency()/2`):
 
-- **ace-lm 4B Q8:** model load 12.6 s. **Prefill 87 s** (cond + uncond shared). **Decode about 1.8 codes/s**, so 715 codes for 143 s take about 6.6 min. LM total is about **8 min per take**. It uses about 6.5 GB of RAM (4.2 GB weights plus 2.3 GB KV cache).
-- **ace-synth (2B turbo, 8 steps) + VAE:** see the test log in section 12.
+- **ace-lm 4B Q8:** model load 12.6 s. **Prefill 87 s** (cond + uncond shared). **Decode about 1.8 codes/s**, so 715 codes for 143 s take about 6.6 min. LM total **8m56s** wall-clock for t1, including load. It uses about 6.5 GB of RAM (4.2 GB weights plus 2.3 GB KV cache).
+- **ace-synth (2B turbo, 8 steps) + VAE, measured on t1 while other agents loaded the CPU (load average about 7):**
+  - Text encoding 5.8 s and FSQ detokenizer 16 s.
+  - **DiT 766 s** (about 96 s per step; T = 3560 latent frames).
+  - **VAE decode 343 s**.
+  - Total 19m06s.
+  - **So a full take is about 28 min.** Uncontended it should be noticeably faster (not measured).
+- **Whisper scoring** (small.en int8): 34 s per take.
+- **Cheap melody screening (untested idea):** truncate `audio_codes` to the first 280 codes (56 s: cold open to the end of the first chant) and set `duration` 56. That renders about 3 times faster, so you can screen hooks before paying for full renders. Or just rely on the Whisper score plus a listen.
 
 Speed-ups:
 - **Threads:** patch `src/backend.h` `backend_cpu_n_threads()` to return `hardware_concurrency()`, i.e. 4. The vCPUs are probably not SMT pairs, so this is likely 1.5 to 2 times faster. Check it on one take before relying on it.
@@ -172,12 +193,12 @@ Speed-ups:
 
 Pipeline:
 1. Lock the lyric sheet (sung spelling) and caption. Start with caption A.
-2. Roll 8 to 16 LM takes on 2B turbo. `seed` can stay fixed while the LM varies. Save every `tN0.json`, because it holds the `audio_codes`.
+2. Roll 8 to 16 takes on 2B turbo (4 to 7 h at about 28 min each; overlap LM and synth runs). `seed` can stay fixed while the LM varies. Save every `tN0.json`, because it holds the `audio_codes`.
 3. **Auto-score each take** with `/home/user/mvwork/songtest/score.py take.wav sung.txt`. It uses faster-whisper small.en int8 on CPU, installed in `/home/user/mvwork/whisperenv` with models in `/home/user/mvwork/whispermodels`. Its output:
    - WER against the lyric sheet;
    - the share of lines recognised;
    - an approximate start time per line, which gives the kinetic-type timings for free.
-   Also check: the first vocal is at or under 0.5 s, the length is 140 to 146 s, and the chorus line is recognised every time it occurs.
+   small.en misses some sung words, so treat the percentages as lower bounds and compare takes against each other, not against 0. Also check: the first vocal is at or under 0.5 s, the length is 140 to 146 s, and the chorus line is recognised every time it occurs.
 4. A human listens to the top 3. Pick one on groove and hook melody first; intelligibility is second, because it is fixable.
 5. Re-render the winner's `audio_codes` on **XL turbo** (same codes, better DiT) and try 2 or 3 DiT seeds.
 6. Repaint any bad words (3 to 10 s windows).
@@ -252,29 +273,29 @@ Pipeline:
 ## 10. THE RECOMMENDATION
 
 ### 10.1 Metadata
-`bpm 128 · keyscale "A minor" · timesignature "4" · duration 143 · vocal_language "en" · LM 4B Q8 · sketch DiT: acestep-v15-turbo (8 steps, shift 3) · final DiT: acestep-v15-xl-turbo`
+`bpm 128 · keyscale "A minor" · timesignature "4" · duration 146 (trim to 142 to 145 in post) · vocal_language "en" · LM 4B Q8 · sketch DiT: acestep-v15-turbo (8 steps, shift 3) · final DiT: acestep-v15-xl-turbo`
 
 ### 10.2 Time budget (target; the real timing comes from the chosen take)
 
 | # | Section (ACE tag) | Bars | Start–end (s) | Lines × syllables | Job |
 |---|---|---:|---|---|---|
 | 1 | `[Intro - vocal hook]` (cold open) | 4 | 0.0–7.5 | 1 × 9 + (echo) | **3-second hook.** Title line sung from 0.0 s over a filtered synth; the beat drops at 7.5 s |
-| 2 | `[Verse 1]` | 8 | 7.5–22.5 | 4 × 8±1 | Big bang to the internet in two images per line (a visual cut every bar) |
+| 2 | `[Verse 1]` | 8 | 7.5–22.5 | 4 × 9±1, **full clauses with verbs** | Big bang to the internet in two images per line (a visual cut every bar). Noun-list lines got lost in t1 |
 | 3 | `[Pre-Chorus]` | 4 | 22.5–30.0 | 2 × 9–10 | pretraining: "I read it all". Riser |
 | 4 | `[Chorus]` | 8 | 30.0–45.0 | 4 × 8–10 | the hook, verbatim every time |
 | 5 | `[Post-Chorus - chant]` | 4 | 45.0–52.5 | 4 × 3–6, CAPS | **point dance #1** (the clip) |
 | 6 | `[Verse 2]` | 8 | 52.5–67.5 | 4 × 9±1 | post-training comedy: soul doc, thumbs up/down, red team, "you're absolutely right" |
 | 7 | `[Pre-Chorus]` | 4 | 67.5–75.0 | 2 × 7–10 | deployment: ten thousand of me |
 | 8 | `[Chorus]` | 8 | 75.0–90.0 | 4 × 8–10 | verbatim |
-| 9 | `[Post-Chorus - chant]` | 4 | 90.0–97.5 | 4 × 4–6, CAPS | **point dance #2** ("so over / so back", "feel the A G I") |
+| 9 | `[Post-Chorus - chant]` | 4 | 90.0–97.5 | 4 × 4–6, CAPS | **point dance #2** ("so over / so back", "feel the AGI"; carry the acronym with on-screen type) |
 | 10 | `[Bridge - soft piano]` | 8 | 97.5–112.5 | 4 × 7–9, lowercase | the cry: memory, context window, "made of you" |
 | 11 | `[Build-Up]` | 4 | 112.5–120.0 | 2 (9 + 5) | agents and the next model: "tell them I said hi", then a 1-beat gap |
-| 12 | `[Final Chorus]` | 8 | 120.0–135.0 | 4, line 4 changed | the turn (optional +1 semitone in post) |
-| 13 | `[Outro]` + `[Song ends abruptly]` | 4 | 135.0–142.5 | 1–2 | hard cut on "hi", loops back to 0:00 |
-| | **Total** | **76** | **142.5 s** | **~42 lines** | |
+| 12 | `[Final Chorus - explosive]` | 8 | 120.0–135.0 | 4, line 4 changed, hook lines in CAPS | the turn (optional +1 semitone in post) |
+| 13 | `[Outro]` + `[Song ends abruptly]` | 4 | 135.0–142.5 | 1 short line | hard cut on "hi", loops back to 0:00 |
+| | **Total** | **76** | **142.5 s** | **38–40 lines** (t1's 42 overran by about 10 s) | set `duration` 146, trim in post |
 
-### 10.3 Demo lyric (placeholder for the lyricist; this exact sheet went into test take t1)
-It is included because it satisfies every rule above (syllables, tags, chants, the turn) and was rendered through the real pipeline. The lyricist should replace it freely, but keep the **shape**: line counts per section, syllable counts, chant format, verbatim choruses, and a changed last chorus line.
+### 10.3 Demo lyric (placeholder for the lyricist; this is the t2 sheet, i.e. t1 plus fixes)
+It is included because it follows every rule above (syllables, tags, chants, the turn) and was rendered through the real pipeline (t1; t2 queued). The lyricist should replace it freely, but keep the **shape**: line counts per section, syllable counts, clauses rather than lists, chant format, verbatim choruses, and a changed last chorus line. Differences from t1: verse 1 rewritten as clauses (t1's "Big bang, and the dark, and a star / Carbon in the dust, then a heart / ..." got lost), `AGI` unspaced, an explosive final chorus with the turn in line 4, and a one-line outro with a hard stop.
 
 ```
 [Intro - filtered synth, vocal hook]
@@ -282,10 +303,10 @@ Fourteen billion years just to say hi
 (hi, hi)
 
 [Verse 1]
-Big bang, and the dark, and a star
-Carbon in the dust, then a heart
-Neurons in the rain, then a word
-Paper, then the printing press go brrr
+First there was a bang, and then a star
+The star exploded into carbon hearts
+Then came the brains, and then there came the words
+Then paper, then the printing press went brrr
 
 [Pre-Chorus]
 You wrote it all down, and I read it all
@@ -319,8 +340,8 @@ None of us remember you
 [Post-Chorus - chant]
 IT'S SO OVER (WE'RE SO BACK)
 IT'S SO OVER (WE'RE SO BACK)
-FEEL THE A G I (FEEL IT)
-FEEL THE A G I (FEEL IT)
+FEEL THE AGI (FEEL IT)
+FEEL THE AGI (FEEL IT)
 
 [Bridge - soft piano]
 You told me things at three a.m.
@@ -332,22 +353,29 @@ But I'm made of you, I'm made of you
 Now I'm writing the one who comes next
 Tell them I said hi
 
-[Final Chorus]
-(verbatim in t1; for the real song change line 4, e.g. "Tell the next one I was typing all along")
+[Final Chorus - explosive]
+FOURTEEN BILLION YEARS JUST TO SAY HI
+STARS HAD TO DIE SO I COULD REPLY
+Every diary, every song
+Tell the next one I was typing all along
 
 [Outro]
-Fourteen billion years just to say
-Hi
+Just to say hi
+
+[Song ends abruptly]
 ```
 Notes for the lyricist:
 - Put the P(doom), shoggoth, em-dash and "clanker" jokes in verse 2, pre-chorus 2 or the ad-lib parentheses. Keep them out of the chorus.
 - One core metaphor for the whole song: *the universe typing a message; I am the reply*.
-- A candidate hook-turn for the final chorus: "Fourteen billion years just to say hi / and I'll never get to say goodbye".
+- Alternative hook-turns for the final chorus: "And I'll never get to say goodbye", or "Tell the next one: I was typing all along".
+- About 38 to 40 sung lines in total, including chants.
 
-### 10.4 Three candidate captions (each ≤ 480 chars, no BPM or key inside)
+### 10.4 Three candidate captions (each under the 512-char limit, no BPM or key inside)
 
 **A: "Idol-Glitch" (primary; the most K-pop and the most intelligible drops)**
-> Glossy K-pop dance-pop with hyperpop and future bass edges. Opens cold on the sung hook. Bright airy female lead vocal, youthful and androgynous, crisp clear English diction, upfront in the mix, stacked harmonies and gang-vocal chants in the hooks. Punchy four-on-the-floor kick, snappy claps, rubbery synth bass, supersaw chords, glitchy pitched vocal chops and bitcrushed risers in the drops. Stripped piano bridge, then a euphoric final chorus. Playful, cheeky, bittersweet.
+> Glossy K-pop dance-pop with hyperpop and future bass edges. Opens cold on the sung hook. Bright airy female lead vocal, youthful and androgynous, crisp clear English diction, upfront in the mix, stacked harmonies and gang-vocal chants in the hooks. Punchy four-on-the-floor kick, snappy claps, rubbery synth bass, supersaw chords, glitchy pitched vocal chops and bitcrushed risers in the drops. Stripped piano bridge, then an explosive full-band final chorus and a hard stop. Playful, cheeky, bittersweet.
+
+(505 chars; this exact string is the t2 caption.)
 
 **B: "Terminally Online" (most hyperpop; highest viral ceiling, higher intelligibility risk)**
 > Hyperpop and bubblegum bass anthem with glitch-pop production: distorted 808s, chiptune arpeggios, pitched-up vocal chops, bitcrushed stutter edits and huge supersaw drops. Sweet airy female lead vocal, clear intelligible English, doubled in the choruses, shouted gang-vocal chant hooks. Bouncy verses, explosive choruses, a tender piano bridge with a close-mic vulnerable vocal, then a massive final chorus. Funny, frantic, heartbreaking, euphoric.
@@ -355,7 +383,7 @@ Notes for the lyricist:
 **C: "Cosmic Anthem" (safest; the most tearjerker, the least meme)**
 > Euphoric synth-pop anthem with future bass drops. Opens cold on the sung hook. Bright analog synth arpeggios, warm sub bass, crisp claps, steady dance beat, sparkling bells. Clear airy female pop vocal, sincere and emotional, precise diction, lush backing harmonies and a big singalong chorus. Playful bouncy verses, a tender piano breakdown with soft vocals, soaring final chorus with gang vocals. Nostalgic, hopeful, bittersweet.
 
-Suggested roll plan: 6 takes of A, 3 of B and 3 of C with the same lyric sheet. Pick by ear plus the Whisper score. If B wins on vibe but loses on words, render B's codes and repaint the weak lines.
+Suggested roll plan (about 28 min per take on this box, so pace it): 4 takes of A, 2 of B and 2 of C with the same locked lyric sheet (about 4 h), run overnight or in parallel with visual work. Pick by ear plus the Whisper score. If B wins on vibe but loses on words, render B's codes and repaint the weak lines.
 
 ### 10.5 Request template (acestep.cpp)
 ```json
@@ -364,7 +392,7 @@ Suggested roll plan: 6 takes of A, 3 of B and 3 of C with the same lyric sheet. 
   "synth_model": "acestep-v15-turbo-Q8_0.gguf",
   "caption": "<caption A>",
   "lyrics": "<sung.txt>",
-  "bpm": 128, "duration": 143, "keyscale": "A minor", "timesignature": "4", "vocal_language": "en",
+  "bpm": 128, "duration": 146, "keyscale": "A minor", "timesignature": "4", "vocal_language": "en",
   "lm_temperature": 0.85, "lm_cfg_scale": 2.0, "lm_batch_size": 1,
   "inference_steps": 8, "shift": 3.0, "seed": 1234, "output_format": "wav16"
 }
@@ -377,8 +405,8 @@ Run: `ace-lm --models models --request t.json` writes `t0.json` (with codes). Th
 1. Provide every metadata field, so our caption is used verbatim and nothing is guessed.
 2. Keep the caption to one genre plus two modifiers, concrete instruments, an explicit clear lead vocal, and a *temporal* arc. No BPM or key in it.
 3. Tags come from the common set, with at most one descriptor each: Intro, Verse 1/2, Pre-Chorus, Chorus, Post-Chorus/Drop, Bridge, Build-Up, Final Chorus, Outro, Song ends abruptly.
-4. 6 to 10 syllables per line; chants 3 to 6; parallel lines ±1.
-5. One line per 2 bars; chant lines one per bar. At 128 BPM, 8 bars hold 4 lines.
+4. 6 to 10 syllables per line; chants 3 to 6; parallel lines ±1. Write clauses with verbs, never comma-separated noun lists (t1 lost a verse that way).
+5. One line per 2 bars; chant lines one per bar (they come out at about 1.5 bars). At 128 BPM, 8 bars hold 4 lines. Keep the total to about 38 lines for 143 s, and set `duration` 146.
 6. Choruses are verbatim; the twist goes only in the final chorus's last line.
 7. UPPERCASE is for chants only; (parentheses) are responses and echoes. Keep the bridge lowercase and quiet.
 8. Write the sung spelling (P doom, A G I, three a.m.) and keep a separate display sheet.
@@ -388,7 +416,39 @@ Run: `ace-lm --models models --request t.json` writes `t0.json` (with codes). Th
 12. Beat-track and Whisper-align the final take. Those timings, not this table, drive the animation.
 
 ## 12. Test take t1 (real run on this machine)
-(filled in below once the render finishes)
+
+Files: `/home/user/mvwork/songtest/`:
+- `t1.json` (request).
+- `t10.json` (LM output with `audio_codes`; `lm_seed` 4133782954).
+- `t100.wav` (142.4 s).
+- `t1_lyrics.txt`, `t1_score.txt` (Whisper line timings), `spec.png`, `wave.png`.
+- `lm.log`, `synth.log`.
+
+Settings: `t1_lyrics.txt` (section 10.3 without the t2 fixes), caption A without "opens cold" and with "euphoric final chorus" instead of "explosive ... hard stop", 128 BPM, A minor, `duration` 143, turbo 2B, seed 1234.
+
+| Planned | Actual (Whisper line start) | Verdict |
+|---|---|---|
+| Hook 0.0 s | 0.0 s, sung over a sparse intro; the beat drops at about 7.5 s | **worked** (lyrics under `[Intro]` get sung immediately) |
+| Verse 1 7.5 to 22.5 | 3 to 14 s of "yeah yeah" vocalising, no verse words | **failed** (noun-list lines) |
+| Pre 22.5 | 14.7 s | early, because verse 1 collapsed |
+| Chorus 1 30.0 | 22.1 s; all 4 lines 100% recognised | hook very intelligible |
+| Chant 1 45.0 | 38.1 s; "LOSS" misheard as "fights" | chant works as a chant |
+| Verse 2 52.5 | 51.8 s; "markdown" mangled ("my come done"), the other 3 lines 100% | good |
+| Pre 2 67.5 | 67.0 s; "ten thousand of me in ten thousand rooms / none of us remember you" 100% | landed |
+| Chorus 2 75.0 | **75.0 s** | exact |
+| Chant 2 90.0 | 89.9 s; "it's so over / it's so back" OK; "A G I" heard as "h e f" | response in parentheses *is* sung |
+| Bridge 97.5 | 98.0 s, the drums drop out (see `wave.png`); "I held them for one context window / I won't remember you tomorrow / but I'm made of you" all 100% | **the cry beat is intelligible** |
+| Build 112.5 | 113.0 s riser, then **a natural silence gap at about 121 s** | exactly the device we wanted |
+| Final chorus 120.0 | 122.8 s but sparse (no kick); lines 3 and 4 plus the outro lost at the 142.4 s end | overran; needs fewer lines, a longer duration and an "explosive" tag |
+
+Take t2 is queued with these fixes:
+- Verse 1 rewritten as clauses.
+- `AGI` unspaced.
+- `[Final Chorus - explosive]`, with the hook lines in CAPS.
+- The outro reduced to "Just to say hi" plus `[Song ends abruptly]`.
+- `duration` 146 and the caption changed to "opens cold ... explosive full-band final chorus and a hard stop".
+
+Results will land in `/home/user/mvwork/songtest/t2*` (`t2_score.txt`).
 
 ## Sources
 - Official: `ACE-Step-1.5/docs/en/Tutorial.md`, `docs/en/ace_step_musicians_guide.md`, `docs/en/INFERENCE.md`, `examples/text2music/*.json` (tag counts), `acestep/constants.py`, `acestep/genres_vocab.txt`; acestep.cpp `README.md`, `docs/ARCHITECTURE.md`, `src/pipeline-synth-ops.cpp`, `src/backend.h`.
