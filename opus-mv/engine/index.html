@@ -1,0 +1,100 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Opus Music Video</title>
+<link rel="stylesheet" href="fonts/fonts.css">
+<style>
+  html, body { margin: 0; height: 100%; background: #0d0b0a; overflow: hidden; }
+  #stage { position: fixed; inset: 0; display: grid; place-items: center; }
+  canvas { display: block; max-width: 100vw; max-height: 100vh; aspect-ratio: 16/9; }
+  #ui { position: fixed; left: 0; right: 0; bottom: 0; padding: 10px 16px; display: flex; gap: 12px; align-items: center;
+        font: 13px/1.2 ui-monospace, monospace; color: #f4efe6; background: linear-gradient(transparent, rgba(0,0,0,.6)); opacity: 0; transition: opacity .3s; }
+  body:hover #ui, #ui.show { opacity: 1; }
+  #ui button { background: #f4efe6; color: #111; border: 0; padding: 6px 12px; font: inherit; cursor: pointer; }
+  #scrub { flex: 1; accent-color: #e8603c; }
+  #play { position: fixed; inset: 0; display: grid; place-items: center; background: rgba(13,11,10,.55); color: #f4efe6; font: 600 22px/1.3 ui-sans-serif, system-ui; cursor: pointer; text-align: center; }
+  body.render #ui, body.render #play { display: none; }
+</style>
+</head>
+<body>
+<div id="stage"><canvas id="c" width="1920" height="1080"></canvas></div>
+<div id="play">&#9654; play (sound on)</div>
+<div id="ui"><button id="pp">pause</button><span id="tc">0:00.0</span><input id="scrub" type="range" min="0" max="1000" value="0"><span id="sec"></span></div>
+<audio id="audio" preload="auto"></audio>
+<script src="../audio/timeline.js"></script>
+<script src="core.js"></script>
+<script src="gfx.js"></script>
+<script src="type.js"></script>
+<script src="manifest.js"></script>
+<script>
+(async () => {
+  const q = new URLSearchParams(location.search);
+  const MODE = q.get('mode') || 'live';
+  const scale = +(q.get('scale') || 1);
+  if (MODE === 'render') document.body.classList.add('render');
+  // song timing
+  const T = window.TIMELINE || {};
+  Object.assign(SONG, { bpm: T.bpm || 120, offset: T.offset || 0, duration: T.duration || 140, beats: T.beats || null,
+    barPhase: T.barPhase || 0, sections: T.sections || [], words: T.words || [], lines: T.lines || [] });
+  // load scene scripts listed in manifest.js (window.MANIFEST = [...paths])
+  for (const src of (window.MANIFEST || [])) await new Promise((res, rej) => { const s = document.createElement('script'); s.src = src; s.onload = res; s.onerror = () => { console.error('failed ' + src); res(); }; document.body.appendChild(s); });
+  await document.fonts.ready;
+  for (const f of (window.FONT_PRELOAD || [])) { try { await document.fonts.load(f); } catch (e) { console.error('font', f, e); } }
+  const C = document.getElementById('c');
+  gfxInit(C, scale);
+  window.CANVAS = C;
+  G.frameId = 0;
+  if (window.STYLE_INIT) await window.STYLE_INIT();
+
+  window.renderAt = (t, opt = {}) => {
+    G.t = t; G.frameId++; G.post = {};
+    const X = G.X;
+    X.setTransform(G.scale, 0, 0, G.scale, 0, 0);
+    X.globalAlpha = 1; X.globalCompositeOperation = 'source-over'; X.filter = 'none';
+    const active = scenesAt(t);
+    if (!active.length) { X.fillStyle = '#f3ede2'; X.fillRect(0, 0, W, H); }
+    for (const s of active) {
+      X.save();
+      try { s.fn(X, t, t - s.t0, s.t1 - s.t0, s); } catch (e) { console.error(`scene ${s.name} @${t.toFixed(2)}: ${e.stack || e}`); }
+      X.restore();
+      X.setTransform(G.scale, 0, 0, G.scale, 0, 0); X.globalAlpha = 1; X.globalCompositeOperation = 'source-over'; X.filter = 'none';
+    }
+    if (window.OVERLAY) { X.save(); try { window.OVERLAY(X, t); } catch (e) { console.error('overlay', e.stack || e); } X.restore(); }
+    finish(X);
+    if (opt.label) {
+      X.save(); X.setTransform(G.scale, 0, 0, G.scale, 0, 0);
+      const sec = sectionAt(t), nm = active.map(s => s.name).join('+');
+      X.font = '600 28px monospace'; X.fillStyle = 'rgba(0,0,0,.72)'; X.fillRect(0, 0, 760, 40);
+      X.fillStyle = '#fff'; X.fillText(`${t.toFixed(2)}s  b${beatPos(t).toFixed(1)}  ${sec ? sec.name : ''}  ${nm}`.slice(0, 52), 10, 29); X.restore();
+    }
+  };
+  window.READY = true;
+
+  if (MODE !== 'live') return;
+  // ---- live player: audio clock drives the frame
+  const A = document.getElementById('audio');
+  A.src = q.get('audio') || (T.audio || '../audio/song.mp3');
+  const scrub = document.getElementById('scrub'), tc = document.getElementById('tc'), secEl = document.getElementById('sec'), pp = document.getElementById('pp');
+  const playEl = document.getElementById('play');
+  let tNow = +(q.get('t') || 0); A.currentTime = tNow;
+  const fmt = s => `${Math.floor(s / 60)}:${(s % 60).toFixed(1).padStart(4, '0')}`;
+  playEl.onclick = () => { A.play(); playEl.style.display = 'none'; };
+  pp.onclick = () => { if (A.paused) A.play(); else A.pause(); };
+  A.onplay = () => pp.textContent = 'pause'; A.onpause = () => pp.textContent = 'play';
+  A.onended = () => { playEl.style.display = 'grid'; playEl.innerHTML = '&#8635; replay'; };
+  scrub.oninput = () => { A.currentTime = scrub.value / 1000 * (A.duration || SONG.duration); };
+  addEventListener('keydown', e => { if (e.code === 'Space') { e.preventDefault(); pp.onclick(); } if (e.code === 'ArrowRight') A.currentTime += 5; if (e.code === 'ArrowLeft') A.currentTime -= 5; });
+  const loop = () => {
+    tNow = A.currentTime;
+    renderAt(tNow);
+    const d = A.duration || SONG.duration;
+    scrub.value = Math.round(tNow / d * 1000); tc.textContent = fmt(tNow); const s = sectionAt(tNow); secEl.textContent = s ? s.name : '';
+    requestAnimationFrame(loop);
+  };
+  loop();
+})();
+</script>
+</body>
+</html>
