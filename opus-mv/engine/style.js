@@ -160,8 +160,12 @@ function printPass(X) {
   const lift = clamp(P.lift || 0);
   if (ground === 'paper' && !lift) return;
   // margin overlay: paper outside the flood, CLAY underprint sliver
-  const L = layer('_printmargin');
   const inset = ground === 'paper' ? W : PRINT.margin + E.in2(lift) * (H / 2 + 20);
+  // perf (hook agent): the static margin (no lift) is cached as a CPU canvas; rebuilding it through the
+  // swiftshader-backed layers cost ~500 ms per INK frame. Output is identical.
+  const ckey = !lift && `${inset}|${P.edgeSeed || 1}|${P.sliver || 'bl'}|${G.scale}`;
+  if (ckey && PRINT.cache && PRINT.cache.has(ckey)) { X.save(); X.setTransform(1, 0, 0, 1, 0, 0); X.drawImage(PRINT.cache.get(ckey), 0, 0); X.restore(); return; }
+  const L = layer('_printmargin');
   L.fillStyle = C.PAPER; L.fillRect(0, 0, W, H);
   L.globalCompositeOperation = 'destination-out';
   if (floodPath(L, inset, P.edgeSeed || 1, 3)) L.fill();
@@ -172,6 +176,11 @@ function printPass(X) {
   U.fillStyle = C.CLAY; if (floodPath(U, inset, P.edgeSeed || 1, 3, sl)) U.fill();
   U.globalCompositeOperation = 'destination-out'; if (floodPath(U, inset, P.edgeSeed || 1, 3)) U.fill(); U.globalCompositeOperation = 'source-over';
   drawLayer(L, '_printunder', { op: 'source-over', alpha: .9 });
+  if (ckey) {
+    const src = layerCanvas('_printmargin'), c = new OffscreenCanvas(src.width, src.height);
+    c.getContext('2d', { willReadFrequently: true }).drawImage(src, 0, 0);
+    (PRINT.cache = PRINT.cache || new Map()).set(ckey, c);
+  }
   drawLayer(X, '_printmargin');
 }
 // replaces gfx finish(): print margin, grain (static on INK, boil on PAPER), paper texture multiply

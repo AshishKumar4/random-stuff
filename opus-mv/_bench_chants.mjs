@@ -1,0 +1,20 @@
+import { chromium } from 'playwright';
+import path from 'node:path'; import fs from 'node:fs';
+import { pathToFileURL } from 'node:url';
+const ROOT = process.cwd();
+let exe; for (const d of fs.readdirSync('/opt/pw-browsers').sort().reverse()) { const p = path.join('/opt/pw-browsers', d, 'chrome-linux', 'chrome'); if (d.startsWith('chromium-') && fs.existsSync(p)) { exe = p; break; } }
+const b = await chromium.launch({ executablePath: exe, args: ['--allow-file-access-from-files','--enable-unsafe-swiftshader','--use-angle=swiftshader'] });
+const p = await b.newPage({ viewport: { width: 1920, height: 1080 } });
+await p.goto(pathToFileURL(path.join(ROOT, 'engine/index.html')).href + '?mode=render&scenes=scenes/chants.js');
+await p.waitForFunction(() => window.READY === true);
+const r = await p.evaluate(() => {
+  const out = [];
+  for (const t of [44, 46.5, 47.3, 49.9, 51.9, 94.4, 95.6, 96.8, 44]) {
+    let best = 1e9;
+    for (let i = 0; i < 3; i++) { const a = performance.now(); renderAt(t + i / 30); window.CANVAS.toDataURL('image/jpeg', .94); best = Math.min(best, performance.now() - a); }
+    out.push(`${t}:${best | 0}`);
+  }
+  return out.join('  ');
+});
+console.log(r);
+await b.close();
