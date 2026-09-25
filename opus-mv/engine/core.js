@@ -109,3 +109,19 @@ function scenesAt(t) { return SCENES.filter(s => t >= s.t0 && t < s.t1); }
 
 Object.assign(window, { TAU, clamp, lerp, invlerp, remap, frac, seg, smooth, E, spring, kf, hash, hash2, hash3, hs, rng, noise1, noise2, fbm, wob, boilT, jit, hex2rgb, rgb2hex, mix, rgba, SONG, beatPos, beatN, beatTime, barPos, pulse, pulseBar, onBeatSince, sectionAt, wordsIn, lineAt, lineById, SCENES, scene, scenesAt });
 Object.defineProperty(window, 'BOIL_FPS', { get: () => BOIL_FPS, set: v => { BOIL_FPS = v; } });
+
+// ---- lyric lookup by text (robust to timeline updates). Returns onset time of the first word
+// matching `text` (case-insensitive, punctuation ignored) whose onset lies in [t0, t1]; else fallback.
+const _norm = s => (s || '').toLowerCase().replace(/[^a-z0-9가-힣]+/g, '');
+function findWord(text, t0, t1, fallback) {
+  const n = _norm(text);
+  for (const w of SONG.words) if (w.s >= t0 - .01 && w.s <= t1 && (_norm(w.w) === n || _norm(w.d) === n)) return w;
+  return fallback !== undefined ? { w: text, s: fallback, e: fallback + .4, fallback: true } : null;
+}
+const wordOnset = (text, t0, t1, fallback) => { const w = findWord(text, t0, t1, fallback); return w ? w.s : fallback; };
+function findLine(prefix, t0, t1) {
+  const n = _norm(prefix);
+  for (const L of SONG.lines) if (L.s >= t0 - .01 && L.s <= t1 && _norm(L.text).startsWith(n)) return L;
+  return null;
+}
+Object.assign(window, { findWord, wordOnset, findLine });

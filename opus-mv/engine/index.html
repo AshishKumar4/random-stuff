@@ -27,6 +27,9 @@
 <script src="core.js"></script>
 <script src="gfx.js"></script>
 <script src="type.js"></script>
+<script src="style.js"></script>
+<script src="opus.js"></script>
+<script src="ui.js"></script>
 <script src="manifest.js"></script>
 <script>
 (async () => {
@@ -62,7 +65,7 @@
       X.setTransform(G.scale, 0, 0, G.scale, 0, 0); X.globalAlpha = 1; X.globalCompositeOperation = 'source-over'; X.filter = 'none';
     }
     if (window.OVERLAY) { X.save(); try { window.OVERLAY(X, t); } catch (e) { console.error('overlay', e.stack || e); } X.restore(); }
-    finish(X);
+    (window.finishStyle || finish)(X);
     if (opt.label) {
       X.save(); X.setTransform(G.scale, 0, 0, G.scale, 0, 0);
       const sec = sectionAt(t), nm = active.map(s => s.name).join('+');

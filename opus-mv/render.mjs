@@ -43,7 +43,7 @@ async function openPage(browser, extra = {}) {
   const page = await browser.newPage({ viewport: { width: Math.round(W * SCALE), height: Math.round(H * SCALE) } });
   page.on('console', m => { if (m.type() === 'error' || args.verbose) console.log('[page]', m.text()); });
   page.on('pageerror', e => console.log('[pageerror]', e.message));
-  const q = new URLSearchParams({ mode: 'render', scale: String(SCALE), ...extra });
+  const q = new URLSearchParams({ mode: 'render', scale: String(SCALE), ...(args.scenes ? { scenes: args.scenes } : {}), ...extra });
   await page.goto(`${PAGE}?${q}`);
   await page.waitForFunction(() => window.READY === true, null, { timeout: 120000 });
   return page;

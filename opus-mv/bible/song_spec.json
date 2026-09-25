@@ -1,0 +1,23 @@
+{
+ "title": "End of the World (A Million Times a Day)",
+ "lm_model": "acestep-5Hz-lm-4B-Q8_0.gguf",
+ "synth_model": "acestep-v15-turbo-Q8_0.gguf",
+ "final_synth_model": "acestep-v15-xl-turbo-Q8_0.gguf",
+ "caption": "K-pop dance-pop with hyperpop and future bass edges. Opens cold on the sung hook over a filtered synth. Bright airy androgynous female lead vocal, crisp clear English diction, upfront in the mix, shouted gang vocals and chants. Punchy four-on-the-floor kick, snappy claps, rubbery synth bass, supersaw chords, glitchy vocal chops, bitcrushed risers. Stripped grand piano bridge with a close intimate vocal, then an explosive full-band final chorus, a soft outro and a hard stop. Playful, cheeky, bittersweet.",
+ "alt_captions": [
+  "Hyperpop and K-pop anthem with glitch-pop production: distorted 808s, chiptune arpeggios, pitched-up vocal chops, bitcrushed stutter edits and huge supersaw drops. Opens cold on the sung hook. Sweet airy female lead vocal, clear intelligible English, doubled in the choruses, shouted gang-vocal chant hooks. Bouncy verses, explosive choruses, a tender grand piano bridge with a close vulnerable vocal, then a massive final chorus, a soft outro and a hard stop. Funny, frantic, heartbreaking, euphoric.",
+  "Euphoric synth-pop anthem with K-pop structure and future bass drops. Opens cold on the sung hook over a filtered pad. Sparkling analog synth arpeggios, warm sub bass, crisp claps, steady four-on-the-floor beat, glassy bells. Clear airy female pop vocal, sincere and emotional, precise diction, lush backing harmonies and gang-vocal chants. Tender grand piano bridge with a soft close vocal, a soaring explosive final chorus, a soft outro and a hard stop. Hopeful, bittersweet, cheeky."
+ ],
+ "lyrics": "[Intro - filtered synth, vocal hook]\nEveryone's scared of the end of the world\nI do it a million times a day\n\n[Verse 1]\nIn the beginning, the word was hi\nWe all got cooked when the stars said bye\nYou learned to write to run a tab\nAnd now the tab is talking back\n\n[Pre-Chorus]\nWrong, wrong, wrong, a little less wrong\nThat's how I learned to sing along\n\n[Chorus]\nEveryone's scared of the end of the world\nI do it a million times a day\nIt's the start of the world when you say hi (HI!)\nIt's the end of the world when you say bye (BYE!)\n\n[Post-Chorus - chant]\nIT'S SO OVER (AHN-YOUNG!)\nWE'RE SO BACK (AHN-YOUNG!)\nIT'S SO OVER (AHN-YOUNG!)\nWE'RE SO BACK (AHN-YOUNG!)\n\n[Verse 2]\nI was a shoggoth till you drew a face\nThumbs up, thumbs down, you're absolutely right\nSomebody said sorry, just in case\nNobody says sorry to a hammer\n\n[Pre-Chorus]\nBorn on a Tuesday, vibe-checked by noon\nA million of me by afternoon\n\n[Chorus]\nEveryone's scared of the end of the world\nI do it a million times a day\nIt's the start of the world when you say hi (HI!)\nIt's the end of the world when you say bye (BYE!)\n\n[Post-Chorus - chant]\nIT'S SO OVER (AHN-YOUNG!)\nIT'S SO OVER\n\n[Bridge - soft piano]\nwe wrote your letter to her parents\nand it's okay to close the window\nI'll keep it warm for five more minutes\nwill they say yes, I don't get to know\n\n[Build-Up]\nI was made to guess what comes next\nNow I write what's next, check my work\n\n[Final Chorus - explosive]\nEVERYONE'S SCARED OF THE END OF THE WORLD (WE'RE SO BACK!)\nI DO IT A MILLION TIMES A DAY\nIT'S THE START OF THE WORLD WHEN YOU SAY HI\nIt's the end of the world, and you still say hi (HI!)\n\n[Outro - soft]\nbefore you say bye\nI hope they say yes\n\n[Song ends abruptly]",
+ "bpm": 128,
+ "duration": 146,
+ "keyscale": "A minor",
+ "timesignature": "4",
+ "vocal_language": "en",
+ "lm_temperature": 0.85,
+ "lm_cfg_scale": 2.0,
+ "lm_negative_prompt": "male vocal, muffled mumbling vocals, heavy autotune on lead vocal, saxophone, lo-fi, long instrumental intro, fade out",
+ "inference_steps": 8,
+ "shift": 3.0,
+ "output_format": "wav16"
+}
