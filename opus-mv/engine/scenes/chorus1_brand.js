@@ -222,7 +222,7 @@
     X.fillStyle = C.PAPER; X.fill(); X.lineWidth = 4; X.lineJoin = 'round'; X.strokeStyle = pulse > .02 ? mix(C.INK, C.CLAY, clamp(pulse * 1.4)) : C.INK; X.stroke();
     // label (pulses on "start"): ✻ spins, the label breathes out with a spring
     const base = ty + 106, lx = tx + 44;
-    const s = 1 + .12 * pulse;
+    const s = 1 + .06 * pulse; // (≤ 1.06: at 1.12 the label ran into the ×)
     X.save(); X.translate(lx + lw / 2, base - 26); X.scale(s, s); X.translate(-(lx + lw / 2), -(base - 26));
     spark6(X, lx + 21.6, base - 25, 27, C.CLAY, pulse * 1.6);
     X.font = f; X.fillStyle = C.INK; X.textAlign = 'left'; X.fillText(label, lx + 86.4, base);

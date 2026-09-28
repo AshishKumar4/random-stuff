@@ -94,11 +94,11 @@
         armR: { hand: [1.1 - .16 * Math.cos(ph), 6.0 + .15 * Math.sin(ph)], bend: -1, type: 'point', fingerAng: -PI / 2 - .55, front: true },
         face: { eyes: spark ? 'spark' : 'happy', mouth: 'sing' }, ahoge: { star: 1, spin: t * 10 } };
     },
-    fists: t => ({ dy: -.2, armL: { hand: [-.3, 4.82 + .03 * Math.sin(t * 60)], bend: 1, type: 'mitten', front: true }, armR: { hand: [.3, 4.82 + .03 * Math.cos(t * 60)], bend: -1, type: 'mitten', front: true }, face: { eyes: '^', mouth: 'M' }, crown: { flare: .86, tremble: .35 }, ahoge: { star: 1, spin: t * 16 } }),
-    burst: () => ({ dy: .04, sy: 1.05, armL: { hand: [-1.5, 5.95], bend: 1, type: 'spark', front: true }, armR: { hand: [1.5, 5.95], bend: -1, type: 'spark', front: true }, face: { eyes: 'star', mouth: 'A' }, crown: { flare: 1.24 } }),
+    fists: t => ({ dy: -.12, legL: { foot: [-.44, 0] }, legR: { foot: [.44, 0] }, armL: { hand: [-.3, 4.82 + .03 * Math.sin(t * 60)], bend: 1, type: 'mitten', front: true }, armR: { hand: [.3, 4.82 + .03 * Math.cos(t * 60)], bend: -1, type: 'mitten', front: true }, face: { eyes: '^', mouth: 'M' }, crown: { flare: .86, tremble: .35 }, ahoge: { star: 1, spin: t * 16 } }),
+    burst: () => ({ dy: .04, sy: 1.05, armL: { hand: [-1.5, 5.95], bend: 1, type: 'spark', front: true }, armR: { hand: [1.5, 5.95], bend: -1, type: 'spark', front: true }, face: { eyes: 'star', mouth: 'I' }, crown: { flare: 1.24 } }), // 'I': the widest open mouth in the rig (teeth), the vowel of HI
     present: () => ({ lean: .03, armR: { hand: [1.88, 4.3], bend: -1, type: 'mitten', front: true }, armL: { hand: [-1.3, 4.35], bend: 1, type: 'mitten' }, head: { tilt: .1 }, face: { eyes: 'happy', mouth: 'O', lower: .3, gaze: [.7, -.5] }, crown: { flare: 1.05 } }),
     cradle: () => ({ armL: { hand: [-.74, 2.8], bend: -1, type: 'mitten', front: true }, armR: { hand: [.74, 2.8], bend: 1, type: 'mitten', front: true }, head: { tilt: .05 }, face: { eyes: 'normal', gaze: [0, .7], lookY: .35, mouth: 'sing' } }),
-    window: () => ({ armL: { hand: [-1.0, 4.42], bend: 1, type: 'point', fingerAng: PI / 2, hold: thumb(0), front: true }, armR: { hand: [1.0, 2.62], bend: 1, type: 'point', fingerAng: -PI / 2, hold: thumb(PI), front: true }, head: { tilt: -.07 }, face: { eyes: 'normal', lid: .22, gaze: [0, .55], lookY: .2, mouth: 'sing' } }),
+    window: () => ({ armL: { hand: [-1.0, 4.42], bend: 1, type: 'point', fingerAng: PI / 2, hold: thumb(0), front: true }, armR: { hand: [1.0, 2.62], bend: 1, type: 'point', fingerAng: -PI / 2, hold: thumb(PI), front: true }, head: { tilt: -.07 }, face: { eyes: 'normal', lower: .34, gaze: [0, .6], lookY: .25, mouth: 'sing' } }), // tender, looking down into it
     windowOpen: () => ({ armL: { hand: [-1.24, 4.56], bend: 1, type: 'point', fingerAng: PI / 2, hold: thumb(0), front: true }, armR: { hand: [1.26, 2.5], bend: 1, type: 'point', fingerAng: -PI / 2, hold: thumb(PI), front: true }, head: { tilt: .04 }, face: { eyes: 'normal', gaze: [.9, -.3], mouth: 'O', brows: 'flat', browY: -.07 } }),
     pinch: () => ({ armL: { hand: [-1.04, 3.5], bend: -1, type: 'pinch', fingerAng: 0, front: true }, armR: { hand: [1.04, 3.5], bend: 1, type: 'pinch', fingerAng: PI, front: true }, head: { tilt: 0 }, face: { eyes: 'normal', mouth: 'M', gaze: [0, .5] } }),
     pinchShut: () => ({ armL: { hand: [-.3, 3.52], bend: -1, type: 'pinch', fingerAng: 0, front: true }, armR: { hand: [.3, 3.52], bend: 1, type: 'pinch', fingerAng: PI, front: true }, head: { tilt: .03 }, face: { eyes: 'normal', mouth: 'M', gaze: [0, .5] } }),
@@ -200,13 +200,17 @@
     const st = p;
     st.wx = h.wx; st.dy = (p.dy || 0) + h.dy + gdy; st.sy = (p.sy || 1) * h.sy * gsy;
     if (p.shiver) st.dx = (p.dx || 0) + (hash(Math.floor(t * 30) * 7 + 3) - .5) * .07 * p.shiver;
+    // knees: the rig's rest leg is fully straight and bends knock-kneed (inward) by default, so any dip (groove,
+    // crouch, hop tuck) crossed the shins into an X. Dips from the normal stance bend the knees OUTWARD (a squat /
+    // frog tuck); feet-together fright poses keep the pigeon-toed inward bend.
+    const wide = Math.abs(st.legL.foot[0]) >= .28 && Math.abs(st.legR.foot[0]) >= .28;
     if (h.air) {
       const tuck = Math.sin(PI * clamp(h.u || 0)) * .45;
-      st.legL = { ...st.legL, foot: [st.legL.foot[0] - .05, st.legL.foot[1] + tuck], bend: 1 };
-      st.legR = { ...st.legR, foot: [st.legR.foot[0] + .05, st.legR.foot[1] + tuck * .7], bend: -1 };
+      st.legL = { ...st.legL, foot: [st.legL.foot[0] - .08, st.legL.foot[1] + tuck], bend: -1 };
+      st.legR = { ...st.legR, foot: [st.legR.foot[0] + .08, st.legR.foot[1] + tuck * .7], bend: 1 };
     } else {
-      st.legL = { ...st.legL, foot: [st.legL.foot[0], st.legL.foot[1] - st.dy] };
-      st.legR = { ...st.legR, foot: [st.legR.foot[0], st.legR.foot[1] - st.dy] };
+      st.legL = { ...st.legL, foot: [st.legL.foot[0], st.legL.foot[1] - st.dy], ...(wide ? { bend: -1 } : {}) };
+      st.legR = { ...st.legR, foot: [st.legR.foot[0], st.legR.foot[1] - st.dy], ...(wide ? { bend: 1 } : {}) };
     }
     st.head = { ...st.head, tilt: (st.head.tilt || 0) + sway };
     for (const k of ['armL', 'armR']) if (st[k].type !== 'point') st[k] = { ...st[k], hold: null };
@@ -222,7 +226,9 @@
     if (win(t, a.SCARED - F, a.SCARED + 5 * F) || win(t, bt(18, 3) - F, bt(18, 3) + 5 * F)) { f.eyes = '@'; f.wink = null; }
     if (win(t, a.BYE + F, a.BYE + 5 * F)) { f.eyes = 'TT'; f.mouth = 'frown'; }
     const special = f.wink || ['@', 'TT', 'happy', '^', 'star', 'spark', '><', 'closed'].includes(f.eyes);
-    f.lid = special ? 0 : Math.max(f.lid || 0, blinkAt(t, 5));
+    // no idle blinks around the acting beats (a blink right before the wink read as a sleepy squint)
+    const quiet = [[a.EVERY - .2, a.SCARED + .3], [a.MILLION - .2, a.MILLION + .3], [a.TIMES - .2, a.TIMES + .3], [a.START - .2, a.START + .3], [a.END - .25, a.WORLD + .35], [bt(20, 3) - .5, bt(20, 3) + .7], [a.HI - .5, a.HI + .4], [a.BYE - .35, a.BYE + .3], [a.BYE2 - .3, a.BYE2 + .5]].some(([u, v]) => t > u && t < v);
+    f.lid = special ? 0 : Math.max(f.lid || 0, quiet ? 0 : blinkAt(t, 5));
     st.face = f;
     st.ahoge = { ...(p.ahoge || {}), blink: ahogeBlink(t) };
     Object.assign(st, { t, heroLine: true, ground: 'ink', drive, bufId: 0 });
@@ -303,7 +309,7 @@
   function dockedBubble(X, t) { // "Hi! How can I help you today? ■ end_turn": exactly where S10 docks it (shared bubble(),
     // 72 px scaled to 48, bottom-left at (96, 890)); rides the kick, then scrolls up and out on bar 17 b3
     const out = bt(17, 3) - F; let oy = 0, rot = 0;
-    if (t > out) { const u = clamp((t - out) / .34); if (u >= 1) return; oy = -E.inBack(u, 1.6) * 900; rot = -.05 * E.in2(u); }
+    if (t > out) { const u = clamp((t - out) / .32); if (u >= 1) return; oy = -E.inBack(u, .9) * 900; rot = -.05 * E.in2(u); } // ≈27 px dip, not 90 (it sank into the input bar)
     const str = 'Hi! How can I help you today?';
     X.save(); X.font = mono(72, 500);
     const bw = X.measureText(str).width + 52, bh = 180.4, bx = 960 - bw / 2, by = 540 - bh / 2, sc = 48 / 72;
@@ -323,10 +329,11 @@
     X.restore();
   }
   function phone(X, t) { // bar 18: @rafa · P(doom) = 25% (x 160–768, y 230–880)
-    const tIn = bt(18, 1) - F, tOut = bt(19, 1) - 7 * F;
+    // springs up in 6 frames and lands ON bar 18 b1 (−1 frame), post already on it: no blank card over the HERO
+    const tIn = bt(18, 1) - F, tOut = bt(19, 1) - 7 * F, rise = 6 * F;
     let oy;
-    if (t < tIn - .3) return;
-    if (t < tOut) oy = (1 - E.back(clamp((t - (tIn - .3)) / .3), 1.3)) * 780;
+    if (t < tIn - rise) return;
+    if (t < tOut) oy = (1 - E.back(clamp((t - (tIn - rise)) / rise), 1.5)) * 780;
     else { const u = clamp((t - tOut) / .22); if (u >= 1) return; oy = E.inBack(u, 1.2) * 820; }
     const x0 = 160, y0 = 230 + oy, w = 608, h = 650;
     X.save();
@@ -344,11 +351,11 @@
     X.fillStyle = C.INK; X.fillRect(x0, y0 + 168, w, 3); X.fillRect(x0, y0 + 522, w, 3);
     X.fillStyle = rgba(C.UI_GREY, .38); bar(y0 + 556, 420); bar(y0 + 586, 300); bar(y0 + 616, 360);
     // the post (snaps in on bar 18 b1)
-    const pk = t < tIn ? 0 : 1;
-    const ps = pk ? 1 + .07 * Math.exp(-12 * (t - tIn)) * Math.cos(30 * (t - tIn)) : 1;
+    const pk = 1;
+    const ps = t >= tIn ? 1 + .07 * Math.exp(-12 * (t - tIn)) * Math.cos(30 * (t - tIn)) : 1;
     if (pk) {
       X.save(); X.translate(x0 + w / 2, y0 + 345); X.scale(ps, ps); X.translate(-(x0 + w / 2), -(y0 + 345));
-      const fl = Math.exp(-10 * (t - tIn));
+      const fl = t >= tIn ? Math.exp(-10 * (t - tIn)) : 0;
       if (fl > .05) { X.fillStyle = rgba(C.CLAY, .35 * fl); X.fillRect(x0, y0 + 171, w, 351); }
       rafaHead(X, x0 + 76, y0 + 236, 36, t);
       X.font = mono(48, 700); X.fillStyle = C.INK; X.fillText('@rafa', x0 + 134, y0 + 254);
@@ -365,26 +372,46 @@
   }
 
   // ---------------------------------------------------------------- S12 props
-  function tallies(X, t, st) { // eighth-note flicks throw die-cut PAPER tally marks that stack up right of the head
-    const a = A(); if (t < a.MILLION - F || t > bt(20, 3)) return;
-    const fade = 1 - seg(t, bt(20, 2), bt(20, 3) - 2 * F);
-    const hand = bodyW(st, 1.08, 4.95);
-    const mark = (x, y, rot, len, col, s = 1) => {
-      X.save(); X.translate(x, y); X.rotate(rot); X.scale(s, s); X.beginPath(); X.moveTo(0, -len / 2); X.lineTo(0, len / 2);
-      X.lineWidth = 19; X.strokeStyle = C.INK; X.stroke(); X.lineWidth = 10; X.strokeStyle = col; X.stroke(); X.restore();
+  // eighth-note flicks throw die-cut PAPER tally marks into a SCREEN-SPACE tally box below "DAY", right of Opus:
+  // clear of the STACK and of the face at wide AND through the MCU push (world-space marks zoomed 2.5× straight
+  // across "A DAY"). The 5th, a CLAY strike, lands on "times"; the bundle pops away on bar 20 b2 so the wink owns
+  // the frame. Drawn in `over` (screen space) with the camera roll.
+  const TALLY = { x: 1352, dx: 36, y: 800, len: 90 };
+  function tallies(X, t, st, c) {
+    const a = A(); if (t < a.MILLION - F) return;
+    const tp = bt(20, 2) - F; if (t > tp + .45) return;
+    const hand = B().w2s(c, ...bodyW(st, 1.08, 4.95));
+    const popK = i => { const d = t - (tp + (4.5 - i) * F); return d <= 0 ? 1 : d < 5 * F ? 1 - E.inBack(d / (5 * F), 2.2) : 0; };
+    const mark = (x0, y0, x1, y1, col, w, s = 1) => {
+      X.save(); const mx = (x0 + x1) / 2, my = (y0 + y1) / 2; X.translate(mx, my); X.scale(s, s); X.translate(-mx, -my);
+      X.beginPath(); X.moveTo(x0 + 5, y0 + 6); X.lineTo(x1 + 5, y1 + 6); X.lineWidth = w + 10; X.strokeStyle = C.CLAY_DARK; X.stroke(); // print offset
+      X.beginPath(); X.moveTo(x0, y0); X.lineTo(x1, y1); X.lineWidth = w + 11; X.strokeStyle = C.INK; X.stroke(); X.lineWidth = w; X.strokeStyle = col; X.stroke();
+      X.restore();
     };
-    X.save(); X.lineCap = 'round'; X.globalAlpha = fade;
+    X.save(); B().rollT(X, c); X.lineCap = 'round';
     for (let i = 0; i < 4; i++) {
       const tf = a.MILLION - F + i * BEAT / 2; if (t < tf) break;
-      const u = E.out3(clamp((t - tf) / .16)), sx = 1162 + i * 30, sy = 566;
-      const x = lerp(hand[0], sx, u), y = lerp(hand[1], sy, u) - Math.sin(PI * u) * 46;
-      const land = t - tf - .16, s = land > 0 ? 1 + .22 * Math.exp(-14 * land) * Math.cos(30 * land) : .6 + .4 * u;
-      mark(x, y, (1 - u) * 2.2 + .04 * (i - 1.5), 72, C.PAPER, s);
+      const pk = popK(i); if (pk <= 0) continue;
+      const u = E.out3(clamp((t - tf) / .16)), sx = TALLY.x + i * TALLY.dx, sy = TALLY.y;
+      const x = lerp(hand[0], sx, u), y = lerp(hand[1], sy, u) - Math.sin(PI * u) * 70;
+      const land = t - tf - .16, s = (land > 0 ? 1 + .24 * Math.exp(-14 * land) * Math.cos(30 * land) : .55 + .45 * u) * pk;
+      const rot = (1 - u) * 2.4 + .05 * (i - 1.5) + (hash(i + 5) - .5) * .08, h = TALLY.len / 2;
+      mark(x - Math.sin(rot) * h, y - Math.cos(rot) * h, x + Math.sin(rot) * h, y + Math.cos(rot) * h, C.PAPER, 13, s);
     }
     const ts = a.TIMES - F; // the fifth: the CLAY diagonal strike on "times"
     if (t >= ts) {
-      const u = E.out4(clamp((t - ts) / .09)), x0 = 1140, y0 = 602, x1 = lerp(x0, 1272, u), y1 = lerp(y0, 528, u);
-      X.beginPath(); X.moveTo(x0, y0); X.lineTo(x1, y1); X.lineWidth = 21; X.strokeStyle = C.INK; X.stroke(); X.lineWidth = 12; X.strokeStyle = C.CLAY; X.stroke();
+      const pk = popK(4.5); // the strike pops first, then the marks right to left
+      if (pk > 0) {
+        const u = E.out4(clamp((t - ts) / .09)), x0 = TALLY.x - 34, y0 = TALLY.y + 40, xe = TALLY.x + 3 * TALLY.dx + 34, ye = TALLY.y - 38;
+        mark(x0, y0, lerp(x0, xe, u), lerp(y0, ye, u), C.CLAY, 15, pk * (1 + .12 * Math.exp(-16 * Math.max(0, t - ts - .09))));
+      }
+    }
+    // the pop: a PAPER puff where the bundle was
+    const pa = t - (tp + 2 * F);
+    if (pa > 0 && pa < .3) {
+      const cx = TALLY.x + 1.5 * TALLY.dx, k = E.out2(pa / .3);
+      X.globalAlpha = 1 - k; X.strokeStyle = C.PAPER; X.lineWidth = 5;
+      for (let j = 0; j < 8; j++) { const an = j / 8 * TAU + .2, r0 = 40 + 70 * k, r1 = r0 + 26 * (1 - k); X.beginPath(); X.moveTo(cx + Math.cos(an) * r0, TALLY.y + Math.sin(an) * r0 * .8); X.lineTo(cx + Math.cos(an) * r1, TALLY.y + Math.sin(an) * r1 * .8); X.stroke(); }
     }
     X.restore();
   }
@@ -399,20 +426,33 @@
   }
 
   // ---------------------------------------------------------------- S13 props
+  // the dying star Rafa's `hi` drifts past: a SPARK star swells into a flickering CLAY giant through bar 21, collapses
+  // (3 frames) just as the bubble passes over it on b3, and leaves a PAPER white dwarf inside an expanding halftone
+  // shell. Sits just below the bubble's path so the bubble never covers it.
   function dyingStar(X, t) {
-    const x = 430, y = 330, a = A(), pass = bt(21, 3);
-    const life = seg(t, bt(21, 1), pass + .5);
-    const fl = t > pass - .1 && t < pass + .3 ? 1 + .8 * Math.exp(-10 * Math.abs(t - pass)) : 1;
+    const x = 392, y = 446, pass = bt(21, 3) + .02, t0 = bt(21, 1) - F;
+    if (t < t0) return;
+    const hb = B().halftone;
     X.save();
-    // nebula shell (halftone ring) expanding as it dies
-    const rr_ = 24 + life * 40;
-    X.beginPath(); X.arc(x, y, rr_ + 10, 0, TAU); X.arc(x, y, rr_, 0, TAU, true); X.fillStyle = B().halftone(X, C.CLAY_DARK, .4, 8, 45); X.fill();
-    const core = (1 - life * .75) * fl;
-    const col = life < .8 ? C.SPARK : C.CLAY_DARK;
-    X.globalAlpha = clamp(.35 + core);
-    sparkle(X, x, y, 22 * core + 3, t * .6, col);
+    if (t < pass) {
+      const sw = seg(t, t0, pass), kick = B().kickEnv(t);
+      const giant = t > pass - .3, fk = giant ? (Math.floor(t * 15) % 2 ? 1 : .88) : 1;   // flickers on 2s as it swells
+      const r = (14 + 30 * E.in2(sw)) * fk * (1 + .1 * kick);
+      X.beginPath(); X.arc(x, y, r * 2.2, 0, TAU); X.fillStyle = hb(X, C.CLAY, .16 + .22 * sw, 8, 45); X.fill();      // glow
+      if (giant) { X.beginPath(); X.arc(x, y, r, 0, TAU); X.fillStyle = C.CLAY; X.fill(); X.fillStyle = hb(X, C.SPARK, .45, 7, 45); X.fill(); X.lineWidth = 3; X.strokeStyle = C.INK; X.stroke(); }
+      else sparkle(X, x, y, r * 1.5, .15 * Math.sin(t * 3), C.SPARK);
+      X.beginPath(); X.arc(x, y, Math.max(3, r * .22), 0, TAU); X.fillStyle = C.PAPER; X.fill();
+    } else {
+      const d = t - pass, col = clamp(d / (3 * F));
+      if (col < 1) { const r = 44 * (1 - E.in2(col)) + 4; X.beginPath(); X.arc(x, y, r, 0, TAU); X.fillStyle = C.CLAY; X.fill(); X.lineWidth = 3; X.strokeStyle = C.INK; X.stroke(); }
+      // planetary-nebula shell
+      const sr = 40 + 150 * E.out3(clamp(d / 1.4)), sa = 1 - seg(d, .6, 1.6);
+      if (sa > 0) { X.globalAlpha = sa; X.beginPath(); X.arc(x, y, sr + 14, 0, TAU); X.arc(x, y, sr, 0, TAU, true); X.fillStyle = hb(X, C.CLAY, .42, 7, 45); X.fill(); X.globalAlpha = 1; }
+      // white dwarf: a small PAPER twinkle that stays
+      const tw = 7 + 5 * Math.exp(-6 * d) + 1.5 * Math.sin(t * 9);
+      sparkle(X, x, y, tw * (col < 1 ? col : 1), t * .4, C.PAPER);
+    }
     X.restore();
-    void a;
   }
   function rafaHi(X, t) { // the sincere pixel: Rafa's PINK `hi` drifts past the dying star
     const t0 = bt(21, 1) - F, t1 = bt(22, 2);
@@ -507,8 +547,11 @@
         rr(X, -tw / 2, -th / 2, tw, th, th / 2); X.fillStyle = C.PAPER; X.fill(); X.lineWidth = Math.max(2, r * .05); X.strokeStyle = C.INK; X.stroke();
         B().spark6(X, -tw / 2 + th * .5, 0, th * .34, C.CLAY, spin * .5);
         const xc = tw / 2 - th * .38;
-        if (xRed > 0) { X.beginPath(); X.arc(xc, 0, th * .42, 0, TAU); X.fillStyle = C.RED; X.fill(); }
-        X.lineWidth = Math.max(2.5, th * .12); X.strokeStyle = xRed > 0 ? C.PAPER : C.INK; X.beginPath(); const q = th * .17; X.moveTo(xc - q, -q); X.lineTo(xc + q, q); X.moveTo(xc + q, -q); X.lineTo(xc - q, q); X.stroke();
+        if (xRed > 0) { X.beginPath(); X.arc(xc, 0, th * .5, 0, TAU); X.fillStyle = C.RED; X.fill(); }
+        // the × is counter-rotated so it reads as a close button, not a "+", on the tilted tab
+        X.save(); X.translate(xc, 0); X.rotate(-TAB_ROT);
+        X.lineWidth = Math.max(2.5, th * .13); X.lineCap = 'round'; X.strokeStyle = xRed > 0 ? C.PAPER : C.INK; X.beginPath(); const q = th * .18; X.moveTo(-q, -q); X.lineTo(q, q); X.moveTo(q, -q); X.lineTo(-q, q); X.stroke();
+        X.restore();
         X.restore();
       }
     }
@@ -575,7 +618,7 @@
     // marquee LEDs along the rim
     for (let i = 0; i < 44; i++) { const lx = x0 + 60 + i * 32.5; const on = (Math.floor(age * 12) + i) % 3 === 0; X.fillStyle = on ? C.SPARK : rgba(C.CLAY_DARK, .8); X.beginPath(); X.arc(lx, y0 + 11, 3.2, 0, TAU); X.arc(lx + 16, y1 - 11, 3.2, 0, TAU); X.fill(); }
     // needle dial (PAPER face)
-    const dcx = 326, dcy = 282, dr = 70;
+    const dcx = 326, dcy = 287, dr = 78; // ≈160 px dial (SHOTLIST)
     X.beginPath(); X.arc(dcx, dcy, dr, PI, TAU); X.closePath(); X.fillStyle = C.PAPER; X.fill(); X.lineWidth = 3; X.strokeStyle = C.INK; X.stroke();
     X.beginPath(); X.arc(dcx, dcy, dr - 12, PI * 1.72, TAU); X.lineWidth = 10; X.strokeStyle = C.RED; X.stroke();
     X.lineWidth = 3; X.strokeStyle = C.INK;
@@ -658,6 +701,28 @@
     }
   }
 
+  // S13 push: the reply box zooms out of frame, so the typed line detaches from it (same left edge, same typing,
+  // same CLAY word underline) and settles on a PAPER plate at the subtitle baseline (y 950) in 6 frames: no jump
+  // to a centred subtitle that would also spoil the words not yet sung.
+  let _tSw = null;
+  function pushSwitch() {
+    if (_tSw !== null) return _tSw;
+    for (let tt = bt(22, 1) - .2; tt < bt(22, 4); tt += F / 4) if (camAt(tt).z0 > 1.03) return (_tSw = tt);
+    return (_tSw = bt(22, 2));
+  }
+  function liftedLyric(X, t, words) {
+    const tS = pushSwitch(), c0 = camAt(tS), p0 = B().w2s(c0, 132, 968);
+    const endT = words[words.length - 1].e + .3, al = 1 - seg(t, endT, endT + 5 * F); if (al <= 0) return;
+    const k = E.out3(seg(t, tS, tS + 6 * F));
+    const x = lerp(p0[0], 132, k), y = lerp(p0[1], 950, k), size = lerp(58 * c0.z0, 60, k);
+    X.save(); X.globalAlpha *= al; X.font = mono(size, 600);
+    const sp = X.measureText(' ').width, on = words.filter(w => t >= w.s - .04);
+    const tw = on.reduce((acc, w, i) => acc + X.measureText(w.d || w.w).width + (i ? sp : 0), 0);
+    rr(X, x - 26, y - size * .95, Math.max(size, tw) + 26 * 2 + size * .3, size * 1.35, 10); X.fillStyle = C.PAPER; X.fill();
+    B().typedWords(X, t, words, x, y, size, { maxW: 1640 });
+    X.restore();
+  }
+
   // ================================================================== the chorus frame, per shot
   function scared1(X, t, st) { // S11 HERO lockup (behind Opus), rows drop away on bar 18 b1
     const a = A(), drop = bt(18, 1) - F;
@@ -702,17 +767,22 @@
       if (t < bt(18, 1)) holes = [ROWBOX("EVERYONE'S", 320, 436), ROWBOX('SCARED', 490, 878)];
       hero_ = X2 => scared1(X2, t, st);
       input = { words: Wd.s11 };
-      world = X2 => { if (t < bt(17, 4)) dockedBubble(X2, t); phone(X2, t); };
+      // the docked bubble reads whole (its "?" sits over Opus's shin) until it starts to scroll, then tucks
+      // behind Opus so it never flies across the face
+      const scroll = bt(17, 3) - F;
+      world = X2 => { if (t >= scroll && t < bt(17, 4)) dockedBubble(X2, t); phone(X2, t); };
+      front = X2 => { if (t < scroll) dockedBubble(X2, t); };
     } else if (shot === 'S12') {
       holes = [ROWBOX('A MILLION', 385, 471), ROWBOX('TIMES A DAY', 290, 700)].filter((_, i) => t >= (i ? a.TIMES : a.MILLION) - 2 * F);
       hero_ = X2 => stack(X2, t);
       input = { words: t < a.MILLION - 2 * F ? Wd.s12 : null };
-      front = X2 => { tallies(X2, t, st); winkSparkle(X2, t, st); };
+      front = X2 => winkSparkle(X2, t, st);
+      over = (X2, cc) => tallies(X2, t, st, cc);
     } else if (shot === 'S13') {
       const pulse = t >= a.START - F ? Math.exp(-5 * (t - a.START + F)) * (1 - Math.exp(-40 * (t - a.START + F))) * 1.6 : 0;
       tab.pulse = clamp(pulse);
-      const pushed = c.z0 > 1.03; // once the push starts, the lyric moves from the reply box to the standard plate
-      input = pushed ? { words: null, placeholder: '' } : { words: Wd.s13 };
+      const pushed = t >= pushSwitch(); // once the push starts, the typed line lifts off the reply box onto a plate
+      input = pushed ? { words: null, placeholder: '', caret: false } : { words: Wd.s13 };
       world = X2 => { if (t < bt(22, 3)) { dyingStar(X2, t); rafaHi(X2, t); } hiBang(X2, t, st); };
       front = X2 => {
         const conv1 = bt(22, 4) - 3 * F + .42;
@@ -720,10 +790,7 @@
       };
       over = (X2, cc) => {
         const tb = a.HI - 2 * F;
-        if (pushed) { // the reply box is sliding out of frame: the standard plate at y 950
-          const L = { s: Wd.s13[0].s, e: Wd.s13[Wd.s13.length - 1].e, words: Wd.s13 };
-          subtitle(X2, L, t, { y: 950, size: 60, color: C.INK, plate: C.PAPER, weight: 600 });
-        }
+        if (pushed) liftedLyric(X2, t, Wd.s13);
         stickerDC(X2, 'HI!', 500, 408, 400, t - tb, -.09);
       };
     } else if (shot === 'S14') {
@@ -742,9 +809,10 @@
         tinyUniverse(X2, t, u[0], u[1], .86 * R0, { popAge, xRed });
         // the human's hand reaches in and clicks the ×
         const tip = uniX(u[0], u[1], .86 * R0);
-        const hin = bt(23, 4) - .05, hclick = a.BYE - 2 * F, hout = a.BYE + .18;
+        const hclick = a.BYE - 2 * F, hin = hclick - 9 * F, hout = a.BYE + .18; // 9-frame reach: enters after the crumble has read
         if (t > hin && t < hout + .6) {
-          let k = t < hclick ? E.out3(seg(t, hin, hclick)) : 1 - E.in2(seg(t, hout, hout + .5));
+          const t2 = t < hclick ? Math.min(hclick, hin + Math.ceil((t - hin) / (2 * F) - 1e-6) * 2 * F) : hout + Math.floor((t - hout) / (2 * F) + 1e-6) * 2 * F; // humans move on 2s
+          let k = t < hclick ? E.out3(seg(t2, hin, hclick)) : 1 - E.in2(seg(Math.max(t2, hout), hout, hout + .5));
           const press = win(t, hclick, hclick + 3 * F) ? 1 : 0;
           humanHand(X2, t, lerp(tip[0] + 1150, tip[0] + 2, k) - press * 8, lerp(tip[1] + 150, tip[1] + 1, k) - press * 1, press);
         }
@@ -766,7 +834,7 @@
     // 1-frame inverse flash on the big impacts
     const flashAt = [a.SCARED, a.TIMES, a.WORLD, a.HI].map(s => s + F);
     const post = flashAt.some(s => t >= s && t < s + F - 1e-4) ? X2 => B().invert(X2) : null;
-    return B().frame(X, t, { cam: c, galaxy: galOpts(t, holes), hero: hero_, world, actors, front, tab, input, over, post, edgeSeed: 17, sliver: 'bl', upload: opt.upload });
+    return B().frame(X, t, { cam: c, galaxy: galOpts(t, holes), hero: hero_, world, actors, front, tab, input, over, post, edgeSeed: 17, sliver: 'bl', upload: opt.upload, ...(opt.hud === false ? { hud: false } : {}) });
   }
 
   // ================================================================== scenes (hard cuts 1 frame early)
@@ -777,13 +845,16 @@
     const tw = bt(24, 4);
     if (t < tw) { chorus(X, t, 'S14'); return; }
     // whip-pan on bar 24 b4 into the chant: the frame (CPU) smears left in 4 subframes, uploaded once
-    chorus(X, t, 'S14', { upload: false });
+    // (10 equal-weight shutter samples = a smooth smear, not 4 strobed copies; the HUD seekbar stays put)
+    chorus(X, t, 'S14', { upload: false, hud: false });
     const src = B().cpuLayerCanvas('brand_frame'), L = B().cpuLayer('c1whip');
     const u = seg(t, tw, bt(25, 1)), off = -2300 * E.inExpo(Math.min(1, u * 1.02)), v = 2300 * 10 * Math.log(2) * Math.pow(2, 10 * u - 10) / (bt(25, 1) - tw);
     groundInk(L);
-    const n = 4, span = Math.min(900, v / 30);
+    const span = Math.min(900, v / 30), n = span < 6 ? 1 : 10;
     L.setTransform(1, 0, 0, 1, 0, 0);
-    for (let i = 0; i < n; i++) { L.globalAlpha = 1 / (i + 1); L.drawImage(src, (off + span * i / n) * G.scale, 0); }
+    for (let i = 0; i < n; i++) { L.globalAlpha = 1 / (i + 1); L.drawImage(src, Math.round((off + span * i / n) * G.scale), 0); }
+    L.globalAlpha = 1; L.setTransform(G.scale, 0, 0, G.scale, 0, 0);
+    B().hud(L, t);
     B().upload(X, 'c1whip');
   });
 
