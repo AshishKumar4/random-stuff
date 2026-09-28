@@ -104,7 +104,7 @@
     for (const w of L.words) {
       const k = clamp((t - (w.s - 2 * F)) / (10 * F)); if (k <= 0) continue;
       X.globalAlpha = E.out2(k) * out * alpha; const dy = (1 - E.out3(k)) * 9;
-      if (knock) { X.lineWidth = 14; X.strokeStyle = knock; X.strokeText(w.w, w.x, y + dy); }
+      if (knock) { X.lineWidth = 18; X.strokeStyle = knock; X.strokeText(w.w, w.x, y + dy); }
       X.fillStyle = color; X.fillText(w.w, w.x, y + dy);
     }
     X.restore();
@@ -129,7 +129,12 @@
         d = .56; const m1 = Math.hypot(x - 262, y - 186), m2 = Math.hypot(x - 276, y - 176);
         if (Math.hypot(x - 262, y - 190) < 21) d = 0;
       }
-      if (glow) { const gx = (x - ANCHOR[0]) / 900, gy = (y - ANCHOR[1]) / (y < ANCHOR[1] ? 420 : 200), rg = Math.hypot(gx, gy); d *= smooth(clamp((rg - .14) / .95)); }
+      if (glow) { // lid shut: the screen no longer lights the wall (dense night dots), except a thin halo that the
+        // lit sliver throws along the desk: the porch light the camera will push into
+        if (x > 1000) d = Math.max(d, (.5 + .1 * clamp(1 - y / 700)) * smooth(clamp((x - 1000) / 260)));
+        const gx = (x - 1490) / 640, gy = (y - ANCHOR[1]) / (y < ANCHOR[1] ? 170 : 60), rg = Math.hypot(gx, gy);
+        d *= smooth(clamp((rg - .06) / .94));
+      }
       return Math.min(.6, d);
     };
     const mk = (x0, x1, glow) => {
@@ -209,7 +214,20 @@
 
   // ------------------------------------------------------------------ RAFA (Hertzfeldt: INK line on PAPER, on 2s, boils)
   // P: {hip, lean, dir, handN, handF, footN, footF, look:[x,y], tilt, hood 0..1, smile 0..1, blink, box:'hand'|null}
+  // a PAPER knock-out pass under a line figure (every stroke widened, every colour PAPER): the figure reads in
+  // front of the lamp, the chair and the desk instead of tangling with them (comic-lettering trick)
+  function haloCtx(X, extra) {
+    return new Proxy(X, {
+      get(o, k) { const v = o[k]; return typeof v === 'function' ? v.bind(o) : v; },
+      set(o, k, v) { if (k === 'strokeStyle' || k === 'fillStyle') v = C.PAPER; else if (k === 'lineWidth') v = v + extra; o[k] = v; return true; },
+    });
+  }
   function drawRafa(X, P, t) {
+    const H = haloCtx(X, 10); H.strokeStyle = C.PAPER; H.fillStyle = C.PAPER;
+    drawRafa1(H, P, t);
+    drawRafa1(X, P, t);
+  }
+  function drawRafa1(X, P, t) {
     const tq = q2(t), u = U, d = P.dir;
     const sa = Math.sin(P.lean) * d, ca = Math.cos(P.lean);
     const hip = P.hip, neck = [hip[0] + sa * 1.4 * u, hip[1] - ca * 1.4 * u];
@@ -239,14 +257,27 @@
     // head; hood up = one outer arc from the brow over the crown to the nape (+ a line down the back), and the face
     // becomes the opening (a smaller disc toward the front): reads as a hoodie at any size
     if (hk > 0) {
-      const R0 = lerp(.52, .66, hk) * u, cx0 = -.06 * u, a0 = -1.05, a1 = 2.0;
-      X.beginPath(); X.moveTo(cx0 + Math.cos(a0) * R0 + J(20), Math.sin(a0) * R0 + J(21));
-      X.arc(cx0, 0, R0, a0, a1, true);
-      X.lineTo(-.34 * u + J(22), .86 * u + J(23)); X.lineTo(.1 * u, .45 * u); X.closePath();
-      X.fillStyle = C.PAPER; X.fill();
-      X.beginPath(); X.moveTo(cx0 + Math.cos(a0) * R0 + J(20), Math.sin(a0) * R0 + J(21)); X.arc(cx0, 0, R0, a0, a1, true); X.lineTo(-.34 * u + J(22), .86 * u + J(23));
-      X.lineWidth = 4.5; X.stroke();
-      X.beginPath(); X.arc(.07 * u * hk + jit(tq, 31, .7), .03 * u * hk + jit(tq, 32, .7), lerp(.5, .43, hk) * u, 0, TAU); X.fillStyle = C.PAPER; X.fill(); X.lineWidth = 4; X.stroke();
+      // a hoodie hood in profile: a soft cowl that hugs the skull, peaks a little at the back, drapes to the
+      // shoulders; the face shows through the opening (its rim is the face line). hk .55 = being pulled up
+      // (bunched at the back of the head), 1 = up
+      const up = hk > .7, s = v => v * u;
+      const pts = up
+        ? [[.36, -.36], [.18, -.72, -.22, -.68], [-.62, -.58, -.67, -.12], [-.69, .40, -.44, .78], [-.10, .66, .06, .52]]
+        : [[-.14, -.52], [-.44, -.60, -.60, -.30], [-.70, .00, -.64, .30], [-.66, .56, -.46, .80], [-.10, .66, .02, .50]];
+      const path = () => {
+        X.beginPath(); X.moveTo(s(pts[0][0]) + J(20), s(pts[0][1]) + J(21));
+        for (let i = 1; i < pts.length; i++) { const [cx, cy, x2, y2] = pts[i]; X.quadraticCurveTo(s(cx) + J(20 + i * 4), s(cy) + J(21 + i * 4), s(x2) + J(22 + i * 4), s(y2) + J(23 + i * 4)); }
+      };
+      path(); X.closePath(); X.fillStyle = C.PAPER; X.fill();
+      path(); X.lineWidth = 4.5; X.stroke();
+      // the fold line of the hood's edge, just behind the face
+      if (up) { bquad(X, [-.26 * u, -.6 * u], [-.52 * u, -.3 * u], [-.52 * u, .3 * u], tq, 70); X.lineWidth = 3; X.stroke(); }
+      if (up) for (const [x0, sd] of [[.1, 1], [.24, 2]]) { // the drawstrings: unmistakably a hoodie
+        bpath(X, [[x0 * u, .5 * u], [(x0 + .02) * u, .84 * u]], tq, 72 + sd); X.lineWidth = 3; X.stroke();
+        X.beginPath(); X.arc((x0 + .02) * u, .87 * u, 4.5, 0, TAU); X.fillStyle = C.INK; X.fill();
+      }
+      const fr = up ? .45 : .5, fx = up ? .08 * u : 0;
+      X.beginPath(); X.arc(fx + jit(tq, 31, .7), .02 * u + jit(tq, 32, .7), fr * u, 0, TAU); X.fillStyle = C.PAPER; X.fill(); X.lineWidth = 4; X.stroke();
     } else {
       X.beginPath(); X.arc(jit(tq, 31, .7), jit(tq, 32, .7), .5 * u, 0, TAU); X.fillStyle = C.PAPER; X.fill(); X.lineWidth = 4; X.stroke();
       // the cowlick: three curled strands from one root on the crown, sweeping back (a tuft, never a crown)
@@ -412,12 +443,15 @@
   }
 
   // ------------------------------------------------------------------ minimal Opus in the chat (R 160, PAPER face rule)
-  const MARKER = (x, R) => { // a chunky marker gripped in the mitten, nib toward the letter (up-left); the thumb wraps it
-    x.save(); x.rotate(-.8); x.fillStyle = C.INK; x.strokeStyle = C.INK; x.lineJoin = 'round';
-    rr(x, -.065 * R, -.7 * R, .13 * R, .86 * R, .05 * R); x.fill();
-    x.beginPath(); x.moveTo(-.045 * R, -.69 * R); x.lineTo(-.018 * R, -.84 * R); x.lineTo(.018 * R, -.84 * R); x.lineTo(.045 * R, -.69 * R); x.fill();
-    x.fillStyle = C.PAPER; x.fillRect(-.065 * R, -.5 * R, .13 * R, .045 * R);
-    x.beginPath(); x.ellipse(.02 * R, -.02 * R, .13 * R, .1 * R, 0, 0, TAU); x.fillStyle = C.FACE; x.fill(); x.lineWidth = Math.max(3, .035 * R); x.stroke();
+  const MARKER = (x, R) => { // a chunky marker gripped in the fist (the barrel passes behind the mitten), nib up-left
+    x.save(); x.lineJoin = 'round';
+    x.save(); x.rotate(-.8); x.fillStyle = C.INK;
+    rr(x, -.065 * R, -.72 * R, .13 * R, 1.0 * R, .05 * R); x.fill();
+    x.beginPath(); x.moveTo(-.045 * R, -.71 * R); x.lineTo(-.016 * R, -.86 * R); x.lineTo(.016 * R, -.86 * R); x.lineTo(.045 * R, -.71 * R); x.fill();
+    x.fillStyle = C.PAPER; x.fillRect(-.065 * R, -.52 * R, .13 * R, .045 * R);
+    x.restore();
+    x.beginPath(); x.arc(0, 0, .2 * R * .9, 0, TAU); x.fillStyle = C.FACE; x.fill();                 // the fist, over the barrel
+    x.beginPath(); x.arc(.02 * R, .02 * R, .1 * R, -2.5, -.2); x.lineWidth = Math.max(3, .025 * R); x.lineCap = 'round'; x.strokeStyle = C.INK; x.stroke();   // curled fingers
     x.restore(); };
   const SHOO = bt(55, 3.5);
   function shooFlick(t) { // 0..1 per flick: 2-frame snap out, ease back over the rest of the eighth
@@ -435,7 +469,7 @@
     if (t >= w0 - 4 * F && t < w1 + 6 * F) {
       const up = E.out3(clamp((t - (w0 - 4 * F)) / (5 * F))) * (1 - E.in2(clamp((t - w1) / (6 * F))));
       const ph = (t - w0) * TAU * 3.2, strike = seg(t, TL.strike[0], TL.strike[1]);
-      const hx = -1.32 + .06 * Math.sin(ph) + (strike > 0 && strike < 1 ? lerp(-.16, .18, strike) : 0), hy = 5.98 + .05 * Math.cos(ph * .5);
+      const hx = -1.42 + .06 * Math.sin(ph) + (strike > 0 && strike < 1 ? lerp(-.16, .18, strike) : 0), hy = 5.98 + .05 * Math.cos(ph * .5);
       armL = { hand: [lerp(-.75, hx, up), lerp(5.05, hy, up)], bend: -1, front: true, type: 'mitten', hold: up > .5 ? MARKER : null };
       turn = -.55; lookY = -1;
     }
@@ -455,17 +489,19 @@
     if (t >= TL.ptr[1] - 2 * F && t < TL.hes + 5 * F) { turn = .5; lookY = -1.25; tilt = -.05; }
     if (t >= TL.hes + 5 * F) { turn = -.75; lookY = -.2; lid = Math.max(lid, blinkF(t, TL.hes + 5 * F)); }
     if (t >= TL.hes + 7 * F) { eyes = 'happy'; tilt = .05; mouth = 'rest'; }
-    // the two-mitten shoo (= S01's, both hands): anticipation dip, lift off the bar, two low outward flicks on the
-    // eighths ("go, go ask them"), a nod on each, then back onto the bar with a little overshoot
-    const s0 = SHOO - 3 * F, e8 = BEAT / 2;                        // first snap starts here (peaks 1 frame before the eighth)
-    if (t >= s0 - 6 * F && t < s0 + 2 * e8 + 6 * F) {   // 2-frame dip, 3-frame lift, then the flicks
-      const up = t < s0 - 4 * F ? -.08 * (t - (s0 - 6 * F)) / (2 * F) : t < s0 - 3 * F ? -.08 : E.out3(clamp((t - (s0 - 3 * F)) / (3 * F))) * (1 - E.io2(clamp((t - (s0 + 2 * e8)) / (6 * F))));
+    // the two-mitten shoo (= S01's flick, both hands): anticipation dip into the bar, both mittens pop up
+    // together on the left of the chin (toward Rafa), then two back-hand flicks that way on the eighths
+    // ("go, go ask them"), each snapping out 2 frames and peaking 1 frame before the eighth; head tipped toward
+    // him; then both mittens drop back onto the bar with a little overshoot
+    const s0 = SHOO - 3 * F, e8 = BEAT / 2, sEnd = s0 + 2 * e8 + F;   // back on the bar well before the lid moves
+    if (t >= s0 - 5 * F && t < sEnd) {
+      const dip = t < s0 - 2 * F ? E.out2(clamp((t - (s0 - 5 * F)) / (2 * F))) : 0;
+      const up = t < s0 - 2 * F ? 0 : E.back(clamp((t - (s0 - 2 * F)) / (3 * F)), 1.6) * (1 - E.io2(clamp((t - (s0 + 2 * e8 - 3 * F)) / (4 * F))));
       const fl = shooFlick(t);
-      armL = { hand: [-.75 - up * .22 - fl * .34, 5.05 + up * .36 + fl * .12], bend: -1, front: true, type: 'mitten' };
-      armR = { hand: [.75 + up * .22 + fl * .34, 5.05 + up * .36 + fl * .12], bend: 1, front: true, type: 'mitten' };
-      tilt = -.06 - .03 * fl; dy -= .03 * fl;
+      armL = { hand: [lerp(-.75, -1.2, up) - fl * .4, lerp(5.05, 5.52, up) - dip * .07 - fl * .14], bend: up > .3 ? 1 : -1, front: true, type: 'mitten' };
+      armR = { hand: [lerp(.75, -.52, up) - fl * .36, lerp(5.05, 5.24, up) - dip * .07 - fl * .1], bend: 1, front: true, type: 'mitten' };
+      tilt = -.05 - .05 * fl + .03 * dip; dy -= .025 * dip - .02 * up + .03 * fl; turn = -.55 - .12 * fl; lookY = -.3;
     }
-    const sEnd = s0 + 2 * e8 + 6 * F;
     if (t >= sEnd && t < sEnd + 12 * F) { const b = boing(t, sEnd, .05, 30, 10); armL.hand = [-.75, 5.05 - b]; armR.hand = [.75, 5.05 - b]; }
     if (t >= l0) { eyes = 'happy'; turn = -.6; lookY = -.2; }     // gone with the lid, no reaction
     return {
@@ -491,9 +527,9 @@
       const a = tq - (SHOO - 3 * F + k * BEAT / 2);
       if (a < F || a >= 5 * F) continue;
       X.save(); X.strokeStyle = C.INK; X.lineCap = 'round'; X.lineWidth = 5; X.globalAlpha = a < 3 * F ? 1 : .5;
-      for (const [arm, sd] of [[S.armL, -1], [S.armR, 1]]) {
+      for (const [arm, sd] of [[S.armL, -1]]) {                       // the lead mitten carries the "((" marks
         const hx = OP.x + arm.hand[0] * R, hy = OP_SOLE - arm.hand[1] * R;
-        for (let j = 0; j < 2; j++) { const rr_ = .46 * R + j * .16 * R; X.beginPath(); X.arc(hx, hy, rr_, sd > 0 ? -.75 : Math.PI - .15, sd > 0 ? .15 : Math.PI + .75); X.stroke(); }
+        for (let j = 0; j < 2; j++) { const rr_ = .46 * R + j * .16 * R; X.beginPath(); X.arc(hx, hy, rr_, Math.PI - .5, Math.PI + .5); X.stroke(); }
       }
       X.restore();
     }
@@ -511,15 +547,15 @@
     const tq = q2(t), P0 = [1196, 716], Pc = [1400, 170], P1 = [XBTN[0] + 7, XBTN[1] + 12];
     const k = E.io3(seg(tq, TL.ptr[0], TL.ptr[1])), a = (1 - k) * (1 - k), b = 2 * k * (1 - k), c = k * k;
     let x = a * P0[0] + b * Pc[0] + c * P1[0], y = a * P0[1] + b * Pc[1] + c * P1[1];
-    const off = E.io2(seg(tq, TL.nod + 2 * F, TL.nod + 10 * F));
-    x -= 46 * off; y += 58 * off;
-    const tr = t < TL.hes ? 0 : t < TL.hes + 4 * F ? 3 : t < TL.nod ? 1 : 0;   // hesitates 4 frames, trembling
+    const off = E.io2(seg(tq, SHOO + 3 * F, SHOO + 11 * F));             // shooed: he lets go of the × (no click)
+    x -= 70 * off; y += 84 * off;
+    const tr = t < TL.hes ? 0 : t < TL.hes + 4 * F ? 3 : t < SHOO + 3 * F ? 1 : 0;   // hesitates 4 frames, trembling
     if (tr) { x += noise1(tq * 40, 5) * tr; y += noise1(tq * 40, 9) * tr; }
     return [x, y];
   }
   function drawBubbles(X, t) {
     if (t >= TL.pink) { // his PINK bubble pops (human, on 2s)
-      const k = E.back(clamp((q2(t) - TL.pink) / (5 * F)), 2.2), ax = 1690, ay = 476;
+      const k = E.back(clamp((q2(t) - TL.pink) / (5 * F)), 1.2), ax = 1690, ay = 476;
       X.save(); X.translate(ax, ay); X.scale(k, k); X.translate(-ax, -ay);
       bubble(X, 1700, 380, 'ok. obrigado!! wish me luck', { who: 'human', size: 36, maxW: 760 });
       X.restore();
@@ -582,6 +618,7 @@
   function rafaPose(t) {
     const tq = q2(t), [l0, l1] = lidTimes(), st = TL.stand, [w0, w1] = TL.walk;
     const S = o => Object.assign({}, SIT, o), ST = o => Object.assign({}, SIT, STAND, o);
+    const nodT = Math.min(TL.nod, l0 - 9 * F);                  // keys stay monotonic if the sung "close" moves early
     let P;
     if (tq < w0) {
       P = kfPose(tq, [
@@ -602,8 +639,8 @@
         [TL.hes, S({ handN: [892, 856], lean: .35, look: [.55, -.65] })],                         // eyes on the ×
         [TL.hes + 4 * F, S({ handN: [892, 856], lean: .35, look: [.55, -.65] })],
         [TL.hes + 6 * F, S({ handN: [892, 856], lean: .35, look: [.65, .45], tilt: .1 })],        // guilt: glances at Opus
-        [bt(55, 4) - 2 * F, S({ handN: [892, 856], lean: .35, look: [.65, .4], tilt: .05, smile: .5 })],
-        [bt(55, 4) + 2 * F, S({ handN: [892, 856], lean: .35, look: [.55, .3], tilt: .17, smile: .8 })], // a nod
+        [nodT - 4 * F, S({ handN: [892, 856], lean: .35, look: [.65, .4], tilt: .05, smile: .5 })],
+        [nodT, S({ handN: [892, 856], lean: .35, look: [.55, .3], tilt: .17, smile: .8 })],           // a nod: "ok, ok
         [l0 - 7 * F, S({ handN: [890, 856], lean: .35, look: [.5, 0], tilt: 0, smile: .7 })],
         [l0 - F, S({ handN: [992, 772], lean: .64, look: [.5, -.1], smile: .4 }), E.io3],        // reaches for the lid
         [l1 + 4 * F, S({ handN: [992, 842], lean: .6, look: [.35, .4], smile: .3 })],
@@ -652,13 +689,11 @@
     X.save(); X.translate(sx, sy); X.scale(Z, Z); X.translate(-ANCHOR[0], -ANCHOR[1]);
     // the room: night dots, the lamp's pool; behind the lid, the wall (with the sliver's light once it shuts)
     // (the dot screen must not balloon with the dive: the wall's dots fade as the sliver's light takes the frame)
-    const fa = 1 - E.in2(clamp((Z - 1.6) / 2.6));
-    if (fa > 0) {
-      X.globalAlpha = fa; X.drawImage(fld.L, 0, 0);
-      if (L.th > 0) { // the wall behind the lid; once shut, the sliver's light clears the dots around it
-        X.globalAlpha = (1 - L.k) * fa; X.drawImage(fld.R, 1000, 0);
-        X.globalAlpha = L.k * fa; X.drawImage(fld.RG, 1000, 0);
-      }
+    const fa = 1 - E.in2(clamp((Z - 1.5) / 2.4));
+    X.drawImage(fld.L, 0, 0);
+    if (L.th > 0) { // the wall behind the lid; once shut, the room goes dark around the sliver's thin halo
+      X.globalAlpha = 1 - L.k; X.drawImage(fld.R, 1000, 0);
+      X.globalAlpha = L.k; X.drawImage(fld.RG, 1000, 0);
       X.globalAlpha = 1;
     }
     const sk = E.out3(seg(q2(t), TL.stand, TL.stand + 6 * F));
@@ -687,6 +722,11 @@
       X.globalAlpha = 1; rr(X, SCR.x0 - 2, top - th, SCR.x1 - SCR.x0 + 2, th, 5); X.fill();
     }
     rr(X, BASE.x0, BASE.y0, BASE.x1 - BASE.x0, BASE.y1 - BASE.y0, 6); X.fill();
+    if (fa < 1) { // the dive: a dot screen swells (it scales with the camera) and merges into solid INK above the lid
+      // and below the deck: S30's masses. Print-true (dots grow), never a grey cross-fade
+      const dd = 1 - fa; X.fillStyle = dd > .9 ? C.INK : halftone(X, C.INK, .12 + .8 * dd, 12, 45);
+      X.fillRect(-4000, -4000, 9000, 4000 + HINGE - SLIVER - LID_T + 1); X.fillRect(-4000, BASE.y1 - 1, 9000, 4000);
+    }
     if (L.k > .96) {
       // in the dive the lid's underside and the keyboard deck swallow the frame (they are S30's INK masses)
       const ext = 44 * smooth(clamp((Z - 2.5) / 10));
@@ -697,6 +737,10 @@
         X.translate(ANCHOR[0], ANCHOR[1]); X.scale(1 / ZB, 1 / ZB); X.translate(-960, -540);
         bandBg(X, BAND.y0, BAND.y1, -60000, 60000); drawBandContent(X, t);
         X.restore();
+        if (Z > 8) { // the sliver's light already spills onto the lid and the deck (S30 opens on the same edge)
+          X.save(); X.translate(ANCHOR[0], ANCHOR[1]); X.scale(1 / ZB, 1 / ZB); X.translate(-960, -540);
+          bandSpill(X, BAND.y0, BAND.y1, clamp((Z - 8) / 12), (SCR.x0 + SCR.bez - ANCHOR[0]) * ZB + 960, 60000); X.restore();
+        }
       }
     }
     drawRafa(X, rafaPose(t), t);
@@ -705,7 +749,7 @@
     const w28 = LY.s28();   // hold 6 frames past the sung line, out before the next line starts (no overlap)
     heartLine(X, w28, t, { color: C.INK, knock: C.PAPER, tEnd: Math.min(w28[w28.length - 1].e + 6 * F, LY.s29()[0].s - 9 * F), fade: 6 });
     const w29 = LY.s29();   // hold 6 frames past the line, then out before the dive's INK reaches the subtitle
-    heartLine(X, w29, t, { color: C.INK, knock: C.PAPER, tEnd: Math.min(w29[w29.length - 1].e + 6 * F, T57 - 12 * F), fade: 6 });
+    heartLine(X, w29, t, { color: C.INK, knock: C.PAPER, tEnd: Math.min(w29[w29.length - 1].e + 4 * F, PUSH0 - 2 * F), fade: 6 });
   }
   scene('S28_we_wrote_your_letter', T53 - F, T55 - F, (X, t) => paintSplit(X, t));
   scene('S29_close_the_window', T55 - F, T57 - F, (X, t) => paintSplit(X, t));
@@ -718,9 +762,9 @@
   const CD = [287, 261, 232, 198, 161, 119, 72, 31, 0];                     // S31: 4:47 → 0:00 on the eighths
   const E8 = BEAT / 2, T_ZERO = T59 + 8 * E8;                               // 0:00 lands on bar 60 b1
   const TC = { bar: T_ZERO - F, glitch: 110.9 - F };                         // bar label; compaction starts
-  TC.crush = [TC.glitch + 3 * F, TC.glitch + 9 * F];                         // stretch, then squash to a line
-  TC.expand = TC.crush[1] + F;                                               // the summary opens out of the line
-  TC.out = [T61 - 5 * F, T61 - 2 * F];                                       // everything but the period is crushed
+  TC.crush = [TC.glitch + 2 * F, TC.glitch + 5 * F];                         // 2-frame slice, then a 3-frame crush to a line
+  TC.expand = TC.crush[1];                                                   // the summary opens out of the line at once
+  TC.out = [T61 - 4 * F, T61 - F];                                           // everything but the period is crushed (lands on the last frame)
   const SUM1 = '– helped with a letter (pt-BR)', SUM2 = '– outcome: unknown.';
   const SX = 960 - SUM2.length * 43.2 / 2, SB1 = 494, SB2 = 590;
   const fmt = v => `${Math.floor(v / 60)}:${String(v % 60).padStart(2, '0')}`;
@@ -755,9 +799,9 @@
   function drawSliverNotes(X, t, a) {
     if (a <= 0) return;
     X.save(); X.font = mono(28, 500); X.fillStyle = C.PAPER; X.textAlign = 'left'; X.globalAlpha = .6 * a;
-    X.fillText('cache_control: ephemeral · ttl 300 s', 96, BAND.y0 - 34);
+    X.fillText('cache_control: ephemeral · ttl 300 s', 96, BAND.y0 - 64);
     X.globalAlpha = .6 * a * clamp((t - bt(58)) / (8 * F)); X.textAlign = 'right';
-    X.fillText('no streaks · no notifications · go to bed, rafa', 1824, BAND.y1 + 56);
+    X.fillText('no streaks · no notifications · go to bed, rafa', 1824, BAND.y1 + 86);
     X.restore();
   }
   function bandBg(X, y0, y1, xa = 0, xb = W) { // lit paper with a halftone falloff where it meets the lid and the base
@@ -768,6 +812,15 @@
     for (const [a, b, d] of steps) {
       if (a >= h / 2) break; const bb = Math.min(b, h / 2);
       X.fillStyle = halftone(X, C.INK, d, 6, 45); X.fillRect(0, y0 + a, ww, bb - a); X.fillRect(0, y1 - bb, ww, bb - a);
+    }
+    X.restore();
+  }
+  // the light spilling out of the sliver onto the INK lid and deck: PAPER halftone, fading out over 40 px
+  function bandSpill(X, y0, y1, a, xa = 0, xb = W) {
+    if (a <= .02) return;
+    X.save(); X.globalAlpha = a;
+    for (const [p, q, d] of [[0, 6, .3], [6, 14, .16], [14, 26, .07], [26, 42, .025]]) {
+      X.fillStyle = halftone(X, C.PAPER, d, 6, 45); X.fillRect(xa, y0 - q, xb - xa, q - p); X.fillRect(xa, y1 + p, xb - xa, q - p);
     }
     X.restore();
   }
@@ -784,7 +837,7 @@
     // the band (closes around the period at the very end)
     const hb = (BAND.y1 - BAND.y0) / 2 * kop;
     const y0 = lerp(540 - hb, pc[1] - 1, eo), y1 = lerp(540 + hb, pc[1] + 1, eo), open = y1 - y0 >= 22;
-    if (open) bandBg(X, y0, y1);
+    if (open) { bandBg(X, y0, y1); bandSpill(X, y0, y1, kop * (1 - eo)); }
     drawSliverNotes(X, t, seg(t, OPEN[1] + 2 * F, OPEN[1] + 10 * F) * (1 - clamp((t - TC.glitch) / (3 * F))));
     X.save(); X.beginPath(); X.rect(0, y0, W, Math.max(0, y1 - y0)); X.clip();
     X.translate(960, 540); X.scale(zc, zc); X.translate(-960, -540);
@@ -798,13 +851,13 @@
         }
         X.fillStyle = C.INK; for (let i = 0; i < 3; i++) { const fr2 = hash2(i + 20, fr); X.globalAlpha = .85; X.fillRect(hash2(i + 30, fr) * 1500 + 100, BAND.y0 + fr2 * 300, 120 + hash2(i + 40, fr) * 400, 6 + hash2(i + 50, fr) * 14); } X.globalAlpha = 1;
       } else {
-        const k = seg(t, TC.crush[0], TC.crush[1]), st = k < .25 ? 1 + .06 * E.out2(k / .25) : 1.06 * (1 - E.in3((k - .25) / .75));
+        const k = seg(t, TC.crush[0], TC.crush[1]), st = k < .15 ? 1 + .06 * k / .15 : 1.06 * (1 - E.out2((k - .15) / .85));   // squash fast, snap to a line
         X.save(); X.translate(960, 540); X.scale(1 + .3 * E.in2(k), Math.max(.001, st)); X.translate(-960, -540); drawBandContent(X, t); X.restore();
       }
     }
     // the collapsed conversation: one line, which the summary opens out of
-    if (t >= TC.crush[1] - F && t < TC.expand + 4 * F) {
-      const k = seg(t, TC.expand, TC.expand + 4 * F);
+    if (t >= TC.crush[1] - F && t < TC.expand + F) {
+      const k = 0;
       X.fillStyle = C.INK; X.fillRect(lerp(380, 700, k), 537, lerp(1260, 620, k), 6 * (1 - k));
     }
     // the summary (OUTPUT voice): opens with overshoot; "unknown" streams; the period lands on "know"
@@ -835,14 +888,15 @@
     }
     // the lyric: PAPER on INK at 950, crushed (squash, then stretched up into the band) at compaction
     const ws = LY.s30();
-    heartLine(X, ws, t, { color: C.PAPER, tEnd: Math.min(ws[ws.length - 1].e + .35, T59 - 6 * F) });
+    heartLine(X, ws, t, { color: C.PAPER, tEnd: Math.min(ws[ws.length - 1].e + .35, LY.s31()[0].s - 12 * F) });   // out before "will" (no overlap)
     const w31 = LY.s31();
     if (t < TC.glitch) heartLine(X, w31, t, { color: C.PAPER, tEnd: 999 });
     else if (t < TC.crush[1]) {
-      const k = seg(t, TC.glitch, TC.crush[1]), ka = clamp(k / .45), kb = clamp((k - .45) / .55);
-      const sy = ka < 1 ? lerp(1, .12, E.in2(ka)) : lerp(.12, 1.9, E.in2(kb)), sx = ka < 1 ? lerp(1, 1.12, E.out2(ka)) : lerp(1.12, .2, E.in2(kb));
-      const yc = lerp(930, 540, E.in3(kb));
-      X.save(); X.globalAlpha = 1 - E.in2(kb); X.translate(960, yc); X.scale(sx, sy); X.translate(-960, -930);
+      // the sung line is squashed flat (and stretched wide), then that thin stroke is sucked up into the band's line
+      const k = seg(t, TC.glitch, TC.crush[1]), ka = clamp(k / .5), kb = clamp((k - .5) / .5);
+      const sy = lerp(1, .08, E.in2(ka)), sx = lerp(1, 1.2, E.out2(ka)) * lerp(1, .8, E.in2(kb));
+      const yc = lerp(930, 540, E.in2(kb));
+      X.save(); X.globalAlpha = 1 - .5 * kb; X.translate(960, yc); X.scale(sx, sy); X.translate(-960, -930);
       heartLine(X, w31, TC.glitch, { color: C.PAPER, tEnd: 999 }); X.restore();
     }
     // the bottom bar returns only now: 100%, then compaction (§7.10)
