@@ -14,5 +14,6 @@ window.MANIFEST_ALL = [
  "scenes/verse1.js",
  "scenes/verse2.js"
 ];
+window.MANIFEST_V2 = [];
 window.MANIFEST = (new URLSearchParams(location.search).get('scenes') || '').split(',').filter(Boolean);
-if (!window.MANIFEST.length) window.MANIFEST = window.MANIFEST_ALL;
+if (!window.MANIFEST.length) window.MANIFEST = new URLSearchParams(location.search).get('v') === '2' ? window.MANIFEST_V2 : window.MANIFEST_ALL;

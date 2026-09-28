@@ -23,7 +23,7 @@
 <div id="play">&#9654; play (sound on)</div>
 <div id="ui"><button id="pp">pause</button><span id="tc">0:00.0</span><input id="scrub" type="range" min="0" max="1000" value="0"><span id="sec"></span></div>
 <audio id="audio" preload="auto"></audio>
-<script src="../audio/timeline.js"></script>
+<script>document.write('<script src="../audio/timeline' + (new URLSearchParams(location.search).get("v") === "2" ? "_v2" : "") + '.js"><\/script>');</script>
 <script src="core.js"></script>
 <script src="gfx.js"></script>
 <script src="type.js"></script>

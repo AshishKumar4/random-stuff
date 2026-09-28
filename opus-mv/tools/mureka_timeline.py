@@ -19,7 +19,8 @@ def main():
     ap.add_argument('--src', default='../audio/song.mp3')
     a = ap.parse_args()
     q = json.load(open(a.task))
-    ch = [c for c in q['choices'] if c.get('index', 0) == a.index][0]
+    m = [c for c in q['choices'] if c.get('index') == a.index]
+    ch = m[0] if m else q['choices'][min(a.index, len(q['choices']) - 1)]
     tags = []
     if a.lyrics:
         tags = [m.group(1) for m in re.finditer(r'^\[([^\]]+)\]', open(a.lyrics).read(), re.M)]
@@ -33,8 +34,13 @@ def main():
         name = tags[si] if si < len(tags) else s['section_type']
         sections.append({'name': name, 'type': s['section_type'], 'start': round(s['start'] / 1000 + o, 3), 'end': round(s['end'] / 1000 + o, 3)})
         for L in s.get('lines', []):
-            ws = [{'w': w['text'].strip(), 'd': w['text'].strip(), 's': round(w['start'] / 1000 + o, 3), 'e': round(w['end'] / 1000 + o, 3)} for w in L.get('words', []) if w['text'].strip()]
-            lines.append({'id': len(lines), 'sec': name, 'text': L['text'], 'display': L['text'], 's': round(L['start'] / 1000 + o, 3), 'e': round(L['end'] / 1000 + o, 3), 'words': ws})
+            raw = [w for w in L.get('words', []) if w['text'].strip()]
+            ws = []
+            for k, w in enumerate(raw):  # Mureka word ends are near-onsets: extend each word to the next onset (max 0.9 s)
+                s0 = w['start'] / 1000 + o
+                nxt = raw[k + 1]['start'] / 1000 + o if k + 1 < len(raw) else s0 + 0.6
+                ws.append({'w': w['text'].strip(), 'd': w['text'].strip(), 's': round(s0, 3), 'e': round(min(nxt, s0 + 0.9), 3)})
+            lines.append({'id': len(lines), 'sec': name, 'text': L['text'], 'display': L['text'], 's': ws[0]['s'] if ws else round(L['start'] / 1000 + o, 3), 'e': ws[-1]['e'] if ws else round(L['end'] / 1000 + o, 3), 'words': ws})
             words += ws
     tl = {'bpm': float(np.atleast_1d(tempo)[0]), 'offset': 0, 'duration': round(dur, 3), 'beats': [round(float(b), 4) for b in beats], 'barPhase': 0,
           'sections': sections, 'words': words, 'lines': lines, 'audio': a.src, 'source': {'task': q.get('id'), 'index': a.index, 'model': q.get('model')}}
