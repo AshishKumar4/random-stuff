@@ -107,7 +107,9 @@
         const r0 = i / n * rmax, r1 = (i + 1) / n * rmax, lv = level((i + .5) / n);
         if (lv <= 0) continue;
         L.beginPath(); if (i === n - 1) L.rect(0, 0, cw, ch); else L.arc(cx * s, cy * s, r1 * s, 0, TAU);
-        if (r0 > 0) L.arc(cx * s, cy * s, r0 * s, 0, TAU, true);
+        // rings overlap by 2 device px: abutting anti-aliased edges would each keep a sliver of ink and leave
+        // faint concentric seams on the drained paper
+        if (r0 > 0) L.arc(cx * s, cy * s, Math.max(0, r0 * s - 2), 0, TAU, true);
         L.fillStyle = L.createPattern(bayerCanvas(lv, cell), 'repeat'); L.fill('evenodd');
       }
     }
@@ -181,27 +183,28 @@
   // ------------------------------------------------------------------ choreography (R units, body space, y up)
   // A pose is a flat record; strings snap one third into a transition (expression swaps land on 1s).
   const P0 = { dy: 0, crouch: 0, sy: 1, lean: 0, hTilt: 0, hDy: 0, lx: -.9, ly: 2.85, rx: .9, ry: 2.85, flare: 1, droop: 0, lower: 0, gx: 0, gy: 0, wav: 0, lid: 0, blush: .8,
-    eyes: 'normal', mouth: 'sing', lt: 'mitten', rt: 'mitten', lf: 0, rf: 0, brows: null, trem: 0, knee: 1 };
+    eyes: 'normal', mouth: 'sing', lt: 'mitten', rt: 'mitten', lf: 0, rf: 0, brows: null, trem: 0, knee: 1, palm: 0 };
   // the 안녕 wave: identical after OVER and after BACK (that is the joke)
-  const WAVE = { ...P0, hTilt: -.07, hDy: .02, lx: -.82, ly: 3.0, rx: 1.2, ry: 5.4, rf: 1, flare: 1.05, lower: .4, eyes: 'happy', mouth: 'sing', wav: 1, knee: 1 };
+  // the hand is raised above the cheek line and opens into a palm (fingers fanned) so it reads as a wave, not a mic
+  const WAVE = { ...P0, hTilt: -.07, hDy: .02, lx: -.82, ly: 3.0, rx: 1.46, ry: 6.02, rf: 1, flare: 1.05, lower: .4, eyes: 'happy', mouth: 'sing', wav: 1, knee: 1, palm: 1 };
   const K = { // key poses (partial; resolved on top of the previous key)
-    RISE: { dy: .1, crouch: 0, sy: 1.04, lean: 0, hTilt: -.1, hDy: .05, lx: -1.05, ly: 3.35, rx: 1.05, ry: 3.35, rf: 0, flare: 1.06, droop: 0, lower: 0, eyes: 'normal', brows: 'angry', wav: 0, knee: 1 },
+    RISE: { palm: 0, dy: .1, crouch: 0, sy: 1.04, lean: 0, hTilt: -.1, hDy: .05, lx: -1.05, ly: 3.35, rx: 1.05, ry: 3.35, rf: 0, flare: 1.06, droop: 0, lower: 0, eyes: 'normal', brows: 'angry', wav: 0, knee: 1 },
     SLUMP1: { dy: 0, crouch: .1, sy: .93, lean: .05, hTilt: .26, hDy: -.3, lx: -.7, ly: 2.1, rx: .66, ry: 2.15, flare: .95, droop: .6, eyes: 'closed', brows: 'angry', knee: -.25 },
     SLUMP2: { crouch: .2, sy: .91, lean: -.07, hTilt: -.26, hDy: -.38, lx: -.84, ly: 1.95, rx: .56, ry: 2.05, droop: .8, knee: -.38 },
     SLUMP3: { crouch: .3, sy: .88, lean: .08, hTilt: .32, hDy: -.46, lx: -.58, ly: 1.7, rx: .68, ry: 1.65, droop: 1, flare: .9, eyes: 'TT', knee: -.45 },
-    DIP: { crouch: .16, sy: .95, hDy: -.12, lean: 0 },
-    CROUCH: { dy: 0, crouch: .24, sy: .9, lean: 0, hTilt: 0, hDy: -.14, lx: -.34, ly: 4.5, rx: .34, ry: 4.5, lf: 1, rf: 1, lt: 'mitten', rt: 'mitten', flare: .9, droop: 0, lower: 0, eyes: '><', brows: 'up', wav: 0, knee: 1 },
+    DIP: { palm: 0, crouch: .16, sy: .95, hDy: -.12, lean: 0 },
+    CROUCH: { palm: 0, dy: 0, crouch: .24, sy: .9, lean: 0, hTilt: 0, hDy: -.14, lx: -.34, ly: 4.5, rx: .34, ry: 4.5, lf: 1, rf: 1, lt: 'mitten', rt: 'mitten', flare: .9, droop: 0, lower: 0, eyes: '><', brows: 'up', wav: 0, knee: 1 },
     BURST: { dy: .12, crouch: 0, sy: 1.12, hTilt: 0, hDy: .08, lx: -1.32, ly: 5.8, rx: 1.32, ry: 5.8, lt: 'spark', rt: 'spark', lf: 1, rf: 1, flare: 1.2, eyes: 'star', brows: null },
     PUMP: { dy: .22, sy: 1.06, lx: -1.12, ly: 6.75, rx: 1.12, ry: 6.75, hTilt: .08, flare: 1.14 },
     LAND1: { dy: 0, sy: .95, crouch: .06 },
     VARMS: { dy: .26, crouch: 0, sy: 1.1, lx: -1.95, ly: 6.2, rx: 1.95, ry: 6.2, hTilt: -.07, flare: 1.24 },
     LAND2: { dy: 0, sy: .93, crouch: .08 },
     // chant 2: Opus alone drops into the anticipation crouch and holds it
-    HOPE: { dy: 0, crouch: .22, sy: .94, lean: 0, hTilt: 0, hDy: -.1, lx: -.33, ly: 4.52, rx: .33, ry: 4.52, lf: 1, rf: 1, lt: 'mitten', rt: 'mitten', flare: 1, droop: 0, lower: 0, eyes: 'normal', mouth: 'O', brows: 'angry', gx: 0, gy: -.2, wav: 0, trem: .3, knee: 1 },
+    HOPE: { palm: 0, dy: 0, crouch: .22, sy: .94, lean: 0, hTilt: 0, hDy: -.1, lx: -.33, ly: 4.52, rx: .33, ry: 4.52, lf: 1, rf: 1, lt: 'mitten', rt: 'mitten', flare: 1, droop: 0, lower: 0, eyes: 'normal', mouth: 'O', brows: 'angry', gx: 0, gy: -.2, wav: 0, trem: .3, knee: 1 },
     HOPE_UP: { crouch: .18, hDy: -.06, gy: -1, gx: 0, flare: 1.06, brows: 'angry', mouth: 'O' },
     HOPE_LENS: { gy: 0, gx: 0, flare: 1, mouth: 'M' },
     DEFLATE: { crouch: .26, sy: .92, hDy: -.16, hTilt: .05, lx: -.58, ly: 2.95, rx: .56, ry: 3.0, lf: 0, rf: 0, droop: .35, flare: .97, brows: 'angry', mouth: '._.', trem: 0 },
-    HOLD_SLUMP: { crouch: .14, sy: .91, hTilt: .26, hDy: -.36, droop: .9, eyes: 'closed', knee: -.45 },
+    HOLD_SLUMP: { palm: 0, crouch: .14, sy: .91, hTilt: .26, hDy: -.36, droop: .9, eyes: 'closed', knee: -.45 },
   };
   const f = F;
   const seqOver = o => [[o[0] - 6 * f, 3 * f, K.RISE, E.out2], [o[0] - 3 * f, 6 * f, K.SLUMP1, E.back], [o[1] - 3 * f, 6 * f, K.SLUMP2, E.back],
@@ -234,7 +237,7 @@
   // full pose with follow-through: head lags 2 frames, hands lag 3 (BIBLE §6.1 rig timing)
   function poseAt(tr, t) {
     const b = evalTrack(tr, t), h = evalTrack(tr, t - 2 * F), a = evalTrack(tr, t - 3 * F);
-    return { ...b, hTilt: h.hTilt, hDy: h.hDy, lx: a.lx, ly: a.ly, rx: a.rx, ry: a.ry, lt: a.lt, rt: a.rt, lf: a.lf, rf: a.rf };
+    return { ...b, hTilt: h.hTilt, hDy: h.hDy, lx: a.lx, ly: a.ly, rx: a.rx, ry: a.ry, lt: a.lt, rt: a.rt, lf: a.lf, rf: a.rf, palm: a.palm };
   }
   // pose record -> drawOpus state
   function toState(p, t, gr, tr, seed) {
@@ -247,13 +250,25 @@
       t, ground: gr, dy: p.dy - p.crouch + bob, sy: p.sy * (1 + .014 * p.trem * Math.sin(TAU * t / 1.7)), lean: p.lean,
       head: { tilt: p.hTilt + wig * .03, dy: p.hDy },
       armL: { hand: [p.lx, p.ly], bend: bendL, type: p.lt, front: !!p.lf },
-      armR: { hand: [p.rx + wig * .17, p.ry + Math.abs(wig) * .05], bend: bendR, type: p.rt, front: !!p.rf },
+      armR: { hand: [p.rx + wig * .2, p.ry - Math.abs(wig) * .06], bend: bendR, type: p.rt, front: !!p.rf, hold: p.palm > .5 ? openPalm(wig) : undefined },
       legL: { foot: [-.36, p.crouch], bend: -p.knee }, legR: { foot: [.36, p.crouch], bend: p.knee }, // knee < 0: knock-kneed slump
       face: { eyes: p.eyes, mouth, lower: p.lower, brows: p.brows, gaze: [p.gx, p.gy], lid: Math.max(p.lid, blinkAt(t, seed)), blush: p.blush },
       // the crown kicks on every beat; not in the chant-2 silence (the audio is gated from ≈95.6)
       crown: { flare: p.flare * (1 + .06 * (t > 95.6 && t < 98 ? 0 : pulse(t, 8))), droop: p.droop, tremble: p.trem },
       ahoge: { blink: ahogeBlink(t) },
       drive: tr ? (u => { const q = evalTrack(tr, u - 2 * F); return q.hTilt + q.hDy * .6 + q.lean * .8 - q.crouch * .3; }) : null,
+    };
+  }
+  // open palm for the 안녕 wave (drawn in hand-local px by the rig's `hold` hook): four fanned fingers and a thumb
+  // tucked behind the palm disc, the whole hand wagging from the wrist on the eighths
+  function openPalm(wig) {
+    return (x, R) => {
+      const lw = Math.max(1.6, .04 * R), r = .2 * R;
+      x.save(); x.rotate(wig * .28); x.lineJoin = 'round'; x.lineWidth = lw; x.strokeStyle = C.INK; x.fillStyle = C.FACE;
+      for (const a of [-.56, -.19, .18, .54]) { x.save(); x.rotate(a); rr(x, -.06 * R, -r - .16 * R, .12 * R, .28 * R, .06 * R); x.fill(); x.stroke(); x.restore(); }
+      x.save(); x.rotate(-1.35); rr(x, -.06 * R, -r - .09 * R, .12 * R, .2 * R, .06 * R); x.fill(); x.stroke(); x.restore();
+      x.beginPath(); x.arc(0, 0, r * 1.04, 0, TAU); x.fill(); x.stroke();
+      x.restore();
     };
   }
   // where the head is (R units above the sole, x offset) for the floating PINK bubble
@@ -325,7 +340,7 @@
   }
 
   // ------------------------------------------------------------------ formation (perspective wedge; V of 5 at the front)
-  const HOR = 500, FLOOR = 1055, SPX = 185, R_OP = 52, R_IN = 46;
+  const HOR = 500, FLOOR = 1055, SPX = 176, R_OP = 52, R_IN = 46;
   const zRow = r => 1 + .25 * r;
   function slot(r, c) { const z = zRow(r); return { r, c, x: 960 + c * SPX * (1 + .07 * Math.max(0, r - 2)) / z, y: HOR + (FLOOR - HOR) / z, R: (r === 0 ? R_OP : R_IN) / z, z }; }
   const isV = (r, c) => r <= 2 && Math.abs(c) === r;
@@ -487,11 +502,12 @@
     if (_c1) return _c1;
     const bars = C1.bars.map(b => ({ ...b, o: onsets(b.n, b.kind) }));
     const tr = track(bars.map(b => (b.kind === 'over' ? seqOver : seqBack)(b.o)));
-    const FL = { init: 1, list: [{ s: C1.t0 - F, d: 3 * F, to: 0 }, ...bars.slice(1).map(b => ({ s: b.o[0] - 6 * F, d: 4 * F, to: b.kind === 'back' ? 1 : 0 }))] };
+    // the first lift rides the S14 whip-pan (the INK page leaves frame left, see the scene), so the flips start at bar 26
+    const FL = { init: 0, list: bars.slice(1).map(b => ({ s: b.o[0] - 6 * F, d: 4 * F, to: b.kind === 'back' ? 1 : 0 })) };
     const slams = bars.flatMap(b => b.o.slice(0, 4));
     const b27 = bars[2].o;
     const stageT = [0, b27[1] - 2 * F, b27[2] - 2 * F, b27[3] - 2 * F]; // 5 -> 16 -> 64 -> 256, one per beat of bar 27
-    return (_c1 = { bars, tr, FL, slams, stageT, pair2: bars[2].o[0] - 6 * F, flipT: FL.list.map(f => f.s + f.d) });
+    return (_c1 = { bars, tr, FL, slams, stageT, pair2: bars[2].o[0] - 6 * F, flipT: [C1.t0 + 2 * F, ...FL.list.map(f => f.s + f.d)] });
   }
 
   scene('S15_chant_so_over_so_back', C1.t0, C1.t1, (X0, t) => viaCPU(X0, X => {
@@ -502,6 +518,14 @@
     const land = clamp((t - C1.t0) / (4 * F)), wx = (1 - E.out3(land)) * 340;
     const z = 1 + .03 * punch(t, D.slams);
     const cam = makeCam(960, 780, z, 960 + wx, 780);
+    // S14's INK page exits left with the pan (its noisy flood edge and CLAY sliver) as the paper stage arrives
+    if (land < 1) {
+      const edge = wx * 1.7 - 300;
+      if (edge > -40) {
+        X.save(); X.translate(-2, 2); noisyRect(X, -80, 22, edge, H - 22, 25); X.fillStyle = C.CLAY; X.fill(); X.restore();
+        noisyRect(X, -80, 22, edge, H - 22, 25); X.fillStyle = C.INK; X.fill();
+      }
+    }
     lamps(X, t, cam, k, gr === 'ink' ? 1 : 0, D.flipT);
     floorSpot(X, cam, gr, t > D.stageT[1] ? 560 : 340);
     // pair 2: the crowd multiplies behind the type (ripple of per-dancer time offsets)
@@ -552,7 +576,7 @@
   // ================================================================== S26 + S27 (chant 2)
   const T49 = barT(49), T51 = barT(51), T52 = barT(52), T53 = barT(53);
   const CLOSE = [{ slot: [2, 2], t: T51 + BEAT }, { slot: [1, -1], t: T51 + 1.5 * BEAT }, { slot: [1, 1], t: T51 + 2 * BEAT }]; // × on eighths
-  const GAP = slot(2, -2);
+  const GAP = slot(2, -2), DOT_UP = 5.4, DOT_R = .34; // residue dot: at face height, 0.34 R
   let _c2 = null;
   function c2Data() {
     if (_c2) return _c2;
@@ -591,7 +615,7 @@
     else floorSpot(X, cam, gr, 300);
     // the gap in the V: a grey dot where an instance should be (the residue lifts with the ink)
     const resA = 1 - seg(t, T52 - 3 * F, T52 + 5 * F);
-    if (resA > 0) { const [gx, gy] = cam.p(GAP.x, GAP.y - 3.6 * GAP.R); X.save(); X.globalAlpha = resA; X.fillStyle = C.UI_GREY; X.beginPath(); X.arc(gx, gy, .22 * GAP.R * cam.z, 0, TAU); X.fill(); X.restore(); }
+    if (resA > 0) { const [gx, gy] = cam.p(GAP.x, GAP.y - DOT_UP * GAP.R); X.save(); X.globalAlpha = resA; X.fillStyle = C.UI_GREY; X.beginPath(); X.arc(gx, gy, DOT_R * GAP.R * cam.z, 0, TAU); X.fill(); X.restore(); }
     if (t >= T51 - 3 * F) withheldBack(X, t);
     // calls (bars 49, 50)
     X.save(); cam.apply(X);
@@ -625,11 +649,11 @@
   function closingInstance(X, cam, d, tr, t, gr, id, tc, resA = 1) {
     const fr = (t - tc) * 30;
     const p = poseAt(tr, t), hd = headOf(p);
-    const cxW = d.x, cyW = d.y - 3.6 * d.R; // implosion centre (chest)
+    const cxW = d.x, cyW = d.y - DOT_UP * d.R; // implosion centre (the face: it closes like an eye, to a grey dot)
     const [cx, cy] = cam.p(cxW, cyW), R = d.R * cam.z;
     if (fr >= 5) { // grey dot residue
       const a = E.back(clamp((fr - 5) / 4), 3);
-      if (resA > 0) { X.save(); X.globalAlpha = resA; X.fillStyle = C.UI_GREY; X.beginPath(); X.arc(cx, cy, .22 * R * a, 0, TAU); X.fill(); X.restore(); }
+      if (resA > 0) { X.save(); X.globalAlpha = resA; X.fillStyle = C.UI_GREY; X.beginPath(); X.arc(cx, cy, DOT_R * R * a, 0, TAU); X.fill(); X.restore(); }
       return;
     }
     const L = fr >= -1 ? { k: fr < 2 ? 1 + .07 * E.out2(clamp((fr + 1) / 3)) : 1.07 * (1 - E.in2(clamp((fr - 2) / 3))), slices: fr >= 3 ? 7 : 0 } : { k: 1, slices: 0 };
@@ -638,7 +662,7 @@
     const kl = Math.max(3, .035 * R + 1.5);
     const rings = gr === 'ink' ? [[C.PAPER, 3.5 + kl], [C.INK, 3.5]] : [[C.PAPER, kl + 1]];
     const fig = composeFigure(id, R, st, rings, fr < -1 ? [hd[0] + BUBBLE[0], hd[1] + BUBBLE[1]] : null, G.scale);
-    blitFigure(X, fig, x, y, { k: L.k, pivot: 3.6 * R, slices: L.slices, sliceSeed: id * 9 + Math.floor(fr) });
+    blitFigure(X, fig, x, y, { k: L.k, pivot: DOT_UP * R, slices: L.slices, sliceSeed: id * 9 + Math.floor(fr) });
     // reversed particle paths into the centre
     if (fr >= 0) {
       X.save(); const u = clamp(fr / 5);
