@@ -1038,8 +1038,10 @@
 
   // ---------------------------------------------------------------- registration
   scene('F0', -1, .5 / 30, (X, t) => viaCPU(X, F => desk(F, t)));
-  scene('S01', .5 / 30, 3.11, (X, t) => viaCPU(X, F => desk(F, t)));
-  scene('S02', 3.11, 3.75, (X, t) => viaCPU(X, F => desk(F, t)));
+  // S01 runs to the end of the implosion, S02 (WORLD, the dash, the heap, I DO IT) to the print-in; both are desk()
+  const S02_T0 = clamp(TM().tW, 1.5, 3.5);
+  scene('S01', .5 / 30, S02_T0, (X, t) => viaCPU(X, F => desk(F, t)));
+  scene('S02', S02_T0, 3.75, (X, t) => viaCPU(X, F => desk(F, t)));
   scene('S03', 3.75, 6.56, (X, t) => viaCPU(X, F => sky(F, t)));
   scene('S04', 6.56, 7.5, (X, t) => viaCPU(X, F => sky(F, t)));
   window.HOOK = { poster: (X, t) => viaCPU(X, F => desk(F, Math.min(0, t))), times: TM };

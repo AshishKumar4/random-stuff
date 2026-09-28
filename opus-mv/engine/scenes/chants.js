@@ -62,23 +62,26 @@
   }
 
   // ------------------------------------------------------------------ lyric onsets (never hardcoded)
-  // Each bar: [call word 1, 2, 3, response]. All-or-nothing per bar: if the timeline doesn't carry the bar's words
-  // in order inside the bar, the whole bar falls back to the beat grid (b1..b4), so the choreography never tears.
+  // Each bar: [pickup, downbeat word, punch word, response] = [IT'S, SO, OVER, (ahn] / [WE'RE, SO, BACK, (ahn].
+  // As sung (composition A): IT'S / WE'RE is a 16th pickup, SO lands ON the downbeat, OVER / BACK on beat 2 and the
+  // (ahn-YOUNG!) answer on beat 3-and. The timeline carries the answer as "(ahn" + "young!)", and its onset snapping
+  // can give the pickup and SO the same start: SO is kept at least 3 frames after the pickup and, when it is that
+  // close to the bar line, locked to the downbeat it is sung on. All-or-nothing per bar: if the timeline doesn't carry
+  // the bar's words in order, the whole bar falls back to the composition's rhythm, so the choreography never tears.
   const WORDS = { over: ["IT'S", 'SO', 'OVER'], back: ["WE'RE", 'SO', 'BACK'] };
   const _ons = new Map();
   function onsets(n, kind, resp = true) {
     const key = `${n}${kind}${resp}`; if (_ons.has(key)) return _ons.get(key);
-    const T = barT(n), list = WORDS[kind].slice();
-    let out = [], lo = T - .3, ok = true;
-    for (let k = 0; k < (resp ? 4 : 3); k++) {
-      let w = null;
-      const cands = k === 3 ? ['AHN-YOUNG', '안녕'] : [list[k]];
-      for (const c of cands) { w = findWord(c, lo, k === 0 ? T + .9 : T + BAR - .05); if (w) break; }
-      if (!w) { ok = false; break; }
-      out.push(w.s); lo = w.s + .08;
-    }
-    if (!ok) out = [0, 1, 2, 3].map(k => T + k * BEAT);
-    else if (!resp) out.push(T + 3 * BEAT); // where the answer would have been
+    const T = barT(n), list = WORDS[kind];
+    const w0 = findWord(list[0], T - .4, T + .15), w1 = w0 && findWord(list[1], w0.s - .01, T + .4);
+    const w2 = w1 && findWord(list[2], Math.max(w1.s, T) + .15, T + 2 * BEAT);
+    const w3 = resp && w2 ? (findWord('ahn', w2.s + .3, T + BAR - .05) || findWord('안녕', w2.s + .3, T + BAR - .05)) : null;
+    let out;
+    if (w0 && w1 && w2 && (w3 || !resp)) {
+      let so = Math.max(w1.s, w0.s + 3 * F);
+      if (Math.abs(so - T) < .12) so = T;
+      out = [w0.s, so, w2.s, resp ? w3.s : T + 3 * BEAT]; // (no answer: where it would have been, the end of the held OVER)
+    } else out = [T - BEAT / 4, T, T + BEAT, resp ? T + 2.5 * BEAT : T + 3 * BEAT];
     _ons.set(key, out);
     return out;
   }
@@ -206,11 +209,14 @@
     DEFLATE: { crouch: .26, sy: .92, hDy: -.16, hTilt: .05, lx: -.58, ly: 2.95, rx: .56, ry: 3.0, lf: 0, rf: 0, droop: .35, flare: .97, brows: 'angry', mouth: '._.', trem: 0 },
     HOLD_SLUMP: { palm: 0, crouch: .14, sy: .91, hTilt: .26, hDy: -.36, droop: .9, eyes: 'closed', knee: -.45 },
   };
-  const f = F;
-  const seqOver = o => [[o[0] - 6 * f, 3 * f, K.RISE, E.out2], [o[0] - 3 * f, 6 * f, K.SLUMP1, E.back], [o[1] - 3 * f, 6 * f, K.SLUMP2, E.back],
-    [o[2] - 3 * f, 7 * f, K.SLUMP3, E.back], [o[3] - 5 * f, 2 * f, K.DIP, E.out2], [o[3] - 3 * f, 7 * f, WAVE, E.back]];
-  const seqBack = o => [[o[0] - 7 * f, 4 * f, K.CROUCH, E.out3], [o[0] - 3 * f, 6 * f, K.BURST, E.back], [o[1] - 3 * f, 6 * f, K.PUMP, E.back],
-    [o[1] + 5 * f, 3 * f, K.LAND1, E.in3], [o[2] - 3 * f, 6 * f, K.VARMS, E.back], [o[2] + 5 * f, 4 * f, K.LAND2, E.in3],
+  const f = F, E8 = BEAT / 2;
+  // o = [pickup, SO (downbeat), OVER/BACK (beat 2), (ahn (beat 3-and)]. Hits land 3 frames early and settle on the syllable.
+  // OVER: rise on the pickup, then three hits down, one per sung syllable (SO / O- / -VER), then the 안녕 wave.
+  const seqOver = o => [[o[1] - 6 * f, 3 * f, K.RISE, E.out2], [o[1] - 3 * f, 6 * f, K.SLUMP1, E.back], [o[2] - 3 * f, 6 * f, K.SLUMP2, E.back],
+    [o[2] + E8 - 3 * f, 7 * f, K.SLUMP3, E.back], [o[3] - 5 * f, 2 * f, K.DIP, E.out2], [o[3] - 3 * f, 7 * f, WAVE, E.back]];
+  // BACK: fists at the chin on the pickup, SO bursts into spark hands, BACK throws the V, the same 안녕 wave.
+  const seqBack = o => [[o[1] - 7 * f, 4 * f, K.CROUCH, E.out3], [o[1] - 3 * f, 6 * f, K.BURST, E.back], [o[1] + 5 * f, 3 * f, K.LAND1, E.in3],
+    [o[2] - 3 * f, 6 * f, K.VARMS, E.back], [o[2] + E8 - 2 * f, 5 * f, K.PUMP, E.back], [o[2] + E8 + 3 * f, 3 * f, K.LAND2, E.in3],
     [o[3] - 5 * f, 2 * f, K.DIP, E.out2], [o[3] - 3 * f, 7 * f, WAVE, E.back]];
 
   function blendP(a, b, k) {
@@ -340,7 +346,11 @@
   }
 
   // ------------------------------------------------------------------ formation (perspective wedge; V of 5 at the front)
-  const HOR = 500, FLOOR = 1055, SPX = 176, R_OP = 52, R_IN = 46;
+  const HOR = 500, FLOOR = 1055, SPX = 164, R_OP = 56, R_IN = 46;
+  // framing (world -> screen): pair 1 and chant 2 sit close on the lead, waist-up (R_OP·Z1 ≈ 84 px, boots below the
+  // frame); pair 2 cranes back as the formation multiplies so the 256 wedge reads, the lead still in front at R ≈ 62.
+  const Z1 = 1.5, SY1 = 1188, Z2 = 1.1, SY2 = 1096;
+  const LCAM = { ax: 960, ay: 540, z: 1, sx: 960, sy: 540, p: (x, y) => [x, y], apply() {} }; // lamps hang in screen space
   const zRow = r => 1 + .25 * r;
   function slot(r, c) { const z = zRow(r); return { r, c, x: 960 + c * SPX * (1 + .07 * Math.max(0, r - 2)) / z, y: HOR + (FLOOR - HOR) / z, R: (r === 0 ? R_OP : R_IN) / z, z }; }
   const isV = (r, c) => r <= 2 && Math.abs(c) === r;
@@ -362,30 +372,41 @@
   const BUBBLE = [-.5, 3.05]; // bubble offset from the head (R units): up-left, clear of the cursor ahoge
 
   // ------------------------------------------------------------------ type
-  const ROWS = { over: [["IT'S", 270], ['SO', 270], ['OVER', 270]], back: [["WE'RE", 230], ['SO', 270], ['BACK', 270]] };
-  // baselines. The stack sits above the dancers (their crowns overlap the bottom row) and the top row is cropped by the
-  // frame / flood edge through the tops of its letters (CROP). See the report: the bible's bottom-row crop put the
-  // dancers' bodies over SO and OVER, and the pun stopped reading.
-  const BASE = [176, 400, 624], STACK_CY = 307;
+  // The call is a justified two-row block in the 9:16 core, sized to the sung rhythm: row 1 carries the pickup and the
+  // downbeat (IT'S SO / WE'RE SO, sung as one gesture), row 2 the punch word on beat 2 (OVER / BACK, the biggest type).
+  // Each row is sized to the same 548 px column (≤ 560 with breathing), so both calls print as the same block. Nothing
+  // is cropped by the frame: the block sits above the dancers and the front crowns overlap only the punch word's feet.
+  const COLW = 548, ROW_GAP = 30, BLOCK_BASE = 448;
+  const CALLS = { over: [["IT'S", 'SO'], 'OVER'], back: [["WE'RE", 'SO'], 'BACK'] };
   const _hw = new Map();
   const heroW = (X, s, z) => { const k = s + z; if (!_hw.has(k)) _hw.set(k, heroWidth(X, s, z, 'xcond')); return _hw.get(k); };
+  const _lay = {};
+  function callLayout(X, kind) {
+    if (_lay[kind]) return _lay[kind];
+    const [[a, b], p] = CALLS[kind], r1 = a + ' ' + b;
+    const s1 = Math.floor(COLW * 100 / heroW(X, r1, 100)), s2 = Math.floor(COLW * 100 / heroW(X, p, 100));
+    const y2 = BLOCK_BASE, y1 = Math.round(y2 - .69 * s2 - ROW_GAP);
+    const wA = heroW(X, a, s1), wB = heroW(X, b, s1), wR = heroW(X, r1, s1), x0 = 960 - wR / 2;
+    const words = [{ str: a, size: s1, x: x0 + wA / 2, y: y1, w: wA, row: 0 }, { str: b, size: s1, x: x0 + wR - wB / 2, y: y1, w: wB, row: 0 },
+      { str: p, size: s2, x: 960, y: y2, w: heroW(X, p, s2), row: 1 }];
+    return (_lay[kind] = { words, rowW: [wR, words[2].w], top: y1 - .69 * s1, cy: (y1 - .69 * s1 + y2) / 2 });
+  }
   function drawCall(X, t, bar, alpha = 1) {
-    const o = bar.o, kind = bar.kind === 'back' ? 'back' : 'over', rows = ROWS[kind];
+    const o = bar.o, kind = bar.kind === 'back' ? 'back' : 'over', Lay = callLayout(X, kind);
     const col = kind === 'back' ? C.PAPER : C.INK;
     const tDrop = o[3] - 5 * F; // falls during the dip, so 안녕 lands on a clear sky
-    for (let k = 0; k < 3; k++) {
-      const age = t - (o[k] - 2 * F); if (age < 0) continue;
-      const [str, size] = rows[k];
-      let x = 960, y = BASE[k], rot = 0;
-      const dd = t - tDrop - (2 - k) * F * .5; // gravity drop-away, bottom row first, 6 frames to clear the frame
-      if (dd > 0) { y += 30000 * dd * dd + 1500 * dd; rot = (hash(k + bar.n * 7) - .5) * dd * 2.4; x += (hash(k + 3 + bar.n * 7) - .5) * dd * 500; if (y - size > 1200) continue; }
-      const wd = heroW(X, str, size);
-      const sx = Math.min(560 / wd, .975 + .045 * pulse(t, 6)); // breathe, clamped so the row never passes 560 px
+    Lay.words.forEach((w, k) => {
+      const age = t - (o[k] - 2 * F); if (age < 0) return;
+      // breathe on the beat about the column centre, clamped so a row never passes 560 px
+      const sx = Math.min(560 / Lay.rowW[w.row], .975 + .045 * pulse(t, 6));
+      let x = 960 + (w.x - 960) * sx, y = w.y, rot = 0;
+      const dd = t - tDrop - (w.row ? 0 : F); // gravity drop-away, the punch word first, 6 frames to clear the frame
+      if (dd > 0) { y += 30000 * dd * dd + 1500 * dd; rot = (hash(k + bar.n * 7) - .5) * dd * 2.4; x += (hash(k + 3 + bar.n * 7) - .5) * dd * 500; if (y - w.size > 1200) return; }
       X.save(); X.globalAlpha *= alpha; X.translate(x, y); X.rotate(rot);
-      hero(X, str, 0, 0, size, { stretch: 'xcond', color: col, shadow: C.CLAY_DARK, shadowOff: 7, sx, age });
+      hero(X, w.str, 0, 0, w.size, { stretch: 'xcond', color: col, shadow: C.CLAY_DARK, shadowOff: w.row ? 8 : 6, sx, age });
       X.restore();
-      scraps(X, t, o[k] - 2 * F + .05, x, y, wd * .9, bar.n * 13 + k, kind === 'back' ? [C.PAPER, C.CLAY] : [C.INK, C.CLAY]);
-    }
+      scraps(X, t, o[k] - 2 * F + .05, x, y, w.w * .9, bar.n * 13 + k, kind === 'back' ? [C.PAPER, C.CLAY] : [C.INK, C.CLAY]);
+    });
   }
   // 6-10 paper scraps kicked off a slam
   function scraps(X, t, t0, cx, cy, wd, seed, cols) {
@@ -410,7 +431,7 @@
     const s = E.back(clamp(a / (7 * F)), 2.4) * (1 - E.inBack(out) * .95), al = out >= 1 ? 0 : 1;
     const rot = -.035 + (1 - E.out3(clamp(a / .3))) * -.14;
     X.save(); X.globalAlpha *= al;
-    X.save(); X.translate(960, 360); X.rotate(rot); X.scale(s, s);
+    X.save(); X.translate(960, 336); X.rotate(rot); X.scale(s, s);
     X.font = `900 300px ${FONTS.hangul}`; X.textAlign = 'center'; X.textBaseline = 'alphabetic'; X.lineJoin = 'round';
     if (gr === 'ink') { // die-cut PAPER keyline around the INK outline and the shadow (the sticker reads on INK)
       X.strokeStyle = C.PAPER; X.lineWidth = 30; X.strokeText('안녕', 0, 0);
@@ -427,7 +448,7 @@
       X.font = mono(96, 600); X.textAlign = 'center'; X.textBaseline = 'alphabetic';
       const full = X.measureText(gloss).width;
       X.fillStyle = gr === 'ink' ? C.PAPER : C.INK; X.textAlign = 'left';
-      X.fillText(str, 960 - full / 2, 492);
+      X.fillText(str, 960 - full / 2, 450);
     }
     X.restore();
   }
