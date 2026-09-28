@@ -170,7 +170,7 @@
   }
   // draws lines [top, top+n) in a clipped column; `hlRow` = which source line wears the SPARK selection
   function scrollback(c, o) {
-    const { x0 = 96, y0 = 300, x1 = 1420, y1 = 840, size = 48, lh = 58, top = 0, hl = -1, alpha = 1, base = 36, reveal = 99, smear = 0 } = o;
+    const { x0 = 96, y0 = 300, x1 = 1420, y1 = 840, size = 48, lh = 58, top = 0, hl = -1, alpha = 1, base = 36, reveal = 99, smear = 0, lowFrom = 99, lowA = 1 } = o;
     const L = srcLines().lines, adv = size * .6;
     c.save(); c.beginPath(); c.rect(x0 - 20, y0, x1 - x0 + 40, y1 - y0); c.clip();
     c.font = mono(size, 500); c.textAlign = 'left';
@@ -188,7 +188,7 @@
         continue;
       }
       const cm = /^\s*\/\//.test(s);
-      c.fillStyle = cm ? C.UI_GREY : C.TEAL; c.globalAlpha = alpha * (cm ? .6 : .66);
+      c.fillStyle = cm ? C.UI_GREY : C.TEAL; c.globalAlpha = alpha * (cm ? .6 : .66) * (k >= lowFrom ? lowA : 1);
       c.fillText(vis, x0, y);
       if (smear) { c.globalAlpha = alpha * .22; c.fillText(vis, x0, y + smear); c.globalAlpha = alpha * .1; c.fillText(vis, x0, y + smear * 2); }
     }
@@ -238,7 +238,7 @@
     c.globalAlpha = o.alpha ?? 1; c.drawImage(gc, bx0, by0, bw, bh, bx0, by0, bw, bh);
     if (o.reveal !== undefined) c.restore();
     c.restore();
-    if (o.reveal !== undefined && o.reveal < 1) { c.save(); c.fillStyle = C.SPARK; c.globalAlpha = .9; c.fillRect(x - 3.2 * R, revY - lh * .9, 6.4 * R, 4); c.restore(); }
+    if (o.reveal !== undefined && o.reveal < 1) { c.save(); c.fillStyle = C.SPARK; c.globalAlpha = .9; c.fillRect(x - 2 * R, revY - lh * .9, 4 * R, 5); c.restore(); }
   }
   function textBodyOpus(ctx, t) {
     const a = TB_ARGS; if (!a) return;
@@ -400,7 +400,7 @@
     const S = srcLines();
     const top = S.hl - 2 + (o.scroll || 0);
     const revRows = u < 2 * F ? -1 : Math.floor((u - 2 * F) / F * 2);
-    scrollback(c, { top, hl: S.hl, reveal: revRows, alpha: o.dim ?? 1 });
+    scrollback(c, { top, hl: S.hl, reveal: revRows, alpha: o.dim ?? 1, lowFrom: 5, lowA: .34 });
     // the folder, the minis, the text-body Opus
     const fo = o.folderOpen ?? E.back(seg(t, ENTER, ENTER + 4 * F), 2);
     const fpop = E.back(seg(u, 3 * F, 8 * F), 2.2);
@@ -463,7 +463,7 @@
     const hand = [lerp(1.2, .66, snap), lerp(4.6, 6.12, snap) + trem];
     const st = {
       rays5: true, t, ground: 'ink', lean: -.02 * snap, dy: .03 * snap,
-      armR: { hand, bend: -1, front: true, type: 'mitten' }, armL: { hand: [-.92, 2.95], bend: -1 },
+      armR: { hand, bend: -1, front: true, type: 'mitten', hold: saluteBlade(snap) }, armL: { hand: [-.92, 2.95], bend: -1 },
       head: { tilt: -.05 * snap }, face: { eyes: 'normal', mouth: a > BEAT ? 'wobble' : 'M', brows: 'angry', gaze: [0, -.3], lower: .18, lid: Math.max(.22, blinkF(t, bt(61, 4) - F)) },
       crown: { flare: .97, droop: .12 + .08 * clamp((a - BEAT) / BEAT) }, ahoge: { blink: ahogeBlink(t), sway: -.15 }, jacketRow: beatN(t),
     };
@@ -473,6 +473,13 @@
     blit(c, L);
     c.restore();
   }
+  // the salute's flat hand: fingers together in one blade laid along the brow (the rig's mitten alone reads as a facepalm)
+  const saluteBlade = k => (x, R) => {
+    x.save(); x.rotate(Math.PI + lerp(-.9, .32, k)); x.lineJoin = 'round';
+    rr(x, -.02 * R, -.11 * R, .56 * R, .22 * R, .11 * R); x.fillStyle = C.FACE; x.fill(); x.lineWidth = Math.max(3, .045 * R); x.strokeStyle = C.INK; x.stroke();
+    x.beginPath(); x.moveTo(.2 * R, -.02 * R); x.lineTo(.46 * R, -.02 * R); x.lineWidth = Math.max(2, .025 * R); x.stroke();
+    x.restore();
+  };
   const blinkF = (t, t0) => { const d = (t - t0) * 30; if (d < 0 || d >= 6) return 0; if (d < 2) return d / 2; if (d < 3) return 1; return 1 - (d - 3) / 3; };
 
   // ------------------------------------------------------------------ bar 62 (b): the 12-ray silhouette from diff lines
@@ -492,13 +499,13 @@
       const t0 = hash(j * 3 + 7) * .5, kk = E.out3(clamp((k - t0) / .3));
       if (kk <= 0) continue;
       const dir = j % 2 ? 1 : -1, off = (1 - kk) * 1000 * dir;
-      D.globalAlpha = 1; D.fillStyle = del ? mix(C.UI_GREY, C.INK, .3) : C.TEAL;
+      D.globalAlpha = 1; D.fillStyle = del ? C.SPARK : C.PAPER;
       D.fillRect(cx - 2.2 * r + off, y + 1, 4.4 * r, lh - 3);
-      D.fillStyle = C.INK; D.globalAlpha = .75;
+      D.fillStyle = C.INK; D.globalAlpha = .8;
       D.fillText((del ? '- ' : '+ ') + src.substr((j * 97) % 800, 64), cx - 2.2 * r + off + 8, y + lh - 5);
     }
     D.globalAlpha = 1; D.globalCompositeOperation = 'destination-in'; D.setTransform(1, 0, 0, 1, 0, 0); D.drawImage(layC('bu_mask'), 0, 0);
-    c.save(); c.globalAlpha = .5; c.setTransform(1, 0, 0, 1, 0, 0); c.drawImage(layC('bu_diff'), 0, 0); c.restore();
+    c.save(); c.globalAlpha = .34; c.setTransform(1, 0, 0, 1, 0, 0); c.drawImage(layC('bu_diff'), 0, 0); c.restore();
     c.save(); c.translate(cx, cy); c.globalAlpha = .55 * E.out2(k); c.strokeStyle = C.PAPER; c.lineWidth = 4;
     for (let i = 0; i < 12; i++) { rayPath(c, i / 12 * TAU + .13, .8 * r, 1.05 * r, .6 * r * .62, -.06); c.stroke(); }
     c.restore();
@@ -720,7 +727,7 @@
     yank: { lean: -.1, dy: .04, armR: { hand: [1.62, 4.35], bend: -1, front: true }, armL: { hand: [-1.25, 3.95], bend: -1 }, head: { tilt: -.07 }, face: { eyes: '><', mouth: 'E' } },
     show: { lean: -.03, armR: { hand: [1.5, 4.8], bend: -1, front: true }, armL: { hand: [-1.0, 2.95], bend: -1 }, head: { tilt: -.08 }, face: { eyes: 'normal', gaze: [.25, 0], mouth: 'I' } },
     offer: { lean: .06, armR: { hand: [1.85, 4.5], bend: -1, front: true }, armL: { hand: [-1.0, 2.95], bend: -1 }, head: { tilt: .05 }, face: { eyes: 'normal', gaze: [.6, .1], mouth: 'rest', lower: .22 } },
-    release: { lean: .02, armR: { hand: [1.0, 3.55], bend: -1, front: true }, armL: { hand: [-1.0, 2.95], bend: -1 }, head: { tilt: -.07 }, face: { eyes: 'happy', mouth: 'rest', lower: .4 } },
+    release: { lean: .02, dy: .02, armR: { hand: [.98, 2.9], bend: 1 }, armL: { hand: [-1.0, 2.95], bend: -1 }, head: { tilt: -.09 }, face: { eyes: 'happy', mouth: 'rest', lower: .4 } },
   };
   function pose33(t) {
     const K = [[K33.lift, 'reach'], [K33.fly, 'reach'], [K33.grab, 'yank', E.back], [K33.face, 'show', E.out3], [bt(63, 2) - 6 * F, 'show'], [bt(63, 2) - F, 'offer', E.back], [K33.land + 3 * F, 'offer'], [K33.land + 8 * F, 'release', E.out3]];
@@ -918,19 +925,36 @@
       if (lit) { c.save(); c.fillStyle = C.SPARK; star(c, q.x + rF * .8, q.y - rF * .8, rF * .4, .35, 4, 0); c.fill(); c.restore(); }
       else { c.save(); c.fillStyle = C.UI_GREY; c.fillRect(q.x + rF * .45, q.y + rF * .45, rF * .45, rF * .45); c.restore(); }
     }
+    // the camera flies into the core over the last 5 frames: the panel, label and cards rush past the lens
+    const zc = 1 + 2.6 * E.in2(bz);
+    c.save(); c.translate(CORE[0], CORE[1]); c.scale(zc, zc); c.translate(-CORE[0], -CORE[1]);
     debris(c, t, tau, Z);
     panel(c, t);
     spinLabel(c, t);
+    c.restore();
     // pause-bait, lower left
-    c.save(); c.font = mono(28, 500); c.fillStyle = C.PAPER; c.globalAlpha = .75 * seg(u, 4 * F, 10 * F); c.textAlign = 'left'; c.fillText('finite-time blow-up (claimed)', 60, 980); c.restore();
+    { // pause-bait on its own INK chip, so the vortex never runs through it
+      const pa = seg(u, 4 * F, 10 * F), str = 'finite-time blow-up (claimed)';
+      c.save(); c.globalAlpha = pa; rr(c, 96, 942, str.length * 16.8 + 28, 48, 10); c.fillStyle = rgba(C.INK, .9); c.fill();
+      c.font = mono(28, 500); c.fillStyle = C.PAPER; c.globalAlpha = .85 * pa; c.textAlign = 'left'; c.fillText(str, 110, 976); c.restore();
+    }
     hud(c, t);
     // the blow-up: WHITE erupts from the core
     const b = seg(t, TW - F - 5 * F, TW - F);
     if (b > 0) {
+      // WHITE erupts from the core: a ragged printed disc with a halftone fringe and 12 light spokes, doubling each frame
       G.post.paperTex = 1 - b; G.post.grain = 1 - b; if (b > .6) G.post.ground = 'inkx';
-      c.save(); c.fillStyle = C.WHITE;
-      c.beginPath(); c.arc(CORE[0], CORE[1], 1300 * E.in3(b) + 30 * b, 0, TAU); c.fill();
-      c.globalAlpha = .6 * b; c.lineWidth = 40; c.strokeStyle = C.WHITE; c.beginPath(); c.arc(CORE[0], CORE[1], 1300 * E.in2(b) + 160, 0, TAU); c.stroke();
+      const r = 1500 * Math.pow(b, 1.6) + 40;
+      const ragged = (rad, amp, seed) => { c.beginPath(); for (let i = 0; i <= 96; i++) { const a = i / 96 * TAU, q = rad * (1 + amp * noise1(i * .45, seed) + amp * .5 * noise1(i * 1.7, seed + 3)); const px = CORE[0] + Math.cos(a) * q, py = CORE[1] + Math.sin(a) * q * .9; i ? c.lineTo(px, py) : c.moveTo(px, py); } c.closePath(); };
+      c.save();
+      ragged(r * 1.32, .08, 5); c.fillStyle = dots(c, C.WHITE, .22, 16, 45); c.fill();
+      ragged(r * 1.14, .07, 6); c.fillStyle = dots(c, C.WHITE, .55, 16, 45); c.fill();
+      c.fillStyle = C.WHITE;
+      for (let i = 0; i < 12; i++) { // spokes
+        const a = i / 12 * TAU + .13 + hash(i + 7) * .2, L = r * (1.5 + hash(i) * .9), w = .05 + hash(i + 3) * .04;
+        c.beginPath(); c.moveTo(CORE[0] + Math.cos(a - w) * r * .8, CORE[1] + Math.sin(a - w) * r * .72); c.lineTo(CORE[0] + Math.cos(a) * L, CORE[1] + Math.sin(a) * L * .9); c.lineTo(CORE[0] + Math.cos(a + w) * r * .8, CORE[1] + Math.sin(a + w) * r * .72); c.fill();
+      }
+      ragged(r, .06, 7); c.fill();
       c.restore();
     }
   }
@@ -984,7 +1008,8 @@
       const ang0 = [-2.4, -.25, 2.2][k], ang = ang0 + a * .9;
       const r = lerp(420, 1250, E.in2(a)), s = lerp(.55, 2.3, E.in3(a));
       const x = CORE[0] + Math.cos(ang) * r, y = CORE[1] + Math.sin(ang) * r * .7;
-      c.save(); c.translate(x, y); c.rotate(ang + Math.PI / 2 + (k - 1) * .3 + a * .6); c.scale(s, s); c.globalAlpha = clamp(a * 6) * clamp((1 - a) * 5);
+      // they tumble a little as they pass, but stay near upright so each card reads on pause
+      c.save(); c.translate(x, y); c.rotate([-.22, .18, -.12][k] + (a - .45) * [.5, -.45, .4][k]); c.scale(s, s); c.globalAlpha = clamp(a * 6) * clamp((1 - a) * 5);
       debrisCard(c, k, t);
       c.restore();
     }
@@ -1034,12 +1059,13 @@
     // the note, turned away from us (no text): the same 460 × 310 sheet as in S33, stuck on the key's top edge and swung
     // ~65° back, so it foreshortens into a narrow tilted page with a curl at its free corner and a halftone fold shade
     c.save(); c.translate(K[0] + ks * .1, K[1] - ks * .42); c.rotate(-.1); c.lineJoin = 'round';
-    const nw = 200, nh = 318, sk = -46;                  // projected width, height, perspective skew of the far edge
-    const sheet = () => { c.beginPath(); c.moveTo(0, 0); c.lineTo(nw, sk * .3); c.lineTo(nw, -nh + sk + 40); c.quadraticCurveTo(nw - 8, -nh + sk + 6, nw - 44, -nh + sk + 8); c.lineTo(0, -nh); c.closePath(); };
+    const nw = 176, nh = 262, sk = -34;                  // projected width, height, perspective skew of the far edge
+    const sheet = () => { c.beginPath(); c.moveTo(0, 0); c.lineTo(nw, sk * .3); c.lineTo(nw + 6, -nh + sk + 44); c.quadraticCurveTo(nw - 20, -nh + sk + 30, nw - 52, -nh + sk + 2); c.lineTo(0, -nh); c.closePath(); };
     sheet(); c.fillStyle = C.YELLOW; c.fill();
-    c.save(); sheet(); c.clip(); c.fillStyle = dots(c, C.INK, .1, 9, 45); c.fillRect(0, -nh + sk, 46, nh + 60); c.restore();
     sheet(); c.lineWidth = 5; c.strokeStyle = C.INK; c.stroke();
-    c.beginPath(); c.moveTo(nw - 44, -nh + sk + 8); c.quadraticCurveTo(nw - 30, -nh + sk + 30, nw, -nh + sk + 40); c.lineWidth = 4; c.stroke();
+    // the curled corner shows its underside: a small flap with a halftone shade
+    c.beginPath(); c.moveTo(nw - 52, -nh + sk + 2); c.quadraticCurveTo(nw - 8, -nh + sk - 6, nw + 6, -nh + sk + 44); c.quadraticCurveTo(nw - 22, -nh + sk + 34, nw - 52, -nh + sk + 2); c.closePath();
+    c.fillStyle = C.YELLOW; c.fill(); c.fillStyle = dots(c, C.INK, .16, 7, 45); c.fill(); c.lineWidth = 4; c.stroke();
     c.restore();
     keycap(c, K[0], K[1], ks, { glow: 0, rot: -.06 });
     humanHand(c, K[0], K[1], ks, 1, t, { line: C.INK, fill: C.WHITE, lw: 5, arm: [K[0] + 1100, K[1] + 420], part: 'front', seed: 11 });
