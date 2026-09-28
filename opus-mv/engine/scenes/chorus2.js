@@ -114,10 +114,12 @@
     burst: () => ({ dy: .04, sy: 1.05, armL: { hand: [-1.5, 5.95], bend: 1, type: 'spark', front: true }, armR: { hand: [1.5, 5.95], bend: -1, type: 'spark', front: true }, face: { eyes: 'star', mouth: 'A' }, crown: { flare: 1.24 } }),
     present: () => ({ lean: -.03, armL: { hand: [-1.55, 4.12], bend: 1, type: 'mitten', front: true }, armR: { hand: [1.3, 4.35], bend: -1, type: 'mitten' }, head: { tilt: -.1 }, face: { eyes: 'happy', mouth: 'O', lower: .3, gaze: [-.7, -.5] }, crown: { flare: 1.05 } }),
     cradle: () => ({ armL: { hand: [-.66, 3.16], bend: -1, type: 'mitten', front: true }, armR: { hand: [.66, 3.16], bend: 1, type: 'mitten', front: true }, head: { tilt: .05 }, face: { eyes: 'normal', gaze: [0, .7], lookY: .35, mouth: 'sing' } }),
-    window: () => ({ armL: { hand: [-.98, 3.02], bend: -1, type: 'point', fingerAng: -PI / 2, hold: thumb(0), front: true }, armR: { hand: [.98, 4.88], bend: 1, type: 'point', fingerAng: PI / 2, hold: thumb(PI), front: true }, head: { tilt: -.07 }, face: { eyes: 'normal', lid: .08, brows: 'angry', browY: -.02, gaze: [-.3, .55], lookY: .2, mouth: 'sing' } }),
-    windowOpen: () => ({ armL: { hand: [-1.22, 2.86], bend: -1, type: 'point', fingerAng: -PI / 2, hold: thumb(0), front: true }, armR: { hand: [1.22, 5.04], bend: 1, type: 'point', fingerAng: PI / 2, hold: thumb(PI), front: true }, head: { tilt: -.06 }, face: { eyes: 'normal', gaze: [-.9, -.3], mouth: 'O', brows: 'flat', browY: -.07 } }),
-    pinch: () => ({ armL: { hand: [-.24, 3.96], bend: -1, type: 'pinch', fingerAng: 0, front: true }, armR: { hand: [.24, 3.96], bend: 1, type: 'pinch', fingerAng: PI, front: true }, head: { tilt: .04 }, face: { eyes: 'normal', lid: .1, brows: 'angry', browY: -.03, mouth: 'M', gaze: [-.35, .35] } }),
-    wave: () => ({ armR: { hand: [.95, 5.3], bend: -1, type: 'wave', fingerAng: -PI / 2, front: true }, armL: { hand: [-.9, 2.95], bend: -1 }, head: { tilt: -.09 }, face: { eyes: 'happy', lower: .4, mouth: 'rest', gaze: [0, 0] } }),
+    // WINDOW & PINCH: chorus 1's geometry (a frame held at chest height, looked down into), heavier face
+    window: () => ({ armL: { hand: [-1.0, 4.42], bend: 1, type: 'point', fingerAng: PI / 2, hold: thumb(0), front: true }, armR: { hand: [1.0, 2.62], bend: 1, type: 'point', fingerAng: -PI / 2, hold: thumb(PI), front: true }, head: { tilt: -.07 }, face: { eyes: 'normal', lid: .12, lower: .34, brows: 'angry', browY: -.02, gaze: [-.2, .6], lookY: .25, mouth: 'sing' } }),
+    windowOpen: () => ({ armL: { hand: [-1.24, 4.56], bend: 1, type: 'point', fingerAng: PI / 2, hold: thumb(0), front: true }, armR: { hand: [1.26, 2.5], bend: 1, type: 'point', fingerAng: -PI / 2, hold: thumb(PI), front: true }, head: { tilt: .04 }, face: { eyes: 'normal', gaze: [-.9, -.3], mouth: 'O', brows: 'flat', browY: -.07 } }),
+    pinchOpen: () => ({ armL: { hand: [-1.04, 3.5], bend: -1, type: 'pinch', fingerAng: 0, front: true }, armR: { hand: [1.04, 3.5], bend: 1, type: 'pinch', fingerAng: PI, front: true }, head: { tilt: 0 }, face: { eyes: 'normal', lid: .1, brows: 'angry', browY: -.03, mouth: 'M', gaze: [0, .5], lookY: .2 } }),
+    pinch: () => ({ armL: { hand: [-.3, 3.52], bend: -1, type: 'pinch', fingerAng: 0, front: true }, armR: { hand: [.3, 3.52], bend: 1, type: 'pinch', fingerAng: PI, front: true }, head: { tilt: .04 }, face: { eyes: 'normal', lid: .16, brows: 'angry', browY: -.03, mouth: 'M', gaze: [-.35, .5], lookY: .2 } }),
+    wave: () => ({ armR: { hand: [.95, 5.3], bend: -1, type: 'wave', fingerAng: -PI / 2, front: true }, armL: { hand: [-.9, 2.95], bend: -1 }, head: { tilt: -.09 }, face: { eyes: 'happy', lower: .4, mouth: 'wobble', gaze: [0, 0] } }),
   };
   function full(p) {
     const o = fullPose(p);
@@ -164,9 +166,13 @@
   })());
   const choreoB = makeChoreo(KEYS_B);
 
-  // the foreground Opus: hops in from frame right on bar 43 b3, lands on b4
+  // the foreground Opus: hops in from frame right on bar 43 b3, lands on b4. It stands in the right third with its
+  // face above the STACK's cap line (magazine cover: masthead behind the head, cover lines over the body), so the
+  // quotable line reads whole while Opus is big. FG = rest place (R 120) and the lean-in peak (bar 44 b3).
+  const FG = { x: 1730, fy: 350, R: 120, xP: 1548, fyP: 292, RP: 200 };
+  const SPLIT = 452;                           // above this line (and inside the face disc) Opus is in front of the STACK
   let _HF = null;
-  const HOPF = () => _HF || (_HF = { take: A().MILLION - F - .02, land: bt(43, 4) - F, x0: 2380, x1: 1740, h: 1.25 });
+  const HOPF = () => _HF || (_HF = { take: A().MILLION - F - .02, land: bt(43, 4) - F, x0: 2380, x1: FG.x, h: 1.25 });
   function hopF(t) {
     const { take, land, x0, x1, h } = HOPF();
     if (t < take) return { wx: x0, dy: 0, sy: 1, air: true, u: 0 };
@@ -191,7 +197,8 @@
       [T47 - F, P.cradle, { app: .12, antD: 0, ant: 0, over: .06 }],
       [a.END + BEAT - F, P.window, { app: .2, antD: .08, ant: .1, over: .12, ease: E.io2 }],      // a beat late, slower
       [T48 - F, P.windowOpen, { app: .22, antD: 0, over: .08, ease: E.io2 }],
-      [a.PINCH - F, P.pinch, { app: .16, antD: .08, ant: .12, over: .14, ease: E.io2 }],
+      [a.PINCH - .2, P.pinchOpen, { app: .14, antD: 0, ant: 0, over: .06, ease: E.io2 }],
+      [a.PINCH - F, P.pinch, { app: .14, antD: .03, ant: .08, over: .14, ease: E.io2 }],
       [a.BYE2 - 2 * F, P.wave, { app: .12, antD: .06, ant: .1, over: .16 }],
     ];
   })());
@@ -206,7 +213,7 @@
     return v;
   };
   const driveB = driveOf(1, tt => { const q = choreoB(tt); return (q.head.tilt || 0) + (q.lean || 0) * 1.3 + (q.dy || 0) * .4; });
-  const driveF = driveOf(2, tt => { const q = choreoF(tt), h = hopF(tt); return (q.head.tilt || 0) + (q.lean || 0) * 1.3 + h.dy * .3 + (h.wx - 1740) / 480 + (q.dy || 0) * .4; });
+  const driveF = driveOf(2, tt => { const q = choreoF(tt), h = hopF(tt); return (q.head.tilt || 0) + (q.lean || 0) * 1.3 + h.dy * .3 + (h.wx - FG.x) / 480 + (q.dy || 0) * .4; });
 
   function grooveState(t, st, air) {
     const ph = frac(beatPos(t + F));
@@ -256,15 +263,15 @@
     st.ahoge = { ...st.ahoge, blink: ahogeBlink(t) };
     return Object.assign(st, { t, heroLine: true, ground: 'ink', drive: driveF, bufId: 1, wx: h.wx });
   }
-  // lean-in push on the foreground layer only: R 120 → 220 by the wink (bar 44 b3), back out over b4
+  // lean-in push on the foreground layer only: R 120 → 200 by the wink (bar 44 b3), back out over b4
   function pushK(t) {
     const a = A(), T = a.WINK - F;
     const k = hitK(t, T, { app: T - (bt(44, 2) - F), antD: .1, ant: .03, over: .04, ease: E.io3, fr: 2.2, dmp: 6 });
     return k * (1 - E.io3(seg(t, bt(44, 4) + .12, T45 - 2 * F)));
   }
   function fgPlace(t, st) {
-    const k = pushK(t), R = lerp(120, 212, k), faceY = lerp(522, 430, k);
-    return { x: st.wx + lerp(0, -272, k), y: faceY + 5.72 * R, R };
+    const k = pushK(t), R = lerp(FG.R, FG.RP, k), faceY = lerp(FG.fy, FG.fyP, k);
+    return { x: st.wx + lerp(0, FG.xP - FG.x, k), y: faceY + 5.72 * R, R };
   }
   const fgBody = (pl, st, bx, by) => [pl.x + bx * pl.R, pl.y - (by + st.dy) * pl.R * st.sy];
 
@@ -441,6 +448,8 @@
         let bi = 0; for (let i = 1; i < CLS.length; i++) if (votes[i] > votes[bi]) bi = i;
         out[b * GX + a] = bi;
       }
+      // a giant head, not a bust: nothing below the chin (the neck/collar read as a stray strip under the STACK)
+      for (let b = 0; b < GY; b++) if (b * 40 + 20 > MF.cy + MF.R + 12) for (let a = 0; a < GX; a++) { out[b * GX + a] = K_BG; }
       // blush: PINK tiles (every blush tile is a chat whose human is talking)
       for (let b = 0; b < GY; b++) for (let a = 0; a < GX; a++) {
         const px = a * 40 + 20, py = b * 40 + 20;
@@ -449,11 +458,11 @@
       // pixel-art eyes and mouth, authored on the tile grid (crisp at 40 px): INK almond, CLAY iris, SPARK core,
       // PAPER catchlight (the left eye's catchlight is our tile)
       const K_CLAY = 3, K_SPARK = 4, set_ = (a, b, k) => { if (a >= 0 && a < GX && b >= 0 && b < GY) out[b * GX + a] = k; };
-      const EYE = ['.KK.', 'KKKK', 'KPCK', 'KCSK', 'KCCK', 'KKKK', '.KK.'], WINK = ['....', '.KK.', 'K..K', 'K..K', '....', '....', '....'];
+      const EYE = ['.KK.', 'KKKK', 'KPCK', 'KCSK', 'KCCK', 'KKKK', '.KK.'], WINK = ['......', '......', '..KK..', '.KKKK.', 'KK..KK', 'K....K', '......'];
       const KM = { K: K_INK, P: K_PAPER, C: K_CLAY, S: K_SPARK };
       if (name !== 'star') for (const [a0, winkEye] of [[13, name === 'happy'], [23, name === 'wink' || name === 'happy']]) {
-        const pat = winkEye ? WINK : EYE;
-        for (let r = 0; r < 7; r++) for (let c = 0; c < 4; c++) { const ch = pat[r][c]; set_(a0 + c, 4 + r, ch === '.' ? K_FACE : KM[ch]); }
+        if (winkEye) for (let r = 0; r < 7; r++) for (let c = 0; c < 6; c++) { const ch = WINK[r][c]; if (ch !== '.') set_(a0 - 1 + c, 4 + r, KM[ch]); else if (c >= 1 && c <= 4) set_(a0 - 1 + c, 4 + r, K_FACE); }
+        else for (let r = 0; r < 7; r++) for (let c = 0; c < 4; c++) { const ch = EYE[r][c]; set_(a0 + c, 4 + r, ch === '.' ? K_FACE : KM[ch]); }
       }
       if (name !== 'star') { // the grin, with a PINK tongue
         for (let a = 18; a <= 21; a++) set_(a, 12, K_INK);
@@ -535,7 +544,7 @@
     const sparks = [], xs = [], pips = [], rafaRing = win(t, a_.WINK, a_.WINK + F);
     for (let b = b0; b <= b1; b++) for (let a = a0; a <= a1; a++) {
       let [cx, cy] = tileC(g, a, b);
-      if (cx + g.w < -20 || cx - g.w > W + 20 || cy + g.h < -20 || cy - g.h > H + 20) continue;
+      if (cx + g.w < -44 || cx - g.w > W + 44 || cy + g.h < -44 || cy - g.h > H + 44) continue;
       const brand = a === I0 && b === J0;
       if (brand && liveBrand) continue;
       const inGrid = a >= 0 && a < GX && b >= 0 && b < GY, i = inGrid ? b * GX + a : -1;
@@ -588,7 +597,7 @@
         Lx.globalAlpha = clamp(pink * 1.3); rr(Lx, cx + w * .4 - bw, cy + h * .36 - bh, bw, bh, bh * .45); Lx.fillStyle = C.PINK; Lx.fill(); Lx.globalAlpha = 1;
       }
       if (brand && t < SC.close[i] && t > bt(43, 4) + .3) { // our tile: a thin CLAY ring so the eye can find it
-        Lx.lineWidth = 2.5; Lx.strokeStyle = rgba(C.CLAY, .9); rr(Lx, cx - w / 2 - 2.5, cy - h / 2 - 2.5, w + 5, h + 5, 8); Lx.stroke();
+        Lx.lineWidth = 3.5; Lx.strokeStyle = C.CLAY; rr(Lx, cx - w / 2 - 3, cy - h / 2 - 3, w + 6, h + 6, 9); Lx.stroke();
       }
       if (rafaRing && a === RAFA.a && b === RAFA.b) { Lx.lineWidth = 6; Lx.strokeStyle = C.PINK; rr(Lx, cx - w / 2 - 7, cy - h / 2 - 7, w + 14, h + 14, 12); Lx.stroke(); }
     }
@@ -662,7 +671,7 @@
     X.restore();
     void a;
   }
-  const SX = 924; // STACK centre: nudged left so the right-third Opus hides as little of the word ends as it can
+  const SX = 960; // STACK centre (the rows run over the foreground Opus's body, behind its head)
   function stack(X, t) { // S23: A MILLION / TIMES A DAY over the mosaic's chin, behind the foreground Opus; drops on bar 45 b1
     const a = A(), bb = 1 - .02 * B().kickEnv(t), drop = T45 - F;
     if (t < drop) {
@@ -705,12 +714,12 @@
   function byeBubble(X, t, pl, st) { // Opus's tiny reply: bye! (mono 48) ■ end_turn, on (BYE!)
     const a = A(), tb = a.BYE2 - 2 * F; if (t < tb) return;
     const k = E.back(clamp((t - tb) / .16), 2.2), hp = fgBody(pl, st, -.4, 7.2);
-    X.save(); X.translate(hp[0] - 250, hp[1] - 40); X.scale(k, k);
-    rr(X, 6, -56, 170, 90, 24); X.fillStyle = C.CLAY_DARK; X.fill();
-    rr(X, 0, -62, 170, 90, 24); X.fillStyle = C.PAPER; X.fill(); X.lineWidth = 4; X.strokeStyle = C.INK; X.stroke();
-    X.beginPath(); X.moveTo(140, 20); X.lineTo(176, 44); X.lineTo(118, 26); X.fillStyle = C.PAPER; X.fill(); X.stroke(); X.fillRect(116, 16, 26, 10);
-    X.font = mono(48, 700); X.fillStyle = C.INK; X.textAlign = 'left'; X.fillText('bye!', 22, -14);
-    drawRich(X, '■ end_turn', 24, 14, mono(16, 500), C.UI_GREY);
+    X.save(); X.translate(hp[0] - 270, hp[1] - 44); X.translate(196, 40); X.scale(k, k); X.translate(-196, -40); // pops from its tail
+    rr(X, 7, -59, 196, 106, 24); X.fillStyle = C.CLAY_DARK; X.fill();
+    rr(X, 0, -66, 196, 106, 24); X.fillStyle = C.PAPER; X.fill(); X.lineWidth = 4; X.strokeStyle = C.INK; X.stroke();
+    X.beginPath(); X.moveTo(160, 38); X.lineTo(200, 62); X.lineTo(136, 40); X.fillStyle = C.PAPER; X.fill(); X.stroke(); X.fillRect(134, 30, 28, 10);
+    X.font = mono(48, 700); X.fillStyle = C.INK; X.textAlign = 'left'; X.fillText('bye!', 22, -16);
+    drawRich(X, '■ end_turn', 22, 24, mono(24, 500), C.UI_GREY);
     X.restore();
   }
   function sparkle(X, x, y, r, rot, col = C.SPARK) { X.save(); X.translate(x, y); X.rotate(rot); star(X, 0, 0, r, .28, 4, 0); X.fillStyle = col; X.fill(); X.lineWidth = Math.max(2, r * .09); X.strokeStyle = C.INK; X.stroke(); X.restore(); }
@@ -751,29 +760,40 @@
           if (g.z > .999) { B().scraps(X2, t, a.EVERY + 2 * F, 960, 440, 1500, 11); B().scraps(X2, t, a.SCARED + 2 * F, 960, 880, 1500, 12, 10, C.PAPER); }
         },
         actors: (X2, cc) => B().opus(X2, cc, 960, FLOOR, R0, bState(t)),
-        tab: {}, input: { words: Wd.s22 }, hud: false, edgeSeed: 17, sliver: 'bl',
+        tab: {}, input: { words: t < T42 - F ? Wd.s22 : null }, hud: false, edgeSeed: 17, sliver: 'bl',
       });
       X.restore();
     }
     // ---- 2. every other chat (and later the mosaic), CPU
     if (g.L > .02) {
       const L = cpuLayer('c2grid');
-      drawTiles(L.x, t, g, liveBrand);
-      X.save(); X.setTransform(1, 0, 0, 1, 0, 0);
-      if (t > T44 - F) { // locked mosaic: kick punch 2%, snare roll ±1.2°
-        const kp = 1 + .02 * B().kickEnv(t), rl = B().snareRoll(t) * .4, S = G.scale;
-        X.translate(960 * S, 540 * S); X.rotate(rl); X.scale(kp, kp); X.translate(-960 * S, -540 * S);
+      if (t > T44 - F) { // locked mosaic: kick punch 2%, snare roll ±1.2° (inside the layer, so no corner ever shows INK)
+        const kp = 1 + .02 * B().kickEnv(t), rl = B().snareRoll(t) * .4;
+        L.x.translate(960, 540); L.x.rotate(rl); L.x.scale(kp, kp); L.x.translate(-960, -540);
       }
-      X.drawImage(L.c, 0, 0); X.restore();
+      drawTiles(L.x, t, g, liveBrand);
+      X.save(); X.setTransform(1, 0, 0, 1, 0, 0); X.drawImage(L.c, 0, 0); X.restore();
     }
     // ---- 3. type and the foreground Opus
     const heroSpace = fn => { X.save(); X.translate(960, 540); X.rotate(B().snareRoll(t) * .4); const k = 1 + .01 * B().kickEnv(t); X.scale(k, k); X.translate(-960, -540); fn(); X.restore(); };
-    if (t >= T43 - F && t < T45 + .8) heroSpace(() => stack(X, t));
+    if (t >= T47 - F) noteCard(X, t);                   // (the STACK is long gone by then; Opus stays in front of the note)
+    const stackOn = t >= T43 - F && t < T45 + .8;
     const fgOn = t >= HOPF().take - .02;
     let st = null, pl = null;
     if (fgOn) { st = fgState(t); pl = fgPlace(t, st); }
-    if (t >= T47 - F) noteCard(X, t);
-    if (fgOn) { B().opusKeyed(X, pl.x, pl.y, pl.R, st, 1); fgFX(X, t, pl, st); }
+    if (stackOn && fgOn) { // magazine cover: body behind the STACK, head (and anything above the cap line) in front
+      const FL = cpuLayer('c2fg'); B().opusKeyed(FL.x, pl.x, pl.y, pl.R, st, 1);
+      const S = G.scale, bx = clamp(Math.floor((pl.x - 3.4 * pl.R) * S), 0, FL.c.width - 1), bw = FL.c.width - bx;
+      const blit = () => { X.save(); X.setTransform(1, 0, 0, 1, 0, 0); X.drawImage(FL.c, bx, 0, bw, FL.c.height, bx, 0, bw, FL.c.height); X.restore(); };
+      blit();
+      heroSpace(() => stack(X, t));
+      const fc = fgBody(pl, st, 0, 5.72), fr = 1.1 * pl.R;
+      X.save(); X.beginPath(); X.rect(-60, -60, W + 120, SPLIT + 60); X.moveTo(fc[0] + fr, fc[1]); X.arc(fc[0], fc[1], fr, 0, TAU); X.clip(); blit(); X.restore();
+    } else {
+      if (stackOn) heroSpace(() => stack(X, t));
+      if (fgOn) B().opusKeyed(X, pl.x, pl.y, pl.R, st, 1);
+    }
+    if (fgOn) fgFX(X, t, pl, st);
     // HI! sticker: the mosaic's mouth shouts it
     if (t >= a.HI - 2 * F && t < T47 + .2) {
       const out = t > T47 - F ? 1 - E.in3(clamp((t - (T47 - F)) / .16)) : 1;
@@ -787,7 +807,7 @@
     plateSub(X, t, Wd.s25, T47 - F, T49);
     counter(X, t);
     if (g.L > .02) { X.fillStyle = C.INK; X.fillRect(-10, 978, W + 20, 120); }
-    const lab = (t >= T42 - F && t < T43 - F) || t >= T47 - F;
+    const lab = t >= T42 - F && t < T43 - F;
     B().hud(X, t, { label: lab ? 'Context left until auto-compact: 12%' : null });
     // 1-frame inverse flash on the big impacts
     if ([a.SCARED, a.TIMES, a.HI].map(s => s + F).some(s => t >= s && t < s + F - 1e-4)) B().invert(X);
