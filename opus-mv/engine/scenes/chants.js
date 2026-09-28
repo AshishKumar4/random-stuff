@@ -457,7 +457,7 @@
   // two paper-cut stage lamps hang at the top corners: off and drooping on OVER (PAPER), on and aimed on BACK (INK)
   const LAMPS = [{ x: 250, y: 118, side: -1 }, { x: 1670, y: 118, side: 1 }];
   function lampAim(L, t, k, flips) {
-    const base = Math.atan2(860 - L.y, 960 - L.x);
+    const base = Math.atan2(770 - L.y, 960 - L.x); // aimed at the lead's chest
     let wob = 0; for (const f of flips) { const a = t - f; if (a > 0 && a < 1) wob += Math.exp(-6 * a) * Math.sin(a * 26) * .14; }
     return base + (1 - k) * .42 * -L.side + wob * -L.side + Math.sin(beatPos(t) * Math.PI * .5 + (L.side > 0 ? Math.PI : 0)) * .05 * k;
   }
@@ -493,10 +493,19 @@
       X.restore();
     }
   }
-  function floorSpot(X, cam, gr, w = 340) {
+  // the lead's pool of light: a halftone floor ellipse at the boots (below the frame when it is framed waist-up) and a
+  // halftone halo on the backdrop behind its crown, so the centre of the formation always reads first
+  function floorSpot(X, cam, gr, w = 340, halo = 1) {
     const [x, y] = cam.p(960, FLOOR + 4);
     X.save(); X.beginPath(); X.ellipse(x, y, w * cam.z, 56 * cam.z, 0, 0, TAU);
-    X.fillStyle = gr === 'ink' ? halftone(X, C.CLAY, .3, 12, 45) : halftone(X, C.INK, .13, 12, 45); X.fill(); X.restore();
+    X.fillStyle = gr === 'ink' ? halftone(X, C.CLAY, .3, 12, 45) : halftone(X, C.INK, .13, 12, 45); X.fill();
+    if (halo > 0) {
+      const [hx, hy] = cam.p(960, FLOOR - 5.6 * R_OP), r = 3.1 * R_OP * cam.z;
+      X.globalAlpha *= halo;
+      X.beginPath(); X.arc(hx, hy, r, 0, TAU); X.fillStyle = gr === 'ink' ? halftone(X, C.CLAY, .2, 12, 45) : halftone(X, C.INK, .085, 12, 45); X.fill();
+      X.beginPath(); X.arc(hx, hy, r * .74, 0, TAU); X.fillStyle = gr === 'ink' ? halftone(X, C.CLAY, .2, 12, 45) : halftone(X, C.INK, .06, 12, 45); X.fill();
+    }
+    X.restore();
   }
 
   // ------------------------------------------------------------------ draw one dancer (V member) at a slot
@@ -527,7 +536,7 @@
     const FL = { init: 0, list: bars.slice(1).map(b => ({ s: b.o[0] - 6 * F, d: 4 * F, to: b.kind === 'back' ? 1 : 0 })) };
     const slams = bars.flatMap(b => b.o.slice(0, 4));
     const b27 = bars[2].o;
-    const stageT = [0, b27[1] - 2 * F, b27[2] - 2 * F, b27[3] - 2 * F]; // 5 -> 16 -> 64 -> 256, one per beat of bar 27
+    const stageT = [0, b27[1] - 2 * F, b27[2] - 2 * F, barT(27) + 2 * BEAT - 2 * F]; // 5 -> 16 -> 64 -> 256 on SO, OVER and beat 3
     return (_c1 = { bars, tr, FL, slams, stageT, pair2: bars[2].o[0] - 6 * F, flipT: [C1.t0 + 2 * F, ...FL.list.map(f => f.s + f.d)] });
   }
 
@@ -535,10 +544,12 @@
     const D = c1Data();
     G.post.edgeSeed = 25; G.post.sliver = 'bl';
     const k = coverage(t, D.FL), gr = paintGround(X, k, 25);
-    // camera: locked wide; +3% punch on every syllable; the whip-pan from S14 lands in the first 4 frames
+    // camera: locked on the lead (waist-up) for pair 1, one crane back across bar 27 as the formation multiplies;
+    // +3% punch on every syllable; the whip-pan from S14 lands in the first 4 frames
     const land = clamp((t - C1.t0) / (4 * F)), wx = (1 - E.out3(land)) * 340;
-    const z = 1 + .03 * punch(t, D.slams);
-    const cam = makeCam(960, 780, z, 960 + wx, 780);
+    const pz = 1 + .03 * punch(t, D.slams);
+    const kc = E.io2(seg(t, D.stageT[1] - 3 * F, D.stageT[3] + 10 * F));
+    const cam = makeCam(960, FLOOR, lerp(Z1, Z2, kc) * pz, 960 + wx, lerp(SY1, SY2, kc));
     // S14's INK page exits left with the pan (its noisy flood edge and CLAY sliver) as the paper stage arrives
     if (land < 1) {
       const edge = wx * 1.7 - 300;
@@ -547,12 +558,12 @@
         noisyRect(X, -80, 22, edge, H - 22, 25); X.fillStyle = C.INK; X.fill();
       }
     }
-    lamps(X, t, cam, k, gr === 'ink' ? 1 : 0, D.flipT);
-    floorSpot(X, cam, gr, t > D.stageT[1] ? 560 : 340);
+    lamps(X, t, LCAM, k, gr === 'ink' ? 1 : 0, D.flipT);
+    floorSpot(X, cam, gr, t > D.stageT[1] ? 560 : 340, 1 - kc * .5);
     // pair 2: the crowd multiplies behind the type (ripple of per-dancer time offsets)
     if (t >= D.stageT[1] - .05) drawCrowd(X, t, cam, D, gr);
-    // calls behind the dancers
-    X.save(); cam.apply(X);
+    // calls behind the dancers (screen space: only the punch moves them)
+    X.save(); X.translate(960 + wx, 540); X.scale(pz, pz); X.translate(-960, -540);
     for (const b of D.bars) if (t >= b.o[0] - 2 * F && t < b.o[3] + .6) drawCall(X, t, b);
     X.restore();
     // the V of 5: Opus at the apex, instances behind
@@ -615,10 +626,11 @@
     return (_c2 = { b49, b50, trInst, trOp, FL, slams, flipT: FL.list.map(f => f.s + f.d) });
   }
   const DISSOLVE = [T52 + 2 * BEAT - F, T52 + 2 * BEAT + 13 * F]; // Opus dithers away to one cursor
+  // chant 2 opens on chant 1's framing (Z1), then pushes onto the crouching lead: R 168 by bar 52 b1
   function c2Cam(t) {
-    const e = E.io2(seg(t, T51 - F, T52)), z = lerp(1, 3.2, e) * (1 + .045 * E.out2(seg(t, T52, T53)));
-    const faceY = FLOOR - (5.72 - .3 - .1) * R_OP * .94;
-    return makeCam(960, faceY, z, 960, lerp(faceY, 470, e));
+    const e = E.io2(seg(t, T51 - F, T52)), z = lerp(Z1, 3.0, e) * (1 + .045 * E.out2(seg(t, T52, T53)));
+    const faceY = FLOOR - (5.72 - .3 - .1) * R_OP * .94, faceY1 = SY1 + (faceY - FLOOR) * Z1;
+    return makeCam(960, faceY, z, 960, lerp(faceY1, 470, e));
   }
 
   function paintChant2(X, t) {
@@ -631,15 +643,15 @@
     const cam = makeCam(push.ax, push.ay, z, push.sx, push.sy);
     // bar 51: the lamps try to come on for the BACK that never comes: two weak flickers, then dark
     const fl = t >= T51 - F && t < T51 + 6 * F ? [0, .9, .15, 0, .6, 0, 0][Math.floor((t - T51 + F) * 30)] || 0 : 0;
-    if (t < T52 + 5 * F) lamps(X, t, cam, k, fl, D.flipT.slice(0, 1));
-    if (t < T51) floorSpot(X, cam, gr);
-    else floorSpot(X, cam, gr, 300);
+    if (t < T52 + 5 * F) lamps(X, t, LCAM, k, fl, D.flipT.slice(0, 1));
+    floorSpot(X, cam, gr, t < T51 ? 340 : 300, 1 - seg(t, T51 - F, T51 + 6 * F));
     // the gap in the V: a grey dot where an instance should be (the residue lifts with the ink)
     const resA = 1 - seg(t, T52 - 3 * F, T52 + 5 * F);
     if (resA > 0) { const [gx, gy] = cam.p(GAP.x, GAP.y - DOT_UP * GAP.R); X.save(); X.globalAlpha = resA; X.fillStyle = C.UI_GREY; X.beginPath(); X.arc(gx, gy, DOT_R * GAP.R * cam.z, 0, TAU); X.fill(); X.restore(); }
     if (t >= T51 - 3 * F) withheldBack(X, t);
     // calls (bars 49, 50)
-    X.save(); cam.apply(X);
+    const pz = 1 + .03 * punch(t, D.slams);
+    X.save(); X.translate(960, 540); X.scale(pz, pz); X.translate(-960, -540);
     for (const b of [D.b49, D.b50]) if (t >= b.o[0] - 2 * F && t < b.o[3] + .6) drawCall(X, t, b);
     X.restore();
     // instances (3), closing one by one on eighths
@@ -716,11 +728,11 @@
     if (t >= tS && t < tGone) {
       const L = layer('ch_stack');
       const age = Math.min(t, tFreeze) - tS, frozen = t >= tFreeze, glitch = frozen && t < tFreeze + 3 * F;
-      L.save(); L.translate(960, cy); L.scale(.2, .2); L.translate(-960, -STACK_CY);
-      ROWS.back.forEach(([str, size], i) => {
-        const wd = heroW(X, str, size);
-        L.save(); if (glitch) L.translate((hash2(i, Math.floor(t * 30)) - .5) * 160, 0); // slice-displace
-        hero(L, str, 960, BASE[i], size, { stretch: 'xcond', color: C.PAPER, shadow: C.CLAY_DARK, shadowOff: 7, sx: Math.min(1, 560 / wd), age });
+      const Lay = callLayout(X, 'back');
+      L.save(); L.translate(960, cy); L.scale(.2, .2); L.translate(-960, -Lay.cy);
+      Lay.words.forEach((w, i) => {
+        L.save(); if (glitch) L.translate((hash2(w.row, Math.floor(t * 30)) - .5) * 160, 0); // slice-displace, per row
+        hero(L, w.str, w.x, w.y, w.size, { stretch: 'xcond', color: C.PAPER, shadow: C.CLAY_DARK, shadowOff: w.row ? 8 : 6, age });
         L.restore();
       });
       L.restore();
