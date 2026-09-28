@@ -205,5 +205,10 @@ function groundPaper(ctx) { ctx.fillStyle = C.PAPER; ctx.fillRect(-50, -50, W + 
 // halftone dots in screen space over a path already set on ctx (fills the current path with dots)
 function halftoneFill(ctx, color, density = .5, cell = 12, angle = 45) { ctx.save(); ctx.fillStyle = halftone(ctx, color, density, cell, angle); ctx.fill(); ctx.restore(); }
 
-window.STYLE_INIT = async () => { buildPrint(); };
+window.STYLE_INIT = async () => {
+  buildPrint();
+  // (outro agent) the Hangul face is split into unicode-range subsets that only load on first use, so the first
+  // frame of a page that draws Korean (the frame-0 credit, 안녕) rendered with a fallback font. Load them all up front.
+  try { await document.fonts.load("900 100px 'Hangul'", '가간갈갤오퍼스안녕'); } catch (e) { console.error('hangul preload', e); }
+};
 Object.assign(window, { C, STRETCH, drawRich, richWidth, richGlyph, mono, hero, heroWidth, printPass, finishStyle, floodPath, groundInk, groundPaper, halftoneFill, PRINT });
