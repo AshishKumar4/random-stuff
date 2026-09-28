@@ -370,7 +370,7 @@
     // ring shape varies a touch per "font": round (mono), oval (serif), squarish (marker), heavy (hero)
     const ry = R * [1, 1.12, .95, 1.05][fontK], rx = R * [1, .9, 1.02, 1.08][fontK], th = R * [.3, .22, .34, .42][fontK];
     if (open < .3) {                                  // shut: a sleepy lid arc (a flat ring read as a saucer)
-      ctx.beginPath(); ctx.ellipse(0, -ry * .15, rx * 1.02, ry * lerp(.5, .8, open / .3), 0, Math.PI * .1, Math.PI * .9);
+      ctx.beginPath(); ctx.ellipse(0, -ry * .1, rx * .92, ry * lerp(.26, .42, open / .3), 0, Math.PI * .12, Math.PI * .88);
       ctx.lineCap = 'round'; ctx.lineWidth = Math.max(3, th * .9); ctx.strokeStyle = C.PAPER; ctx.stroke();
       ctx.restore(); return;
     }
@@ -484,7 +484,7 @@
     ctx.letterSpacing = '0px';
     // handwritten "Claude" + a hand-drawn :) (the :) is drawn upright: two dots and a smile, where Opus's eyes/mouth go)
     ctx.font = `400 78px ${FONTS.marker}`; ctx.fillStyle = C.INK; ctx.textAlign = 'right';
-    ctx.fillText('Claude', FACE_L[0] - FACE_r * .55, FACE_L[1] + 30);
+    ctx.fillText('Claude', FACE_L[0] - FACE_r * 1.14, FACE_L[1] + 30);
     const S = faceStrokes(), tq = q2(t);
     ctx.lineCap = 'round'; ctx.strokeStyle = C.INK; ctx.fillStyle = C.INK;
     for (const s of [-1, 1]) { ctx.beginPath(); ctx.arc(FACE_L[0] + s * .34 * FACE_r, FACE_L[1] + .02 * FACE_r, 5.5, 0, TAU); ctx.fill(); }
