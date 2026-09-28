@@ -50,6 +50,8 @@ def main():
     ap.add_argument('--grid-end', type=float, default=144.0)
     ap.add_argument('--take-end', type=float, default=None)
     ap.add_argument('--identity', action='store_true', help='take shares the grid clock (e.g. an ACE cover); only report drift')
+    ap.add_argument('--snap', help='vocal stem wav: snap each word onset to the nearest vocal onset within --snap-win s')
+    ap.add_argument('--snap-win', type=float, default=.15)
     a = ap.parse_args()
     m = json.load(open(a.melody)); A = json.load(open(a.analysis))
     # composition words (grid)
@@ -94,6 +96,25 @@ def main():
     to_grid = lambda t: float(np.interp(t, T, G))
     beats = [round(to_grid(b), 4) for b in A['rhythm']['beats']]
     warp = None if a.identity else [[round(t, 3), round(g, 3)] for g, t in clean]
+    # optional: snap composed onsets to real vocal onsets (identity mode: grid == take clock)
+    snapped = 0
+    if a.snap:
+        import librosa
+        yv, sr = librosa.load(a.snap, sr=22050)
+        on = librosa.onset.onset_detect(y=yv, sr=sr, hop_length=256, units='time', backtrack=True)
+        rms = librosa.feature.rms(y=yv, hop_length=256)[0]
+        for w in comp:
+            t_take = w['s'] if a.identity else float(np.interp(w['s'], G, T))
+            i = bisect.bisect_left(on, t_take)
+            cands = [on[j] for j in (i - 1, i) if 0 <= j < len(on)]
+            if not cands:
+                continue
+            best = min(cands, key=lambda c: abs(c - t_take))
+            if abs(best - t_take) <= a.snap_win:
+                g_new = best if a.identity else float(np.interp(best, T, G))
+                w['e'] = max(w['e'] + (g_new - w['s']), g_new + .08)
+                w['s'] = g_new; snapped += 1
+        res['snapped'] = snapped
     # timeline (grid words from the composition)
     words, lines = [], []
     for w in comp:
