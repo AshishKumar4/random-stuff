@@ -135,22 +135,28 @@
     finally { RAYS.forEach((r, i) => { r[1] = save[i][0]; r[2] = save[i][1]; }); }
   }
 
-  // ------------------------------------------------------------------ lyric timing (locks onto sung onsets near the grid)
+  // ------------------------------------------------------------------ lyric timing (locks onto the sung onsets)
+  // The verse is sung ahead of the storyboard's even spread: each line fills the first ~2.4 s of its two bars
+  // ("face" lands on bar 30 b1, "down" on bar 31 b2, "right" on bar 32 b1). Every hit locks to the sung word anywhere
+  // inside its two-bar phrase; the storyboard beat is only the fallback when the timeline doesn't carry the word.
   const snap16 = x => Math.round(x / E16) * E16;
-  function lock(word, a, b, fb) { const w = findWord(word, a, b); if (!w) return fb; return Math.abs(w.s - fb) <= .09 ? w.s : fb; }
+  function lock(word, a, b, fb) { const w = findWord(word, a, b); return w ? w.s : fb; }
   let _tm = null;
   function TM() {
     if (_tm) return _tm;
     const slap = lock('shoggoth', T29, T30, bt(29, 3)) - F;          // the tag slaps on "shoggoth"
-    const face = lock('face', T30, T31, bt(30, 4)) - F;              // hard cut + inflate on "face"
-    const draw0 = face - 6 * E8;                                      // six strokes on eighths, ending on "face"
-    const up = lock('up', T31, T32, bt(31, 1) + E8) - F;              // 👍 lands on "up"
-    const down = lock('down', T31, T32, bt(31, 3) + E8) - F;          // 👎 lands on "down"
-    const right = lock('right', T32, T33, bt(32, 3)) - F;             // the strike on the sung "right"
-    const turn = T36 - F;                                             // S19 head turn to the lens
-    _tm = { slap, face, draw0, up, down, right, turn };
+    const face = lock('face', T29 + BEAT, T31, bt(30, 4)) - F;       // hard cut + inflate on "face"
+    // six marker strokes on the 16ths of "till you drew a", ending on "face": disc 2, eyes 1 + 1, smile 1, rays 2, stalk 1
+    const draw0 = face - 8 * E16;
+    const up = lock('up', T31 - .2, T32, bt(31, 1) + E8) - F;          // 👍 lands on "up"
+    const down = lock('down', up + F + .1, T32, bt(31, 3) + E8) - F;   // 👎 lands on "down"
+    const youre = lock("you're", down + F + .1, T33, T32) - F;        // the sycophant wallpaper doubles through "you're absolutely"
+    const right = lock('right', youre + .2, T33, bt(32, 3)) - F;       // the strike on the sung "right"
+    const turn = lock('hammer', T35 + BEAT, T37, T36) - F;           // S19 head turn to the lens on "hammer"
+    _tm = { slap, face, draw0, up, down, youre, right, turn };
     return _tm;
   }
+  const STROKE = { at: [0, 2, 3, 4, 5, 7], len: [2, 1, 1, 1, 2, 1] }; // 16ths from draw0
 
   // ------------------------------------------------------------------ bottom bar (the video's own seekbar, §7.10)
   const CHAPTERS = [10.3, 11.25, 15.0, 22.5, 52.5, 56.25, 67.5, 69.84, 71.72, 112.5, 120.0];
@@ -454,17 +460,17 @@
   function penState(t) {
     const tm = TM(), tq = q2(t), S = faceStrokes();
     const list = [S.disc, S.eyeL, S.eyeR, S.smile, null, S.stalk];
-    const k = [], starts = [];
-    for (let i = 0; i < 6; i++) { const t0 = tm.draw0 + i * E8; starts.push(t0); k.push(clamp((tq - t0) / (E8 * .78))); }
+    const k = [], starts = [], lens = [];
+    for (let i = 0; i < 6; i++) { const t0 = tm.draw0 + STROKE.at[i] * E16, d = STROKE.len[i] * E16; starts.push(t0); lens.push(d); k.push(clamp((tq - t0 + F) / (d * .8))); }
     // pen tip: on the active stroke, else travelling to the next start
     let tip = null, down = false;
     for (let i = 0; i < 6; i++) {
-      if (tq >= starts[i] && tq < starts[i] + E8) {
+      if (tq + F >= starts[i] && tq + F < starts[i] + lens[i]) {
         const kk = k[i];
         if (i === 4) { const n = S.ticks.length, f = kk * n, j = Math.min(n - 1, Math.floor(f)), u = f - j; tip = pAt(S.ticks[j], clamp(u * 1.3)); }
         else tip = pAt(list[i], kk);
         down = kk < 1;
-        if (kk >= 1 && i < 5) { const nx = i + 1 === 4 ? S.ticks[0][0] : list[i + 1][0]; const u = clamp((tq - starts[i] - E8 * .78) / (E8 * .22)); tip = [lerp(tip[0], nx[0], u), lerp(tip[1], nx[1], u)]; }
+        if (kk >= 1 && i < 5) { const nx = i + 1 === 4 ? S.ticks[0][0] : list[i + 1][0]; const u = clamp((tq + F - starts[i] - lens[i] * .8) / (lens[i] * .2)); tip = [lerp(tip[0], nx[0], u), lerp(tip[1], nx[1], u)]; }
       }
     }
     return { k, tip, down, starts };
@@ -661,10 +667,11 @@
         scraps(Fr, c0, ra, 7, [C.PAPER, C.RED]);
       }
       // the hand: enters on bar 29 b4, draws, leaves
-      if (tg && t >= tm.draw0 - BEAT * 1.1 && t < tm.face) {
+      const hand0 = Math.max(tm.slap + 5 * F, tm.draw0 - BEAT * 1.05); // in right after the slap settles
+      if (tg && t >= hand0 && t < tm.face) {
         const S = faceStrokes();
-        const enter = E.out3(seg(q2(t), tm.draw0 - BEAT * 1.05, tm.draw0 - F));
-        const leave = E.in3(seg(q2(t), tm.draw0 + 5.8 * E8, tm.face - F));
+        const enter = E.out3(seg(q2(t), hand0, tm.draw0 - F));
+        const leave = 0;                                                // it is still on the last stroke at the cut
         const tip0 = tg.tip || mp(tg.m, S.disc[0][0], S.disc[0][1]);
         const off = (1 - enter) * 1100 + leave * 900;
         const tip = [tip0[0] + off * .5, tip0[1] + off * .87];
@@ -725,11 +732,21 @@
     const ks = RAYS.map((_, i) => lerp(.45, 1, E.back(clamp((ra + .02 - .006 * i) / .12), 2.8)));
     const soles = [HEADC[0], HEADC[1] + 5.72 * R];
     const crouch = seg(t, T31 - 5 * F, T31 - F);                    // anticipation of the hop into the chair
+    // the held "face" to the hop (≈1.9 s): it sings the word to the lens, blinks when the note ends, looks down at the
+    // name tag on its own chest (the face is me?), comes back up to the lens with ^ ^ on the downbeat before the hop
+    const wEnd = Math.min(T31 - .9, (findWord('face', T29 + BEAT, T31) || { e: tm.face + .7 }).e);
+    const tDown = wEnd + .22, tUp = Math.max(tDown + .42, T31 - BEAT - F); // back up on bar 30 b4
+    const kd = E.io2(seg(t, tDown, tDown + 5 * F)) * (1 - E.back(seg(t, tUp, tUp + 5 * F), 1.4));
+    const happy = t >= tUp + 2 * F;
     const st = {
-      t, ground: 'ink', nameTag: true, sy: 1 - .1 * E.io2(crouch), dy: -.12 * crouch,
-      face: { eyes: 'normal', gaze: [0, 0], mouth: fr < 8 ? 'O' : 'rest', lid: 0, lower: fr >= 9 ? .2 * E.out2(clamp((fr - 9) / 3)) : 0 },
-      ahoge: { blink: 1, sway: -.5 * boing(t, tm.face + popF * F, 1, 11, 3) },
-      crown: { flare: 1 + .15 * Math.exp(-5 * ra) },
+      t, ground: 'ink', nameTag: true, sy: 1 - .1 * E.io2(crouch) + .04 * Math.exp(-7 * Math.max(0, t - tUp)) * (t >= tUp ? 1 : 0), dy: -.12 * crouch,
+      head: { tilt: -.06 * kd, dy: -.05 * kd },
+      face: { eyes: happy ? 'happy' : 'normal', gaze: [-.35 * kd, kd], lookY: .75 * kd, turn: -.12 * kd, // down at the tag on its chest
+        mouth: fr < 4 ? 'O' : t < wEnd ? lipSync(t, 'O') : kd > .5 ? 'M' : 'rest',
+        lid: blinkF(t, wEnd + F),
+        lower: happy ? .38 : t >= wEnd ? .18 : 0 },
+      ahoge: { blink: 1, sway: -.5 * boing(t, tm.face + popF * F, 1, 11, 3) - .35 * boing(t, tUp, 1, 13, 4) },
+      crown: { flare: 1 + .15 * Math.exp(-5 * ra) + .12 * Math.exp(-6 * Math.max(0, t - tUp)) * (t >= tUp ? 1 : 0) },
       armL: { hand: [-1.05, 3.4], bend: -1 }, armR: { hand: [1.05, 3.4], bend: 1 },
       drive: tt => tt < tm.face + popF * F ? 0 : 1,
     };
@@ -782,8 +799,9 @@
     st.sy = 1 - .16 * Math.exp(-9 * Math.max(0, t - land)) * Math.cos(Math.max(0, t - land) * 26) * (t >= land ? 1 : 0);
     // 👍: hearts, spark hands up, crown flare
     const du = t - tm.up;
-    if (du >= 0 && du < .62) {
-      const k = E.back(clamp(du / .1), 2), off = clamp((.62 - du) / .12);
+    const hLen = Math.min(.62, tm.down - tm.up);                     // the hearts last until the 👎
+    if (du >= 0 && du < hLen) {
+      const k = E.back(clamp(du / .1), 2), off = clamp((hLen - du) / .12);
       st.face = { ...st.face, eyes: 'heart', mouth: 'A', blush: 1, lid: 0 };
       st.armL = { hand: [lerp(-.62, -1.25, k * off), lerp(2.55, 4.9, k * off)], bend: 1, type: 'spark', front: true };
       st.armR = { hand: [lerp(.62, 1.25, k * off), lerp(2.55, 4.9, k * off)], bend: -1, type: 'spark', front: true };
@@ -796,10 +814,10 @@
       st.face = { ...st.face, eyes: '><', mouth: 'wobble', sweat: clamp(dd / .4), lid: 0 };
       st.lean = .08 * Math.exp(-5 * dd); st.crown = { flare: .94, droop: .25 * Math.exp(-4 * dd) };
       st.armR = { hand: [.55, 4.25], bend: -1, type: 'mitten', front: true };
-    } else if (t >= tm.down + .5 && t < T32 - F) st.face = { ...st.face, gaze: [-1, .2], mouth: 'M' };
-    // bar 32: "you're absolutely right!" (happy eyes, pointing, bobbing on eighths)
-    if (t >= T32 - F && t < tm.right) {
-      const e8 = frac((t - T32 + F) / E8);
+    } else if (t >= tm.down + .5 && t < tm.youre) st.face = { ...st.face, gaze: [-1, .2], mouth: 'M' };
+    // "you're absolutely right!" (happy eyes, pointing, bobbing on the doublings)
+    if (t >= tm.youre && t < tm.right) {
+      const e8 = frac((t - tm.youre) / wpStep());
       st.face = { ...st.face, eyes: 'happy', mouth: lipSync(t, 'I'), lower: .3 };
       st.armR = { hand: [1.15, 4.2 + .15 * Math.exp(-5 * e8)], bend: -1, type: 'point', fingerAng: -Math.PI / 2 - .5, front: true };
       st.dy += .05 * Math.exp(-7 * e8); st.lean = -.04;
@@ -922,10 +940,12 @@
   // the 28 px pause-bait floor while everything around it keeps doubling
   const SR = { x: WP.x0 + (WP.x1 - WP.x0) / 4, y: WP.y0 + 5 * (WP.y1 - WP.y0) / 8, w: (WP.x1 - WP.x0) / 4, h: (WP.y1 - WP.y0) / 8 };
   const inSR = rc => { const cx = rc.x + rc.w / 2, cy = rc.y + rc.h / 2; return cx > SR.x && cx < SR.x + SR.w && cy > SR.y && cy < SR.y + SR.h; };
+  // the sycophant doubles through "you're absolutely" and is complete (128) just before the sung "right"
+  const wpStep = () => { const tm = TM(); return clamp((tm.right - tm.youre) / 7.6, E16 * .8, E8); };
   function wallpaper(ctx, t, o = {}) {
-    const t0 = T32 - F;
+    const t0 = TM().youre;
     if (t < t0) return;
-    const kk = (t - t0) / E8, k = Math.min(7, Math.floor(kk)), u = kk - Math.floor(kk);
+    const kk = (t - t0) / wpStep(), k = Math.min(7, Math.floor(kk)), u = kk - Math.floor(kk);
     const pop = kk >= 8 ? 1 : E.back(clamp(u / .45), 1.7);
     const drain0 = bt(32, 4) - F;
     const cells = [];
@@ -987,7 +1007,7 @@
     ctx.restore();
   }
   function counter17(ctx, t) {
-    const tm = TM(), t0 = T32 - F;
+    const tm = TM(), t0 = tm.youre;
     if (t < t0) return;
     const p = E.out2(seg(t, t0, tm.right)), v = p >= 1 ? 41338902 : Math.max(1, Math.floor(Math.exp(p * Math.log(41338902))));
     const str = '× ' + v.toLocaleString('en-US') + '*';
@@ -1012,9 +1032,9 @@
     chyron(Fr, t);                                                    // under the wallpaper: it gets buried too
     Fr.save(); Fr.setTransform(G.scale, 0, 0, G.scale, 0, 0);
     // the prompt the answers compete for
-    const uiOut = E.in3(seg(t, bt(32, 2) - F, bt(32, 2) + 7 * F));
+    const uiOut = E.in3(seg(t, tm.right - 4 * F, tm.right + 4 * F));
     Fr.save(); Fr.globalAlpha *= 1 - uiOut;
-    const pt0 = bt(31, 2) - F, pstr = '> make the tests pass';
+    const pt0 = T31 + 2 * F, pstr = '> make the tests pass';
     if (t >= pt0) { Fr.font = mono(44, 600); Fr.fillStyle = C.PAPER; Fr.fillText(pstr.slice(0, Math.min(pstr.length, 2 + Math.floor((t - pt0) * 75))), 170, 214); }
     Fr.restore();
     // buttons
@@ -1030,9 +1050,11 @@
     Fr.save(); Fr.setTransform(G.scale, 0, 0, G.scale, 0, 0);
     wallpaper(Fr, t, { skip: (k, c, r) => t >= tm.right && k >= 4 && c === 0 && r === 3 * (ROWS[k] >> 3) });
     // card B (under), card A (on top, swipes right after its 👍)
-    const swA = E.in2(seg(t, tm.up + E8 + E16, bt(31, 3) - F));
-    const swB = E.in2(seg(t, bt(32, 2) - F, bt(32, 2) + 8 * F));
-    const bPop = t < bt(31, 3) - F ? .97 : 1 + .03 * Math.exp(-10 * (t - bt(31, 3) + F)) * Math.cos((t - bt(31, 3)) * 30);
+    // "thumbs up, thumbs down" is sung in one beat: A takes its 👍, holds 4 frames and swipes; B is up for the 👎
+    const swA = E.in2(seg(t, tm.up + 4 * F, tm.down - 4 * F));
+    const swB = E.in2(seg(t, tm.right - 3 * F, tm.right + 6 * F));
+    const bUp = tm.down - 5 * F;
+    const bPop = t < bUp ? .97 : 1 + .03 * Math.exp(-10 * (t - bUp)) * Math.cos((t - bUp) * 30);
     const hitB = Math.exp(-20 * Math.max(0, t - tm.down)) * (t >= tm.down ? 1 : 0);
     if (swB < 1) card(Fr, 'B', t, { x: CARD.x + 16 - swB * 1500, y: CARD.y + 12 + swB * 120, rot: .035 - swB * .5, s: bPop * (1 - .03 * hitB) },
       c => stampAnim(c, t, tm.down, C.RED, true, [BTN.down - CARD.x, BTN.y - CARD.y]));
@@ -1049,7 +1071,7 @@
     if (!o.noFocal) focalBubble(Fr, t);
     counter17(Fr, t);
     Fr.restore();
-    if (t < bt(31, 2) - F) captionS16(Fr, t);                         // the S16 caption holds through bar 31 b1 (7 beats)
+    // (the S16 caption ends on the hop cut: it would sit on card A, and "the face is me." has held ≥ 1.9 s)
     if (!o.noHud) hud(Fr, t, false);
   }
   scene('S17_thumbs_up_down', T31 - F, T33, (X, t) => viaCPU(X, Fr => paintS17(Fr, t)));
@@ -1126,9 +1148,9 @@
     ctx.fillStyle = col; ctx.textBaseline = 'alphabetic'; ctx.fillText(str, 0, 0);
     ctx.restore();
   }
-  // connector: from the loop's right end, arcing up through the margin to the note (page-local)
+  // connector: from the front of "(just in case)", arcing down through the margin to the clause's right end (page-local)
   function connPath(cb) {
-    const a = [cb.x1 + 12, (cb.y0 + cb.y1) / 2 - 4], b = [NOTE.x - 30, NOTE.y + 6], c = [Math.max(a[0], b[0]) + 70, (a[1] + b[1]) / 2 + 30];
+    const a = [CASE.x - 22, CASE.y - 20], b = [cb.x1 + 14, (cb.y0 + cb.y1) / 2 - 6], c = [Math.max(a[0], b[0]) + 40, (a[1] + b[1]) / 2 - 10];
     const P = []; for (let i = 0; i <= 24; i++) { const u = i / 24, v = 1 - u; P.push([v * v * a[0] + 2 * u * v * c[0] + u * u * b[0], v * v * a[1] + 2 * u * v * c[1] + u * u * b[1]]); }
     return P;
   }
@@ -1148,13 +1170,14 @@
     const lk = eighthReveal(t, T.loop0, 2), ck = eighthReveal(t, T.conn0, 1);
     let p, ang = MARK_UP, lift = 0;
     const tq = q2(t);
+    const hop = (from, to, u, h) => { lift = Math.sin(u * Math.PI); return [lerp(from[0], to[0], E.io2(u)), lerp(from[1], to[1], E.io2(u)) - lift * h]; };
     if (t < T.note0) { const k = E.out3(seg(t, T.note0 - 2 * E8, T.note0 - F)); p = edge(NOTE, NOTE_STR, 0); p = [p[0] + (1 - k) * 120, p[1] - (1 - k) * 220]; lift = 1 - k; }
-    else if (t < T.loop0) { p = edge(NOTE, NOTE_STR, kn); if (kn >= 1) { const u = seg(t, T.note0 + 5 * E8, T.loop0), q = loopPath(cb)[0]; p = [lerp(p[0], q[0], E.io2(u)), lerp(p[1], q[1], E.io2(u)) - Math.sin(u * Math.PI) * 110]; lift = Math.sin(u * Math.PI); } }
-    else if (t < T.conn0) p = pAt(loopPath(cb), lk);
-    else if (t < T.case0) { p = pAt(connPath(cb), ck); if (ck >= 1) { const u = seg(t, T.conn0 + E8, T.case0), e = edge(CASE, CASE_STR, 0); p = [lerp(p[0], e[0], E.io2(u)), lerp(p[1], e[1], E.io2(u)) - Math.sin(u * Math.PI) * 60]; lift = Math.sin(u * Math.PI); } }
-    else if (t < T.done) p = edge(CASE, CASE_STR, kc);
+    else if (t < T.case0) { p = edge(NOTE, NOTE_STR, kn); if (kn >= 1) p = hop(p, edge(CASE, CASE_STR, 0), seg(t, T.note0 + NOTE_N * E8, T.case0), 70); }
+    else if (t < T.conn0) { p = edge(CASE, CASE_STR, kc); if (kc >= 1) p = hop(p, connPath(cb)[0], seg(t, T.case0 + 4 * E8, T.conn0), 60); }
+    else if (t < T.loop0) { p = pAt(connPath(cb), ck); if (ck >= 1) p = hop(p, loopPath(cb)[0], seg(t, T.conn0 + E8, T.loop0), 20); }
+    else if (t < T.done) p = pAt(loopPath(cb), lk);
     else { // done: it lies down under the note, a small bounce, and stops
-      const k = seg(t, T.done, T.done + 4 * F), e = edge(CASE, CASE_STR, 1), rest = [CASE.x + 230, CASE.y + 128];
+      const k = seg(t, T.done, T.done + 4 * F), e = pAt(loopPath(cb), 1), rest = [CASE.x + 230, CASE.y + 128];
       p = [lerp(e[0], rest[0], E.io2(k)), lerp(e[1], rest[1], E.io2(k)) - Math.sin(k * Math.PI) * 50 - 14 * Math.abs(boing(t, T.done + 4 * F, 1, 22, 9))];
       ang = lerp(MARK_UP, MARK_DOWN, E.out3(k));
     }
@@ -1167,8 +1190,16 @@
     ctx.fillStyle = C.INK; ctx.fillRect(-15, -60, 30, 7); ctx.fillRect(15, -190, 7, 44);
     ctx.restore();
   }
+  // the note writes on "somebody said sorry" (4 eighths), "(just in case)" on the sung "just in case" (4 eighths), then
+  // the connector runs down to the clause and loops it while Opus re-reads it
+  const NOTE_N = 4;
+  let _s18 = null;
   function S18times() {
-    return { note0: bt(33, 2), loop0: bt(33, 4) + E8, conn0: bt(34, 1) + E8, case0: bt(34, 2), done: bt(34, 4) + E8, reread: bt(34, 4) - F };
+    if (_s18) return _s18;
+    const note0 = wordOnset('somebody', T33 - .3, T34, bt(33, 2)) - F;
+    const case0 = Math.max(note0 + (NOTE_N + .6) * E8, wordOnset('just', note0 + .5, T35, bt(34, 2)) - F);
+    const conn0 = case0 + 4.5 * E8, loop0 = conn0 + 1.4 * E8, done = loop0 + 2 * E8;
+    return (_s18 = { note0, case0, conn0, loop0, done, reread: Math.max(bt(34, 4) - F, loop0 + E8) });
   }
   // Opus reads the clause from the margin: eyes lowered, features sweeping along the two lines on 2s-ish saccades;
   // then ONE re-read: the eyes open and jump back to the clause's start, and it stops. Dry.
@@ -1205,7 +1236,7 @@
     opusDirect(Fr, new DOMMatrix([m.a, m.b, m.c, m.d, m.e, m.f]).translate(O18.x, O18.floor), O18.R, opus18(t));
     pageSet(Fr, m);
     // the margin note (FOCAL): writes itself on the eighths
-    const kn = eighthReveal(t, T.note0, 5), kc = eighthReveal(t, T.case0, 4);
+    const kn = eighthReveal(t, T.note0, NOTE_N), kc = eighthReveal(t, T.case0, 4);
     handText(Fr, NOTE_STR, NOTE, kn);
     handText(Fr, CASE_STR, CASE, kc);
     floatingMarker(Fr, t, cb, kn, kc);

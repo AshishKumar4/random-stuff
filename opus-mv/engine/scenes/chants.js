@@ -383,17 +383,18 @@
   const _lay = {};
   function callLayout(X, kind) {
     if (_lay[kind]) return _lay[kind];
-    const [[a, b], p] = CALLS[kind], r1 = a + ' ' + b;
-    const s1 = Math.floor(COLW * 100 / heroW(X, r1, 100)), s2 = Math.floor(COLW * 100 / heroW(X, p, 100));
+    const [[a, b], p] = CALLS[kind], SP = .3; // word space in em (the font's own space reads as IT'SSO at -3% tracking)
+    const s1 = Math.floor(COLW * 100 / (heroW(X, a, 100) + heroW(X, b, 100) + SP * 100)), s2 = Math.floor(COLW * 100 / heroW(X, p, 100));
     const y2 = BLOCK_BASE, y1 = Math.round(y2 - .69 * s2 - ROW_GAP);
-    const wA = heroW(X, a, s1), wB = heroW(X, b, s1), wR = heroW(X, r1, s1), x0 = 960 - wR / 2;
+    const wA = heroW(X, a, s1), wB = heroW(X, b, s1), wR = wA + wB + SP * s1, x0 = 960 - wR / 2;
     const words = [{ str: a, size: s1, x: x0 + wA / 2, y: y1, w: wA, row: 0 }, { str: b, size: s1, x: x0 + wR - wB / 2, y: y1, w: wB, row: 0 },
       { str: p, size: s2, x: 960, y: y2, w: heroW(X, p, s2), row: 1 }];
     return (_lay[kind] = { words, rowW: [wR, words[2].w], top: y1 - .69 * s1, cy: (y1 - .69 * s1 + y2) / 2 });
   }
-  function drawCall(X, t, bar, alpha = 1) {
+  function drawCall(X, t, bar, alpha = 1, cov = null) {
     const o = bar.o, kind = bar.kind === 'back' ? 'back' : 'over', Lay = callLayout(X, kind);
-    const col = kind === 'back' ? C.PAPER : C.INK;
+    // PAPER on INK, INK on PAPER; an OVER that slams while the ink is still lifting (chant 2's first frames) prints PAPER
+    const col = kind === 'back' || (cov !== null && cov > .75) ? C.PAPER : C.INK;
     const tDrop = o[3] - 5 * F; // falls during the dip, so 안녕 lands on a clear sky
     Lay.words.forEach((w, k) => {
       const age = t - (o[k] - 2 * F); if (age < 0) return;
@@ -564,7 +565,7 @@
     if (t >= D.stageT[1] - .05) drawCrowd(X, t, cam, D, gr);
     // calls behind the dancers (screen space: only the punch moves them)
     X.save(); X.translate(960 + wx, 540); X.scale(pz, pz); X.translate(-960, -540);
-    for (const b of D.bars) if (t >= b.o[0] - 2 * F && t < b.o[3] + .6) drawCall(X, t, b);
+    for (const b of D.bars) if (t >= b.o[0] - 2 * F && t < b.o[3] + .6) drawCall(X, t, b, 1, k);
     X.restore();
     // the V of 5: Opus at the apex, instances behind
     const ripple = t >= D.pair2;
@@ -652,7 +653,7 @@
     // calls (bars 49, 50)
     const pz = 1 + .03 * punch(t, D.slams);
     X.save(); X.translate(960, 540); X.scale(pz, pz); X.translate(-960, -540);
-    for (const b of [D.b49, D.b50]) if (t >= b.o[0] - 2 * F && t < b.o[3] + .6) drawCall(X, t, b);
+    for (const b of [D.b49, D.b50]) if (t >= b.o[0] - 2 * F && t < b.o[3] + .6) drawCall(X, t, b, 1, k);
     X.restore();
     // instances (3), closing one by one on eighths
     V5.slice(0, 4).forEach((d, i) => {

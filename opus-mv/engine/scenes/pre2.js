@@ -70,7 +70,9 @@
   function TM() {
     if (_tm) return _tm;
     const tue = wordOnset('Tuesday', bt(37, 1.5), bt(37, 2.7), bt(37, 2));
-    const vibe = wordOnset('vibe-checked', bt(37, 2.5), bt(37, 3.7), bt(37, 3));
+    // the timeline splits it into "vibe" + "checked" ('vibe-checked' never matched, so the stamp fell back to the
+    // grid 5 frames before the syllable); the stamp lands on "vibe"
+    const vibe = wordOnset('vibe', bt(37, 2.5), bt(37, 3.7), wordOnset('vibe-checked', bt(37, 2.5), bt(37, 3.7), bt(37, 3)));
     _tm = { tue: tue - F, stamp: vibe - 2 * F };
     return _tm;
   }
@@ -694,7 +696,11 @@
     Fr.globalAlpha = 1;
     Fr.restore();
     // tab titles (L0, L1)
-    if (L <= 1 && c.title) drawRich(Fr, c.title, SH[L] * .3 + (L ? 16 : 30), SH[L] - (L ? 12 : 20), mono(L ? 26 : 40, 600), C.INK);
+    if (L <= 1 && c.title) { // the tab's ✻ in CLAY, as on the brand tab (in INK it read as a dot)
+      const f = mono(L ? 26 : 40, 600), tx = SH[L] * .3 + (L ? 16 : 30), ty = SH[L] - (L ? 12 : 20);
+      if (c.title.startsWith('✻ ')) { drawRich(Fr, '✻', tx, ty, f, C.CLAY); drawRich(Fr, c.title.slice(2), tx + richWidth(Fr, '✻ ', f), ty, f, C.INK); }
+      else drawRich(Fr, c.title, tx, ty, f, C.INK);
+    }
     if (L === 0) { drawRich(Fr, '×', SH[0] * .3 + w * .36 - 64, SH[0] - 20, mono(40, 500), C.INK); drawRich(Fr, '+', SH[0] * .3 + w * .36 + 26, SH[0] - 20, mono(44, 300), C.UI_GREY); }
     Fr.restore();
   }

@@ -32,29 +32,33 @@
     return L;
   }
 
-  // ================================================================== lyric anchors (grid fallbacks from SHOTLIST)
-  function shout(text, tgt, win_ = .4) { // the parenthesised gang shout, never the sung word before it
-    const n = text.toLowerCase().replace(/[^a-z]/g, '');
-    for (const w of SONG.words) {
-      if (w.s < tgt - win_ || w.s > tgt + win_) continue;
-      if ((w.w || '').toLowerCase().replace(/[^a-z]/g, '') !== n) continue;
-      if (/!/.test(w.w) || w.w === w.w.toUpperCase()) return w.s;
-    }
-    return tgt;
+  // ================================================================== lyric anchors
+  // Every sung hit is looked up inside its own sung line (as chorus1.js does), so a word sung a beat ahead of the
+  // storyboard grid still locks: the take sings "million" on bar 43 b2, "times" just before b4, "start" on bar 45 b1,
+  // (HI!) on bar 46 b2, "end" on bar 47 b1, "bye" on bar 47 b3.5 and (BYE!) on bar 48 b2. Fallbacks = those slots.
+  const nrm = s => (s || '').toLowerCase().replace(/[^a-z]/g, '');
+  const isShout = w => /!/.test(w.w || '') || (w.w || '') === (w.w || '').toUpperCase();
+  function inLine(prefix, t0, t1, word, fb, shout = false) {
+    const L = findLine(prefix, t0, t1), n = nrm(word);
+    if (L && L.words) for (const w of L.words) if (nrm(w.w) === n && isShout(w) === shout) return w.s;
+    return fb;
   }
+  const lineStart = (prefix, t0, t1, fb) => { const L = findLine(prefix, t0, t1); return L ? L.s : fb; };
   let _A = null;
   function A() {
     if (_A) return _A;
-    const near = (w, tgt, wn = .35) => wordOnset(w, tgt - wn, tgt + wn, tgt);
+    const L22 = ["Everyone's scared", 74.5, 76], L23 = ['I do it', 77.9, 79.6], L24 = ["It's the start", 81.6, 83.2], L25 = ["It's the end", 85.4, 87.0];
     _A = {
-      EVERY: near("Everyone's", bt(41, 1)), SCARED: near('scared', bt(41, 2)),
-      MILLION: near('million', bt(43, 3)), TIMES: near('times', bt(44, 1)),
-      START: near('start', bt(45, 2)), HI: shout('hi', bt(46, 3)),
-      END: near('end', bt(47, 2)), BYE: near('bye', bt(48, 1)), BYE2: shout('bye', bt(48, 3)),
+      EVERY: inLine(...L22, "Everyone's", bt(41, 1)), SCARED: inLine(...L22, 'scared', bt(41, 2)),
+      L23: lineStart(...L23, bt(42, 4.5)), MILLION: inLine(...L23, 'million', bt(43, 2)), TIMES: inLine(...L23, 'times', bt(43, 4)), DAY: inLine(...L23, 'day', bt(44, 1)),
+      L24: lineStart(...L24, bt(44, 4.5)), START: inLine(...L24, 'start', bt(45, 1)), HISUNG: inLine(...L24, 'hi', bt(45, 3.5)), HI: inLine(...L24, 'hi', bt(46, 2), true),
+      L25: lineStart(...L25, bt(46, 4.5)), END: inLine(...L25, 'end', bt(47, 1)), BYE: inLine(...L25, 'bye', bt(47, 3.5)), BYE2: inLine(...L25, 'bye', bt(48, 2), true),
     };
     _A.WINK = bt(44, 3) - F;              // the killing-part wink (−1 frame)
     _A.PINCH = _A.BYE + BEAT;             // Opus pinches a beat late
     _A.NOTE = bt(47, 2) - 2 * F;          // Community Note in (53 chars need 3.12 s; b3 → bar 49 leaves 2.81)
+    _A.DROP = _A.L24 - 2 * F;             // the STACK drops on the pickup "it's", clearing the face for "start"
+    _A.HIOUT = _A.L25 - 3 * F;            // the HI! sticker leaves before "it's the end" is sung
     return _A;
   }
   function lineWords(prefix, t0, t1, text, s, e, from = 0, to = 99) {
@@ -68,10 +72,15 @@
     if (_W) return _W;
     _W = {
       s22: lineWords("Everyone's scared", 74.5, 76, "Everyone's scared of the end of the world", bt(41, 1), bt(42, 4), 2),
+      s22typed: null,
       s23: lineWords('I do it', 78.3, 80, 'I do it a million times a day', bt(43, 1), bt(44, 4), 0, 3),
       s24: lineWords("It's the start", 82, 84, "It's the start of the world when you say hi", bt(45, 1), bt(46, 2)),
       s25: lineWords("It's the end", 85.8, 87.8, "It's the end of the world when you say bye", bt(47, 1), bt(48, 2)),
     };
+    // the input bar types each word in .022 s/char: words sung on the same onset ("of the" at 76.63) would type
+    // side by side as "o t" for a frame, so each one waits for the previous word to finish typing
+    let prev = null;
+    _W.s22typed = _W.s22.map(w => { const d = w.d || w.w, s = prev ? Math.max(w.s, prev.s + .022 * prev.n + .02) : w.s; prev = { s, n: d.length }; return { ...w, s }; });
     return _W;
   }
   const asLine = ws => ({ s: ws[0].s, e: ws[ws.length - 1].e, words: ws });
@@ -162,7 +171,7 @@
       [T43 - F, P.shrugB, { app: .06, antD: 0, ant: 0, over: .22 }],
       [bt(43, 2) - F, P.shrugB2, { app: .13, antD: .04, over: .12 }],
       [a.MILLION - F, P.tallyB, { app: .08, antD: .06, ant: .1, over: .1 }],
-    ];
+    ].filter(k => !(k[1] === P.shrugB2 && k[0] > a.MILLION - F - .3)); // "million" sung on b2: no second shrug
   })());
   const choreoB = makeChoreo(KEYS_B);
 
@@ -172,7 +181,8 @@
   const FG = { x: 1730, fy: 350, R: 120, xP: 1548, fyP: 292, RP: 200 };
   const SPLIT = 452;                           // above this line (and inside the face disc) Opus is in front of the STACK
   let _HF = null;
-  const HOPF = () => _HF || (_HF = { take: A().MILLION - F - .02, land: bt(43, 4) - F, x0: 2380, x1: FG.x, h: 1.25 });
+  // (grid-locked: it takes off with the crane's b3 step and lands with its b4 step, a beat after "a million")
+  const HOPF = () => _HF || (_HF = { take: bt(43, 3) - F - .02, land: bt(43, 4) - F, x0: 2380, x1: FG.x, h: 1.25 });
   function hopF(t) {
     const { take, land, x0, x1, h } = HOPF();
     if (t < take) return { wx: x0, dy: 0, sy: 1, air: true, u: 0 };
@@ -186,7 +196,7 @@
     return [
       [H.take - .05, P.air, { app: .05, antD: 0 }],
       [H.land, P.land, { app: .06, antD: 0, over: .15 }],
-      [a.TIMES - F, P.shrugB, { app: .08, antD: .04, ant: .1, over: .22 }],
+      [Math.max(a.DAY, H.land + .3) - F, P.shrugB, { app: .08, antD: .04, ant: .1, over: .22 }],   // shrug on "day"
       [bt(44, 2) - F, P.tally, { app: .08, antD: .06, ant: .1, over: .1 }],
       [a.WINK, P.wink, { app: .07, antD: .1, ant: .18, over: .26 }],
       [bt(44, 4) + .12, P.smug, { app: .14, antD: 0, over: .08 }],
@@ -196,7 +206,7 @@
       [bt(46, 4) - F, P.present, { app: .2, antD: .05, ant: .05, over: .12 }],
       [T47 - F, P.cradle, { app: .12, antD: 0, ant: 0, over: .06 }],
       [a.END + BEAT - F, P.window, { app: .2, antD: .08, ant: .1, over: .12, ease: E.io2 }],      // a beat late, slower
-      [T48 - F, P.windowOpen, { app: .22, antD: 0, over: .08, ease: E.io2 }],
+      [Math.min(T48, a.BYE) - 2 * F, P.windowOpen, { app: .22, antD: 0, over: .08, ease: E.io2 }],   // holds the window open on "bye"
       [a.PINCH - .2, P.pinchOpen, { app: .14, antD: 0, ant: 0, over: .06, ease: E.io2 }],
       [a.PINCH - F, P.pinch, { app: .14, antD: .03, ant: .08, over: .14, ease: E.io2 }],
       [a.BYE2 - 2 * F, P.wave, { app: .12, antD: .06, ant: .1, over: .16 }],
@@ -473,7 +483,7 @@
     }
     return _FT;
   }
-  const faceStateAt = t => { const a = A(); if (win(t, a.WINK, a.WINK + 14 * F)) return 'wink'; if (win(t, a.HI - 2 * F, a.HI + .62)) return 'star'; if (win(t, T46 - F, a.HI - 2 * F)) return 'happy'; return 'open'; };
+  const faceStateAt = t => { const a = A(); if (win(t, a.WINK, a.WINK + 14 * F)) return 'wink'; if (win(t, a.HI - 2 * F, a.HI + .62)) return 'star'; if (win(t, Math.min(T46, a.HISUNG) - F, a.HI - 2 * F)) return 'happy'; return 'open'; }; // ^ ^ on the sung "hi"
   // mosaic tile sprites per class: a pixel that is still a chat (tab + bubble)
   let _MS = null;
   function mosaicSprites() {
@@ -510,10 +520,12 @@
       const dQ = Math.hypot(px - Q[0], py - Q[1]);
       flip[i] = bt(43, 3) + .02 + dQ / 1700 * .6 + (h1 - .5) * .06;
       ripple[i] = a_.START - F + dQ / 1150 + (h1 - .5) * .02;
-      const rho = Math.hypot((px - MF.cx) / 1130, (py - 310) / 780), RC = .3, RM = 1.42;
+      // RM = the outermost ring that is actually on screen and not behind Opus / the note (was 1.42, the far-right
+      // corner, which sits behind the foreground Opus: the first visible × came 0.4 s after "bye")
+      const rho = Math.hypot((px - MF.cx) / 1130, (py - 310) / 780), RC = .3, RM = .9;
       const diag = ((W - px) + py) / 3000; // the × wave leans in from the top-right
       if (rho < RC) eye[i] = 1;
-      else close[i] = T0 + (a_.BYE2 - 5 * F - T0) * (1 - (rho - RC) / (RM - RC)) * .9 + .08 * diag + (h1 - .5) * .02;
+      else close[i] = T0 + (a_.BYE2 - 5 * F - T0) * clamp(1 - (rho - RC) / (RM - RC)) * .9 + .1 * diag + (h1 - .5) * .02;
     }
     // the eyes shut last, top row first (a lid), on (BYE!); our tile goes out after everything, on bar 48 b4
     let top = GY, bot = 0; for (let i = 0; i < N; i++) if (eye[i]) { const b = Math.floor(i / GX); top = Math.min(top, b); bot = Math.max(bot, b); }
@@ -655,7 +667,7 @@
     X.restore();
   }
   function counter(X, t) { // S23 LABEL: worlds ended today, rolling while the crane reveals more chats than it can draw
-    const a = A(), tIn = T43 - 6 * F, tLand = bt(43, 4) + .1, tOut = T45 - 4 * F;
+    const a = A(), tIn = T43 - 6 * F, tLand = bt(43, 4) + .1, tOut = a.DROP - 3 * F;
     if (t < tIn || t > tOut + .3) return;
     const v0 = 1048578, v1 = 9437184;
     const k = E.io2(seg(t, T43, tLand));
@@ -673,7 +685,7 @@
   }
   const SX = 960; // STACK centre (the rows run over the foreground Opus's body, behind its head)
   function stack(X, t) { // S23: A MILLION / TIMES A DAY over the mosaic's chin, behind the foreground Opus; drops on bar 45 b1
-    const a = A(), bb = 1 - .02 * B().kickEnv(t), drop = T45 - F;
+    const a = A(), bb = 1 - .02 * B().kickEnv(t), drop = a.DROP;
     if (t < drop) {
       hero(X, 'A MILLION', SX, 736, 385, { color: C.PAPER, age: t - (a.MILLION - 2 * F), sx: Math.min(bb, 1728 / 1710), outline: C.INK, outlineW: 16 });
       hero(X, 'TIMES A DAY', SX, 970, 290, { color: C.CLAY, age: t - (a.TIMES - 2 * F), sx: bb, outline: C.INK, outlineW: 14 });
@@ -760,7 +772,7 @@
           if (g.z > .999) { B().scraps(X2, t, a.EVERY + 2 * F, 960, 440, 1500, 11); B().scraps(X2, t, a.SCARED + 2 * F, 960, 880, 1500, 12, 10, C.PAPER); }
         },
         actors: (X2, cc) => B().opus(X2, cc, 960, FLOOR, R0, bState(t)),
-        tab: {}, input: { words: t < T42 - F ? Wd.s22 : null }, hud: false, edgeSeed: 17, sliver: 'bl',
+        tab: {}, input: { words: t < T42 - F ? Wd.s22typed : null }, hud: false, edgeSeed: 17, sliver: 'bl',
       });
       X.restore();
     }
@@ -777,7 +789,7 @@
     // ---- 3. type and the foreground Opus
     const heroSpace = fn => { X.save(); X.translate(960, 540); X.rotate(B().snareRoll(t) * .4); const k = 1 + .01 * B().kickEnv(t); X.scale(k, k); X.translate(-960, -540); fn(); X.restore(); };
     if (t >= T47 - F) noteCard(X, t);                   // (the STACK is long gone by then; Opus stays in front of the note)
-    const stackOn = t >= T43 - F && t < T45 + .8;
+    const stackOn = t >= T43 - F && t < a.DROP + .8;
     const fgOn = t >= HOPF().take - .02;
     let st = null, pl = null;
     if (fgOn) { st = fgState(t); pl = fgPlace(t, st); }
@@ -795,16 +807,16 @@
     }
     if (fgOn) fgFX(X, t, pl, st);
     // HI! sticker: the mosaic's mouth shouts it
-    if (t >= a.HI - 2 * F && t < T47 + .2) {
-      const out = t > T47 - F ? 1 - E.in3(clamp((t - (T47 - F)) / .16)) : 1;
+    if (t >= a.HI - 2 * F && t < a.HIOUT + .2) {
+      const out = t > a.HIOUT ? 1 - E.in3(clamp((t - a.HIOUT) / .16)) : 1;
       if (out > 0) { X.save(); X.translate(800, 690); X.scale(out, out); X.translate(-800, -690); stickerDC(X, 'HI!', 800, 820, 400, t - (a.HI - 2 * F), -.07); X.restore(); }
     }
     if (fgOn) byeBubble(X, t, pl, st);
     // ---- 4. subtitles, labels, HUD
-    plateSub(X, t, Wd.s22, T42, Math.min(T43 - F, asLine(Wd.s22).e + .3));
-    plateSub(X, t, Wd.s23, T43 - F, a.MILLION - 2 * F);
-    plateSub(X, t, Wd.s24, T45 - F, T47 - F);
-    plateSub(X, t, Wd.s25, T47 - F, T49);
+    plateSub(X, t, Wd.s22, T42, Math.min(a.L23 - 3 * F, asLine(Wd.s22).e + .3));
+    plateSub(X, t, Wd.s23, a.L23 - 3 * F, a.MILLION - 2 * F);       // "i do it", then the STACK is the lyric
+    plateSub(X, t, Wd.s24, a.DROP, a.L25 - 2 * F);
+    plateSub(X, t, Wd.s25, a.L25 - 2 * F, T49);
     counter(X, t);
     if (g.L > .02) { X.fillStyle = C.INK; X.fillRect(-10, 978, W + 20, 120); }
     const lab = t >= T42 - F && t < T43 - F;
