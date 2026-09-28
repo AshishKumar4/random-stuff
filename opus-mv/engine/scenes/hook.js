@@ -21,18 +21,37 @@
   const fontMonoK = (px, wt = 500) => `${wt} ${px}px 'Jetbrains Mono Var', 'Hangul', monospace`;
 
   // ---------------------------------------------------------------- timing (locks onto sung onsets)
+  // The sung line starts on frame 1 ("everyone's" 0.05, "scared" 0.48, "of the end of the" 1.14, "world" 1.83 held
+  // to 3.0, "I do it" 3.54), so every beat of the hook is derived from those onsets: EVERYONE'S and SCARED are two
+  // hits on their own syllables, the pointer stalls on "of the", Opus shoos it on the eighths, the click lands on
+  // "world" and WORLD slams while the note is still held; the em dash and its backspace sit on the offbeats after it.
+  const BT = 60 / 128, e8 = BT / 2, F = 1 / FPS;
   let _tm = null;
   function TM() {
     if (_tm) return _tm;
     const on = (w, a, b, fb) => wordOnset(w, a, b, fb);
-    const lock = clamp(on("Everyone's", .3, .95, .5 + 2 / 30) - 2 / 30, .3, .9);
-    const ofT = clamp(on('of', 1.3, 2.0, 1.6 + 2 / 30) - 2 / 30, 1.3, 2.0);
-    const clickF = clamp(Math.round(on('world', 2.55, 3.0, 2.8125) * FPS) - 1, 80, 88);
-    const idoit = clamp(on('I', 3.55, 4.0, 3.75 + 2 / 30) - 2 / 30, 3.7, 3.95);
-    const amil = clamp(on('a', 4.2, 4.7, 4.4 + 2 / 30) - 2 / 30, 4.15, 4.7);
-    const tad = clamp(on('times', 4.8, 5.3, 5.0 + 2 / 30) - 2 / 30, 4.8, 5.3);
-    const wink = clamp(on('day', 6.0, 6.5, 6.3), 6.0, 6.45) - 1 / 30;
-    _tm = { lock, ofT, clickF, tClick: clickF / FPS, idoit, amil, tad, wink, b0: beatPos(3.75) };
+    const lock = clamp(on("Everyone's", -.1, .95, .046) - 2 / 30, 1 / 60, .9);          // frame 0 stays the poster
+    const lockS = clamp(on('scared', lock + .1, 1.3, .476) - 2 / 30, lock + 4 / 30, 1.2);
+    const ofT = clamp(on('of', lockS + .2, 2.0, 1.138) - 2 / 30, lockS + .3, 2.0);
+    const clickF = clamp(Math.round(on('world', ofT + .3, 3.0, 1.834) * FPS) - 1, Math.round((ofT + .55) * FPS), 88);
+    const tc = clickF / FPS;
+    // the pointer: near-miss past the ahoge, stall + tremble on "of the" (with the OF THE END OF THE slam),
+    // Opus's shoo flicks on the eighths between the stall and the click, then it dashes for the ×
+    const hes = ofT, nm = Math.max(.3, hes * .5);
+    const flicks = [];
+    for (let k = Math.ceil((hes + .3) / e8); k * e8 <= tc - .12; k++) flicks.push(k * e8);
+    if (!flicks.length) flicks.push(tc - .15);
+    const shoo = flicks[0] - .08;
+    const tW = (clickF + 11) / FPS;                                    // WORLD slams after the implosion
+    const dash = Math.max(tW + .45, Math.ceil((tW + .45 + F + .067) / BT) * BT - F - .067);   // lands 1 frame before a beat
+    const back = Math.max(dash + .25, Math.ceil((dash + .25 + F) / e8) * e8 - F);            // backspace on the next eighth
+    const drop = back + .03;
+    const idoit = clamp(on('I', 3.3, 4.0, 3.541) - 2 / 30, Math.max(drop + .3, 3.3), 3.95);
+    const amil = clamp(on('a', 4.1, 4.7, 4.226) - 2 / 30, 4.05, 4.7);
+    const tad = clamp(on('times', 4.8, 5.3, 5.039) - 2 / 30, 4.8, 5.3);
+    // the killing-part wink: one beat into the held "day", on the beat (1 frame early)
+    const wink = clamp(on('day', 5.3, 6.5, 5.625) + BT, 5.9, 6.4) - 1 / 30;
+    _tm = { lock, lockS, ofT, clickF, tClick: tc, hes, nm, flicks, shoo, tW, dash, back, drop, idoit, amil, tad, wink, b0: beatPos(3.75) };
     return _tm;
   }
 
@@ -387,15 +406,16 @@
 
   // ---------------------------------------------------------------- the pointer (the human, on 2s)
   function ptrProgress(t, tm) {
-    const tc = tm.tClick;
-    return herm(t, [[0.03, 0, 0], [1.2, .31, .62], [1.6, .6, 0], [1.73, .6, 0], [2.05, .622, .05], [2.13, .63, .25], [tc - .13, .99, .2], [tc - .05, 1, 0]]);
+    const tc = tm.tClick, h = tm.hes, f1 = tm.flicks[0];
+    return herm(t, [[0.03, 0, 0], [tm.nm, .31, .62], [h, .6, 0], [h + .13, .6, 0], [Math.max(h + .2, f1 - .04), .612, .05], [Math.max(h + .26, f1 + .03), .625, .3], [tc - .13, .99, .2], [tc - .05, 1, 0]]);
   }
   const bez = (s) => { const a = (1 - s) * (1 - s), b = 2 * s * (1 - s), c = s * s; return [a * PTR0[0] + b * PTRC[0] + c * XBTN[0], a * PTR0[1] + b * PTRC[1] + c * XBTN[1]]; };
   function ptrState(t, tm) {
     const tq = Math.floor(t * 15 + 1e-6) / 15;            // humans are on 2s
     const s = ptrProgress(Math.max(tq, 0), tm);
     let [x, y] = bez(s);
-    const trem = t < 1.6 ? 0 : t < 1.73 ? 3 : t < 2.1 ? 3 * (1 - (t - 1.73) / .37 * .6) : 0;
+    const h = tm.hes, hr = Math.max(h + .26, tm.flicks[0] + .03);
+    const trem = t < h ? 0 : t < h + .13 ? 3 : t < hr ? 3 * (1 - (t - h - .13) / (hr - h - .13) * .6) : 0;
     if (trem) { x += noise1(tq * 40, 5) * trem * 1.4; y += noise1(tq * 40, 9) * trem * 1.4; }
     const tc = tm.tClick;
     // click: a 2-frame lift (anticipation), then the press (6 px squash) on the click frame
@@ -439,39 +459,38 @@
     let g = toPtr, wLook = clamp(t / .2);            // f1: pupils start tracking the pointer
     const sly = .3 * (1 - clamp((t - .15) / .3));   // frame 0: the knowing left lid (an arched lid, drawn by slyLid)
     let eyes = 'normal', mouth = ':3', lidL = 0, lid = 0, lower = .16 * (1 - clamp((t - .15) / .3)), turn = .42 * toPtr[0] * wLook, lookY = .8 * toPtr[1] * wLook;
-    if (t >= 1.65 && t < 1.78) { wLook = 1; turn = .4 * toPtr[0]; lookY = .8 * toPtr[1]; lid = 0; }    // glance at the stalled pointer
-    if (t >= 1.78 && t < 1.9) { g = [0, 0]; wLook = 1; eyes = 'smug'; turn = 0; lookY = 0; }             // ¬ ¬ to the lens: "watch this"
-    if (t >= 1.9 && t < 2.42) { eyes = 'smug'; turn = .32 * toPtr[0]; lookY = .5 * toPtr[1]; }          // shoo, a sideways smug look at it
-    if (t >= 2.42) { lower = Math.max(lower, .25 * clamp((t - 2.42) / .15)); }
+    const h = tm.hes, t0 = tm.shoo, sm0 = h + .12, sm1 = t0 + .05;
+    if (t >= h && t < sm0) { wLook = 1; turn = .4 * toPtr[0]; lookY = .8 * toPtr[1]; lid = 0; }        // glance at the stalled pointer
+    if (t >= sm0 && t < sm1) { g = [0, 0]; wLook = 1; eyes = 'smug'; turn = 0; lookY = 0; }             // ¬ ¬ to the lens: "watch this"
+    if (t >= sm1 && t < tc - 2 / 30) { eyes = 'smug'; turn = .32 * toPtr[0]; lookY = .5 * toPtr[1]; }   // shoo, a sideways smug look at it
+    if (t >= tc - .3) { lower = Math.max(lower, .25 * clamp((t - (tc - .3)) / .15)); }
     if (t >= tc - 2 / 30) { eyes = 'happy'; mouth = 'rest'; lower = 0; turn = .1; lookY = -.3; }           // ^ ^
     const gaze = [g[0] * wLook, g[1] * wLook];
     // blinks: one while it settles into tracking, one to switch from pointer to lens
     // (the gaze-switch blink is a quick 3-frame one so the ¬ ¬ beat reads right after it)
-    const dq = (t - 1.745) * 30, blq = dq < 0 || dq >= 3 ? 0 : dq < 1 ? .6 : dq < 2 ? 1 : .5;
-    const bl = Math.max(blinkF(t, .92), blq);
+    const dq = (t - (sm0 - .035)) * 30, blq = dq < 0 || dq >= 3 ? 0 : dq < 1 ? .6 : dq < 2 ? 1 : .5;
+    const bl = Math.max(blinkF(t, Math.min(.72, h - .3)), blq);
     lid = Math.max(lid, bl); lidL = Math.max(lidL, bl);
     // head: tiny beat bob (unbothered), lean toward the pointer
     const bob = Math.sin(beatPos(t) * Math.PI) ** 2;
-    const headDy = .018 * bob, tilt = -.05 * wLook * toPtr[0] + (t >= 1.78 && t < 1.9 ? .06 : 0);
-    // arms: the peek grip; the shoo lifts the right mitten and flicks twice on the eighths
+    const headDy = .018 * bob, tilt = -.05 * wLook * toPtr[0] + (t >= sm0 && t < sm1 ? .06 : 0);
+    // arms: the peek grip; the shoo lifts the right mitten and flicks on the eighths
     const grip = { hand: [.75, 5.05], bend: -1, front: true, type: 'mitten' };
     let armR = { ...grip };
-    // the shoo: the mitten pops up beside the cheek (dip = anticipation), then three back-hand flicks
-    // out toward the pointer on the eighths (fast out, slower return), then drops back onto the bar
-    const t0 = 1.875, e8 = 60 / 128 / 2, tEnd = t0 + 3 * e8;
-    if (t >= t0 - 3 / 30 && t < tEnd + .16) {
-      const up = t < t0 ? -.35 * Math.sin(Math.PI * (t - (t0 - 3 / 30)) * 10) : E.back(clamp((t - t0) / .1), 2) * (1 - E.in2(clamp((t - tEnd) / .12)));
+    // the shoo: the mitten pops up beside the cheek (dip = anticipation), then back-hand flicks out toward the
+    // pointer on the eighths (fast out, slower return); it stays up and turns straight into the tiny wave
+    const tWv = tc - 3 / 30;
+    const shooHand = tt => {
+      const up = tt < t0 ? -.35 * Math.sin(Math.PI * (tt - (t0 - 3 / 30)) * 10) : E.back(clamp((tt - t0) / .1), 2);
       let flick = 0;
-      for (let k = 0; k < 3; k++) { const a = (t - (t0 + .05 + k * e8)); if (a >= 0 && a < e8) flick = Math.max(flick, a < .05 ? E.out2(a / .05) : 1 - E.io2(clamp((a - .05) / (e8 - .07)))); }
-      const hx = lerp(.75, 1.3, up) + flick * .34, hy = lerp(5.05, 5.52, up) + flick * .3;
-      armR = { hand: [hx, hy], bend: -1, front: true, type: 'mitten' };
-    }
-    // settle on the bar with a little overshoot after the shoo
-    if (t >= tEnd + .16 && t < 2.75) { armR.hand = [.75, 5.05 - boing(t, tEnd + .16, .06, 30, 9)]; }
-    // tiny wave from the click through the implosion
-    if (t >= tc - 3 / 30) {
-      const k = E.out3(clamp((t - (tc - 3 / 30)) / .1));
-      armR = { hand: [lerp(.75, 1.02, k), lerp(5.05, 5.62, k)], bend: -1, front: true, type: 'wave', fingerAng: -Math.PI / 2 + Math.sin((t - tc) * 34) * .5 * k };
+      for (const f of tm.flicks) { const a = tt - (f - .02); if (a >= 0 && a < e8) flick = Math.max(flick, a < .05 ? E.out2(a / .05) : 1 - E.io2(clamp((a - .05) / (e8 - .07)))); }
+      return [lerp(.75, 1.3, up) + flick * .34, lerp(5.05, 5.52, up) + flick * .3];
+    };
+    if (t >= t0 - 3 / 30 && t < tWv) armR = { hand: shooHand(t), bend: -1, front: true, type: 'mitten' };
+    // tiny wave from the click through the implosion (out of the shoo's raised mitten)
+    if (t >= tWv) {
+      const k = E.out3(clamp((t - tWv) / .1)), from = t0 - 3 / 30 < tWv ? shooHand(tWv) : [.75, 5.05];
+      armR = { hand: [lerp(from[0], 1.02, k), lerp(from[1], 5.62, k)], bend: -1, front: true, type: 'wave', fingerAng: -Math.PI / 2 + Math.sin((t - tc) * 34) * .5 * k };
     }
     const kick = pulse(t, 8);
     const st = {
@@ -481,7 +500,7 @@
       armL: { hand: [-.75, 5.05], bend: 1, front: true, type: 'mitten' }, armR,
       crown: { flare: 1 + .05 * kick },
       // the ahoge boings from the pointer's draft at 1.2, then politely leans out of its way while it hovers
-      ahoge: { blink: ahogeBlink(t), sway: boing(t, 1.2, .55, 15, 3.2) + boing(t, tc, -.35, 18, 5) - .62 * E.io2(clamp((t - 1.4) / .22)) * (1 - E.io2(clamp((t - 2.25) / .25))) + boing(t, 2.5, .12, 14, 5) },
+      ahoge: { blink: ahogeBlink(t), sway: boing(t, tm.nm, .55, 15, 3.2) + boing(t, tc, -.35, 18, 5) - .62 * E.io2(clamp((t - (tm.nm + .2)) / .22)) * (1 - E.io2(clamp((t - (tm.flicks[0] + .05)) / .22))) + boing(t, tm.flicks[0] + .27, .12, 14, 5) },
       drive: tt => Math.sin(beatPos(tt) * Math.PI) ** 2 * .6,
     };
     return st;
@@ -498,7 +517,7 @@
   function titleRows(ctx) { drawRowStatic(ctx, 'END OF THE', 96, 545, 210, C.PAPER); drawRowStatic(ctx, 'WORLD', 96, 808, 330, C.CLAY); }
   function lockRows(ctx, ageE, ageS) {
     slamRow(ctx, "EVERYONE'S", 96, 511, 190, ageE, { color: C.PAPER });
-    slamRow(ctx, 'SCARED', 96, 760, 290, ageS, { color: C.CLAY });
+    if (ageS >= 0) slamRow(ctx, 'SCARED', 96, 760, 290, ageS, { color: C.CLAY });
   }
   function drawColumn(ctx, t, tm, fi) {
     const tc = tm.tClick;
@@ -511,11 +530,14 @@
     }
     else if (t < hitT + 1.1) {
       const L = layer('hk_title'); titleRows(L);
-      shatter(ctx, layerCanvas('hk_title'), [80, 380, 1160, 830], t - hitT, 11, { cols: 9, rows: 4, ox: 700, oy: 560, dirx: -.55, spd: 1.5, fade: .55, g: 5200 });
+      // the shards leave with a 2-frame head start and stay a touch dimmer, so the new row never reads doubled
+      ctx.save(); ctx.globalAlpha *= .8;
+      shatter(ctx, layerCanvas('hk_title'), [80, 380, 1160, 830], t - hitT + .06, 11, { cols: 9, rows: 4, ox: 700, oy: 560, dirx: -.55, spd: 1.5, fade: .55, g: 5200 });
+      ctx.restore();
     }
-    // 2) EVERYONE'S / SCARED, one lockup (SCARED 2 frames behind), until OF THE END OF THE replaces it
-    // (the lockup is replaced on the new row's onset: a 3-frame afterimage that shrinks away)
-    if (t >= tm.lock && t < tm.ofT) lockRows(ctx, t - tm.lock, t - tm.lock - 2 / 30);
+    // 2) EVERYONE'S / SCARED, one lockup built in two hits (each row on its own sung onset), until OF THE END OF
+    // THE replaces it (the lockup is replaced on the new row's onset: a 3-frame afterimage that shrinks away)
+    if (t >= tm.lock && t < tm.ofT) lockRows(ctx, t - tm.lock, t - tm.lockS);
     else if (t >= tm.ofT && t < tm.ofT + .1) {
       const a = (t - tm.ofT) / .1;
       ctx.save(); ctx.globalAlpha = .45 * (1 - a); ctx.translate(560, 570); ctx.scale(1 - .25 * a, 1 - .25 * a); ctx.translate(-560, -570); lockRows(ctx, 1, 1); ctx.restore();
@@ -526,10 +548,10 @@
 
   // ---------------------------------------------------------------- DESK: F0, S01, S02
   function pushZoom(t, tm) {
-    const z = 1 + .15 * E.io2(clamp(t / 2.7));
-    // slam punches (+2.5%, spring back) on the two lockups
+    const z = 1 + .15 * E.io2(clamp(t / (tm.tClick - .07)));
+    // slam punches (+2.5%, spring back) on the lockup's two hits and on OF THE END OF THE
     const pk = (a) => a < 0 ? 0 : Math.exp(-9 * a) * Math.cos(a * 18);
-    return z * (1 + .025 * (pk(t - tm.lock - .1) + pk(t - tm.ofT - .1) * .6));
+    return z * (1 + .025 * (pk(t - tm.lock - .1) * .7 + pk(t - tm.lockS - .1) + pk(t - tm.ofT - .1) * .6));
   }
   function deskWorld(X, t, tm, Mw, o = {}) {
     // the window, galaxy, Opus (clipped behind the bar), bar, mittens, pointer
@@ -680,17 +702,17 @@
   // each other at the bottom of the desktop, fully on screen; dash last, leaning on the D
   const HEAP = [[430, 856, -.24], [700, 836, .4], [948, 896, -1.3], [1150, 832, .6], [1372, 866, -.14], [1600, 992, .52]];
   function heapState(t) { // per letter {x, y (centre), rot} ; dash is index 5
-    const L = worldLetters(), out = [];
+    const L = worldLetters(), out = [], tm = TM();
     const cap = WORLD_SZ * .69, yC = WORLD_B - cap / 2;
     L.forEach((l, i) => {
-      const t0 = 3.46 + i * .018, a = t - t0;
+      const t0 = tm.drop + .03 + i * .018, a = t - t0;
       const cx = l.x + l.w / 2;
       const [tx, yr, r] = HEAP[i];
       const k = clamp(a / .2);
       out.push({ ch: l.ch, x: lerp(cx, tx, E.out2(k)), y: dropY(a, yC, yr), rot: r * E.out3(clamp(a / .16)) + (a > 0 ? Math.sin(a * 40) * .05 * (1 - k) : 0), w: l.w, a });
     });
-    // the em dash: knocked off the line by the backspace at 3.40, falls with the letters
-    const a = t - 3.43, dxs = 1672;
+    // the em dash: knocked off the line by the backspace, falls with the letters
+    const a = t - tm.drop, dxs = 1672;
     out.push({ ch: '—', x: lerp(dxs, HEAP[5][0], E.out2(clamp(a / .25))), y: dropY(a, 340, HEAP[5][1]), rot: HEAP[5][2] * E.out3(clamp(a / .2)) + (a > 0 ? a * 2 : 0) * (1 - clamp(a / .25)), w: 304, a, dash: true });
     return out;
   }
@@ -710,32 +732,35 @@
     ctx.restore();
   }
   function deskAfter(X, t, tm, rel) {
-    const tW = (tm.clickF + 11) / FPS;        // WORLD slams into the empty desktop after the implosion
-    // the ■ blinks on bar 2 b4 and bar 3 b1
-    const blinkPop = Math.max(Math.exp(-14 * Math.max(0, t - 3.25)) * (t >= 3.25 ? 1 : 0), 0);
+    const tW = tm.tW;                         // WORLD slams into the empty desktop after the implosion (held "world")
+    // the ■ blinks on bar 2 b4 (and becomes the first tab on bar 3 b1)
+    const tB = 7 * BT - F;
+    const blinkPop = Math.max(Math.exp(-14 * Math.max(0, t - tB)) * (t >= tB ? 1 : 0), 0);
     drawSquare(X, t, 1, .45 * blinkPop);
-    const aW = t - tW + 2 / 30;               // lands (inverse flash) on frame 96, before the dash
-    if (t < 3.43) {
+    const aW = t - tW + 2 / 30;               // lands (inverse flash) 1 frame after the implosion ends
+    if (t < tm.drop) {
       // WORLD (slam) + the dash
       slamRow(X, 'WORLD', WORLD_X0, WORLD_B, WORLD_SZ, aW, { color: C.PAPER });
-      // em dash slides in from the right, lands 1 frame before b4
-      if (t >= 3.2 && t < 3.43) {
-        const k = clamp((t - 3.2) / .067), x = lerp(2000, 1520, E.back(k, 1.4));
+      // em dash slides in from the right, lands 1 frame before the beat
+      if (t >= tm.dash) {
+        const k = clamp((t - tm.dash) / .067), x = lerp(2000, 1520, E.back(k, 1.4));
         X.save(); X.fillStyle = C.CLAY_DARK; X.fillRect(x + 8, 328, 304, 40); X.fillStyle = C.PAPER; X.fillRect(x, 320, 304, 40); X.restore();
       }
     }
-    // the caret: blinks after the dash, backspaces it (3 frames), then waits
-    if (t >= 3.40) {
-      const k = clamp((t - 3.40) / .1), cx = lerp(1842, 1512, E.io2(k));
-      const on = t < 3.5 || frac((t - 3.5) * 2.2) < .55;
+    // the caret: blinks after the dash, backspaces it (3 frames), then waits; it bows out as I DO IT slams
+    if (t >= tm.back) {
+      const k = clamp((t - tm.back) / .1), cx = lerp(1842, 1512, E.io2(k));
+      const on = (t < tm.back + .1 || frac((t - tm.back - .1) * 2.2) < .55) && t < tm.idoit + 2 / 30;
       if (on) { X.save(); X.fillStyle = C.CLAY; X.fillRect(cx, 186, 24, 312); X.restore(); }
-      X.save(); X.globalAlpha = .8 * clamp((t - 3.40) * 20); X.font = mono(36, 500); X.fillStyle = C.PAPER; X.textAlign = 'right';
+      X.save(); X.globalAlpha = .8 * clamp((t - tm.back) * 20); X.font = mono(36, 500); X.fillStyle = C.PAPER; X.textAlign = 'right';
       X.fillText('(we fixed the writing)', 1866, 560); X.restore();
     }
-    if (t >= 3.43) { // the drop: letters (from 3.46) and the dash into a heap
+    if (t >= tm.drop) { // the drop: letters and the dash into a heap
       const hs = heapState(t);
       hs.forEach(L => { if (L.dash || L.a >= 0) drawLetter(X, L); else drawLetter(X, { ...L, rot: 0 }); });
     }
+    // I DO IT slams on its sung onset, before the sky takes over at 3.75 (same row, same slam curve as sky())
+    if (t >= tm.idoit) slamRow(X, 'I DO IT', 960, 456, 385, t - tm.idoit, { color: C.PAPER, center: true });
   }
 
   // ---------------------------------------------------------------- SKY: S03, S04
@@ -873,7 +898,7 @@
   }
 
   // Opus in S03/S04: springs in at R 180 on "TIMES A DAY", rays pop with a 2-frame stagger, ahoge last;
-  // wink ^_~ with a spark-hand on "day"; looks into the lens for the dive.
+  // wink ^_~ with a spark-hand one beat into the held "day"; looks into the lens for the dive.
   function skyOpus(t, tm) {
     const tin = tm.tad + .1 + 5 / 30;
     const a = t - tin;
@@ -991,7 +1016,7 @@
     const k = clamp((pr - 80) / 260);
     if (k <= 0) return;
     // the round pupil turns into a cursor ▮ (pops with overshoot), blinks once on the 16th, then dives
-    const g = E.in3(clamp((t - 7.31) / (7.5 - 7.31)));
+    const g = E.in2(clamp((t - 7.31) / (7.5 - 7.31)));   // in2: the cursor visibly swells from the first frame of the dive-in
     const ch0 = lerp(0, 118, E.back(k, 1.8)), cw0 = ch0 * .45;
     const ch = Math.exp(lerp(Math.log(Math.max(1, ch0)), Math.log(H * 1.2), g)), cw = Math.exp(lerp(Math.log(Math.max(1, cw0)), Math.log(W * .7), g));
     const off = t > 7.23 && t < 7.27;

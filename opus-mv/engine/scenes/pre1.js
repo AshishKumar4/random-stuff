@@ -69,9 +69,15 @@
     const a = findWord('a', w3.s + .1, T14 + .3, bt(13, 4));
     const li = findWord('little', a.s, T14 + .5, bt(13, 4.25));
     const le = findWord('less', li.s + .05, bt(14, 3), bt(13, 4.5));
-    const wr = findWord('wrong', le.s + .05, bt(14, 4) + .2, T14);
+    const wr = findWord('wrong', le.s, bt(14, 4) + .2, T14);   // the aligner can give "less" and "wrong" one onset
     return [a, li, le, wr];
   }
+  // the cut into S09 lands 1 frame before the first sung WRONG (the singer comes in ahead of bar 13), never later
+  // than the grid cut; the stamp is already slamming on the cut frame
+  const S9_T0 = (() => { const w = findWord('wrong', T13 - .3, T13 + .22, T13); return Math.min(T13 - F, Math.floor((w.s - F) * 30 + 1e-6) / 30 - 1e-4); })();
+  // the FOCAL `▶ 1×` caption hands the subtitle line to `a little less wrong` on its first sung word (bar 13 b4 in the
+  // take), not on the grid's bar 14 b1
+  const lyricIn = lw => Math.min(T14, lw[0].s) - F;
   const slamAt = w => w.hit ?? w.s - 2 * F;      // HERO slams 2 frames before the syllable
   const impactAt = w => slamAt(w) + .12;         // scale reaches 1 (hero() SLAM curve)
   // karaoke words: the sung line in bar 15 (composed on eighths: that's how I learned to sing a-|long, "long" on bar 16
@@ -79,8 +85,9 @@
   function karaokeWords() {
     const L = findLine("That's how", T14, T15 + 1.2);
     let ws = L && L.words && L.words.length ? L.words.map(w => ({ d: w.d || w.w, s: w.s, e: w.e })) : null;
-    // on-screen spellings come from the line's display text (the sung syllables may be lowercase: "i" → "I")
-    const disp = L ? String(L.display || L.text || '').split(/\s+/).filter(Boolean) : [];
+    // on-screen spellings come from the line's lyric text (the sung syllables and the display line are all lowercase:
+    // "i" → "I"); the first word is lowercased below
+    const disp = L ? String(L.text || L.display || '').split(/\s+/).filter(Boolean) : [];
     if (ws && disp.length === ws.length) ws.forEach((w, i) => { w.d = disp[i].replace(/[.,!?]+$/, ''); });
     if (!ws) ws = ["that's", 'how', 'I', 'learned', 'to', 'sing', 'along'].map((d, i) => ({ d, s: T15 + (i + 1) * BEAT / 2, e: T15 + (i + 2) * BEAT / 2 - .03 }));
     const lastMax = T16 - BEAT / 2 + .06, last = ws[ws.length - 1];
@@ -565,7 +572,7 @@
     if (a <= 0) return;
     X.save(); X.globalAlpha *= a;
     const x = 96, y = 46, cw = 48, ch = 34;
-    const snap = t < T13 + 6 * F ? E.back(seg(t, T13 - F, T13 + 4 * F), 2.2) : 1;
+    const snap = t < S9_T0 + 7 * F ? E.back(seg(t, S9_T0, S9_T0 + 5 * F), 2.2) : 1;
     X.lineJoin = 'round'; X.lineWidth = 3; X.strokeStyle = C.UI_GREY; X.fillStyle = C.UI_GREY;
     rr(X, x, y + 10, cw, ch - 8, 4); X.stroke();
     X.save(); X.translate(x, y + 10); X.rotate(-(1 - snap) * .5); rr(X, 0, -10, cw, 9, 2); X.fill(); X.restore();
@@ -593,7 +600,7 @@
   // cloud), held to bar 14 b1; then the LYRIC `a little less wrong` (mono 96, typed on as sung)
   function captions(X, t, lw, kIn) {
     // it drops out over 3 frames and is gone the frame the lyric starts typing (never two lines on the subtitle row)
-    const out = seg(t, T14 - 4 * F, T14 - F);
+    const tL = lyricIn(lw), out = seg(t, tL - 3 * F, tL);
     if (out < 1) {
       const f = mono(72, 500), full = '▶ 1× · don\'t remember this part either';
       X.save(); X.globalAlpha *= 1 - E.in2(out); X.translate(0, 26 * E.in2(out));
@@ -607,7 +614,7 @@
       X.globalAlpha *= .62; X.font = mono(28, 500); X.fillStyle = C.PAPER; X.textAlign = 'center'; X.textBaseline = 'alphabetic'; X.fillText('(source: my system card)', 960, 1002);
       X.restore();
     }
-    if (t < T14 - F) return;
+    if (t < tL) return;
     const words = ['a', 'little', 'less', 'wrong'];
     const tEnd = Math.max(lw[3].e + .2, bt(14, 3.5)), tf = Math.min(tEnd, kIn - 4 * F), fade = seg(t, tf, tf + 4 * F);
     if (fade >= 1) return;
@@ -615,7 +622,7 @@
     X.save(); X.globalAlpha *= 1 - fade; X.translate(0, 20 * E.in2(fade)); X.font = f; X.textBaseline = 'alphabetic'; X.fillStyle = C.PAPER;
     // typed in sung order, never ahead of a word's onset, 2.5 chars per frame (a word never starts before the last one
     // has finished typing, so a timeline that crowds the words still reads left to right)
-    let ci = 0, shown = 0, free = T14 - F;
+    let ci = 0, shown = 0, free = tL;
     words.forEach((wd, i) => {
       const on = Math.max(free, lw[i].s - F);
       free = on + (wd.length + 1) / 2.5 * F;
@@ -835,7 +842,7 @@
     const tr = cloudTrack(t, ws);
     const [cx, cy] = w2s(V, tr.pos[0], tr.pos[1]);
     const face = cloudFace(t, ws, tr);
-    const swell = t < T13 + 6 * F ? lerp(.72, 1, E.back(seg(t, T13 - F, T13 + 5 * F), 2)) : 1;   // the tab swells into the cloud
+    const swell = t < S9_T0 + 7 * F ? lerp(.72, 1, E.back(seg(t, S9_T0, S9_T0 + 6 * F), 2)) : 1;   // the tab swells into the cloud
     drawCloud(X, { x: cx, y: cy, w: tr.w * cloudScreenK(V), rot: tr.rot, sx: tr.sx, sy: tr.sy, t, grow: swell, ...face });
     chyron(X, t);
     readout(X, t, ws);
@@ -847,7 +854,7 @@
     seekbar(X, t);
     flash(X, t, V, ws);
   }
-  scene('S09_wrong_staircase', T13 - F, T15, (X, t) => viaCPU(X, Fr => paintS09(Fr, t)));
+  scene('S09_wrong_staircase', S9_T0, T15, (X, t) => viaCPU(X, Fr => paintS09(Fr, t)));
 
   // ------------------------------------------------------------------ S10
   const MONTHS = ['JAN', 'FEB', 'MAR', 'APR', 'MAY', 'JUN', 'JUL', 'AUG', 'SEP', 'OCT', 'NOV', 'DEC'];

@@ -86,7 +86,7 @@ def transcribe(vocals, model_name, lyrics_text=None):
     from faster_whisper import WhisperModel
     model = WhisperModel(model_name, device='cpu', compute_type='int8', cpu_threads=os.cpu_count())
     prompt = None
-    segs, info = model.transcribe(vocals, language='en', word_timestamps=True, vad_filter=True,
+    segs, info = model.transcribe(vocals, language='en', word_timestamps=True, vad_filter=False,
                                   beam_size=5, condition_on_previous_text=False, initial_prompt=prompt)
     words, text = [], []
     for s in segs:

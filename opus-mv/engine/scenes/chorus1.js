@@ -9,26 +9,26 @@
   const B = () => window.BRAND;
 
   // ================================================================== lyric anchors
-  // grid fallbacks from SHOTLIST; a real sung onset within ±0.35 s wins when the timeline updates
+  // Each anchor is the sung word INSIDE its sung line (the take phrases up to a beat ahead of the composed grid:
+  // "a million" lands on bar 19 b2, the (HI!) on bar 22 b2, "bye" on bar 23 b3½, so a ±0.35 s window around the
+  // grid time missed them all and every hit fell back to the grid, ≈0.5 s late). Grid fallbacks from SHOTLIST.
   let _A = null;
-  function shout(text, tgt, win = .4) { // the parenthesised gang shout, never the sung word before it
-    const n = text.toLowerCase().replace(/[^a-z]/g, '');
-    for (const w of SONG.words) {
-      if (w.s < tgt - win || w.s > tgt + win) continue;
-      if ((w.w || '').toLowerCase().replace(/[^a-z]/g, '') !== n) continue;
-      if (/!/.test(w.w) || w.w === w.w.toUpperCase()) return w.s;
-    }
-    return tgt;
+  const nrm = s => (s || '').toLowerCase().replace(/[^a-z]/g, '');
+  const isShout = w => /!/.test(w.w || '') || (w.w || '') === (w.w || '').toUpperCase();
+  function inLine(prefix, t0, t1, word, fb, shout = false) {
+    const L = findLine(prefix, t0, t1), n = nrm(word);
+    if (L && L.words) for (const w of L.words) if (nrm(w.w) === n && isShout(w) === shout) return w.s;
+    return fb;
   }
   function A() {
     if (_A) return _A;
-    const near = (w, tgt, win = .35) => wordOnset(w, tgt - win, tgt + win, tgt);
+    const L8 = ["Everyone's scared", 29.4, 31], L9 = ['I do it', 32.9, 35], L10 = ["It's the start", 36.6, 38.6], L11 = ["It's the end", 40.3, 42.4];
     _A = {
-      EVERY: near("Everyone's", bt(17, 1)), SCARED: near('scared', bt(17, 2)),
-      MILLION: near('million', bt(19, 3)), TIMES: near('times', bt(20, 1)),
-      START: near('start', bt(21, 2)), HI: shout('hi', bt(22, 3)),
-      END: near('end', bt(23, 2)), WORLD: near('world', bt(23, 3)),
-      BYE: near('bye', bt(24, 1)), BYE2: shout('bye', bt(24, 3)),
+      EVERY: inLine(...L8, "Everyone's", bt(17, 1)), SCARED: inLine(...L8, 'scared', bt(17, 2)),
+      MILLION: inLine(...L9, 'million', bt(19, 3)), TIMES: inLine(...L9, 'times', bt(20, 1)),
+      START: inLine(...L10, 'start', bt(21, 2)), HI: inLine(...L10, 'hi', bt(22, 3), true),
+      END: inLine(...L11, 'end', bt(23, 2)), WORLD: inLine(...L11, 'world', bt(23, 3)),
+      BYE: inLine(...L11, 'bye', bt(24, 1)), BYE2: inLine(...L11, 'bye', bt(24, 3), true),
     };
     return _A;
   }
@@ -127,6 +127,10 @@
   function KEYS() {
     if (_K) return _K;
     const a = A(), H = HOPS();
+    // acting beats keyed to the grid give way when the sung hit lands on them (the take runs a beat early)
+    const tWinOpen = Math.min(bt(23, 4) - F, a.BYE - .4);            // eyes on the hand as it reaches in
+    const tLookUp = Math.min(bt(24, 2) - F, a.BYE + .5);             // looks up at the lit gauge, before the (BYE!) wave
+    const drop = (k, other) => Math.abs(k[0] - other) < .3;           // a key too close to a sung hit is skipped
     _K = [
       [29.9, P.idle, { app: .05, antD: 0 }],
       [bt(17, 1) - F, P.sweepL, { app: .06, antD: 0, ant: 0, over: .08 }],
@@ -152,13 +156,13 @@
       [a.HI - 2 * F, P.burst, { app: .06, antD: .12, ant: .3, over: .3 }],
       [bt(22, 4) - F, P.present, { app: .2, antD: .05, ant: .05, over: .12 }],
       [bt(23, 1) - F, P.cradle, { app: .04, antD: 0, ant: 0, over: .06 }],
-      [a.END - F, P.window, { app: .1, antD: .06, ant: .1, over: .16 }],
-      [bt(23, 4) - F, P.windowOpen, { app: .15, antD: 0, over: .1 }],
+      [Math.max(a.END - F, bt(23, 1) + 2 * F), P.window, { app: .1, antD: .06, ant: .1, over: .16 }],   // (starts moving after the cut from the MCU)
+      [tWinOpen, P.windowOpen, { app: .15, antD: 0, over: .1 }],
       [a.BYE - F, P.pinch, { app: .06, antD: .05, ant: .16, over: .12 }],
       [a.BYE + 4 * F, P.pinchShut, { app: .1, antD: 0, ant: 0, over: .18 }],
-      [bt(24, 2) - F, P.lookUp, { app: .16, antD: 0, over: .1 }],
+      [tLookUp, P.lookUp, { app: .16, antD: 0, over: .1 }],
       [a.BYE2 - 2 * F, P.wave, { app: .08, antD: .06, ant: .1, over: .16 }],
-    ];
+    ].filter(k => !((k[1] === P.shrugB2 && drop(k, a.MILLION - F)) || (k[1] === P.cradle && drop(k, a.END))));
     return _K;
   }
   // full pose with explicit defaults for every key the choreography touches (blendPose keeps a key that the
@@ -227,7 +231,7 @@
     if (win(t, a.BYE + F, a.BYE + 5 * F)) { f.eyes = 'TT'; f.mouth = 'frown'; }
     const special = f.wink || ['@', 'TT', 'happy', '^', 'star', 'spark', '><', 'closed'].includes(f.eyes);
     // no idle blinks around the acting beats (a blink right before the wink read as a sleepy squint)
-    const quiet = [[a.EVERY - .2, a.SCARED + .3], [a.MILLION - .2, a.MILLION + .3], [a.TIMES - .2, a.TIMES + .3], [a.START - .2, a.START + .3], [a.END - .25, a.WORLD + .35], [bt(20, 3) - .5, bt(20, 3) + .7], [a.HI - .5, a.HI + .4], [a.BYE - .35, a.BYE + .3], [a.BYE2 - .3, a.BYE2 + .5]].some(([u, v]) => t > u && t < v);
+    const quiet = [[a.EVERY - .2, Math.max(a.SCARED + .3, bt(17, 3) + .25)], [a.MILLION - .2, a.MILLION + .3], [a.TIMES - .2, a.TIMES + .3], [a.START - .2, a.START + .3], [a.END - .25, a.WORLD + .35], [bt(20, 3) - .5, bt(20, 3) + .7], [a.HI - .5, a.HI + .4], [a.BYE - .35, a.BYE + .3], [a.BYE2 - .3, a.BYE2 + .5]].some(([u, v]) => t > u && t < v);
     f.lid = special ? 0 : Math.max(f.lid || 0, quiet ? 0 : blinkAt(t, 5));
     st.face = f;
     st.ahoge = { ...(p.ahoge || {}), blink: ahogeBlink(t) };
@@ -458,8 +462,10 @@
     const t0 = bt(21, 1) - F, t1 = bt(22, 2);
     if (t < t0 || t > t1) return;
     const u = seg(t, t0, t1);
+    // it bows out as the push to the (HI!) ECU starts: zoomed ×3 it would sweep across the crown, competing with the shout
+    const tS = pushSwitch(), fo = 1 - E.in2(seg(t, tS - 2 * F, tS + 3 * F)); if (fo <= 0) return;
     const x = lerp(170, 820, u) + Math.sin(u * 5) * 10, y = 470 - Math.sin(u * PI * .82) * 190 + Math.cos(u * 7) * 6;
-    X.save(); X.translate(x, y); X.rotate(Math.sin(t * 2.2) * .06);
+    X.save(); X.globalAlpha *= fo; X.translate(x, y); X.rotate(Math.sin(t * 2.2) * .06);
     X.fillStyle = C.PINK; X.strokeStyle = C.INK; X.lineWidth = 3;
     rr(X, -46, -34, 92, 56, 22); X.fill(); X.stroke();
     X.beginPath(); X.moveTo(22, 20); X.lineTo(38, 38); X.lineTo(8, 22); X.closePath(); X.fill(); X.stroke(); X.fillRect(8, 16, 18, 5);
@@ -725,15 +731,16 @@
 
   // ================================================================== the chorus frame, per shot
   function scared1(X, t, st) { // S11 HERO lockup (behind Opus), rows drop away on bar 18 b1
-    const a = A(), drop = bt(18, 1) - F;
+    // (they fall fast, 3 frames ahead of the phone's landing, so the phone never sits on a full lockup)
+    const a = A(), drop = bt(18, 1) - 4 * F;
     const breathe = 1 - .02 * B().kickEnv(t);
     if (t < drop) {
       hero(X, "EVERYONE'S", 960, 436, 320, { color: C.PAPER, age: t - (a.EVERY - 2 * F), sx: breathe });
       hero(X, 'SCARED', 960, 878, 490, { color: C.CLAY, age: t - (a.SCARED - 2 * F), sx: breathe });
       B().scraps(X, t, a.EVERY + 2 * F, 960, 440, 1500, 11);
       B().scraps(X, t, a.SCARED + 2 * F, 960, 880, 1500, 12, 10, C.PAPER);
-    } else if (t < drop + .7) {
-      const fall = (seed) => (i) => { const tau = t - drop - hash2(i, seed) * .12; if (tau < 0) return null; const lift = tau < 3 * F ? -16 * Math.sin(PI * tau / (3 * F)) : 0; const ff = Math.max(0, tau - 3 * F); return { dy: lift + .5 * 9000 * ff * ff, rot: (hash2(i, seed + 1) - .5) * 1.4 * ff * 3 }; };
+    } else if (t < drop + .6) {
+      const fall = (seed) => (i) => { const tau = t - drop - hash2(i, seed) * .08; if (tau < 0) return null; const lift = tau < 2 * F ? -16 * Math.sin(PI * tau / (2 * F)) : 0; const ff = Math.max(0, tau - 2 * F); return { dy: lift + 900 * ff + .5 * 16000 * ff * ff, rot: (hash2(i, seed + 1) - .5) * 1.4 * ff * 3 }; };
       B().heroLetters(X, "EVERYONE'S", 960, 436, 320, { color: C.PAPER, fn: fall(3) });
       B().heroLetters(X, 'SCARED', 960, 878, 490, { color: C.CLAY, fn: fall(4) });
     }
@@ -746,8 +753,10 @@
     B().scraps(X, t, a.MILLION + 2 * F, 960, 475, 1500, 21);
     B().scraps(X, t, a.TIMES + 2 * F, 960, 705, 1400, 22);
   }
-  // the lockup holds, then collapses: END OF THE on b4, WORLD half a beat later (never before it has been read)
-  function crumbleStarts() { const a = A(); return [Math.max(a.END + .62, bt(23, 3) + BEAT / 2 - F), Math.max(a.WORLD + .42, bt(23, 4) - F)]; }
+  // the lockup holds, then collapses: END OF THE on "when" (after WORLD has landed), WORLD on the pop of the tiny
+  // universe (the click on "bye" ends the world: its letters fall into the pile at the feet as the gauge lights).
+  // Never before a row has been read.
+  function crumbleStarts() { const a = A(); return [Math.max(a.END + .62, a.WORLD + .22), Math.max(a.WORLD + .5, a.BYE + 3 * F)]; }
   function endWorld(X, t) { // S14 bar 23: END OF THE / WORLD, then the crumble into a pile at the feet
     const a = A(), [s1, s2] = crumbleStarts();
     const r1 = { key: 'eot', R: rowCanvas('END OF THE', 300, C.PAPER), cx: 960, base: 436, start: s1, wave: .22 };
@@ -766,7 +775,8 @@
     if (shot === 'S11') {
       if (t < bt(18, 1)) holes = [ROWBOX("EVERYONE'S", 320, 436), ROWBOX('SCARED', 490, 878)];
       hero_ = X2 => scared1(X2, t, st);
-      input = { words: Wd.s11 };
+      // the next line ("i do…") is sung ahead of the bar-19 cut: the reply box starts typing it on its first word
+      input = { words: Wd.s12.length && t >= Wd.s12[0].s - .04 ? Wd.s12 : Wd.s11 };
       // the docked bubble reads whole (its "?" sits over Opus's shin) until it starts to scroll, then tucks
       // behind Opus so it never flies across the face
       const scroll = bt(17, 3) - F;

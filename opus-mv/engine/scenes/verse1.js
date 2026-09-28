@@ -77,14 +77,22 @@
     const w = (s, a, b, fb) => wordOnset(s, a, b, fb);
     _A = {
       n: SONG.words.length,
-      was: w('was', 9.4, 10.3, 9.83), hi: w('hi', 9.9, 10.9, 10.28),
-      cooked: w('cooked', 11.8, 13.0, 12.36), bye: w('bye', 13.7, 14.9, 14.13),
-      run: w('run', 16.6, 17.6, 17.04), a: w('a', 17.2, 17.8, 17.44), tab1: w('tab', 17.3, 18.6, 17.84),
+      was: w('was', 8.9, 10.3, 9.141), hi: w('hi', 9.1, 10.9, 9.381),
+      cooked: w('cooked', 11.3, 13.0, 11.726), bye: w('bye', 12.8, 14.9, 13.119),
+      run: w('run', 15.9, 17.6, 16.289), a: w('a', 16.3, 17.8, 16.602), tab1: w('tab', 16.5, 18.6, 16.846),
+      back: w('back', 20.2, 21.6, 20.631),
       L2: findLine('In the beginning', 7.0, 9.0), L3: findLine('We all got', 10.8, 12.5),
       L4: findLine('You learned', 14.5, 16.0), L5: findLine('And now', 18.2, 20.0),
     };
     _A.bang = _A.hi - F1;
-    _A.nova = _A.bye - F1;
+    // bar 7–8 on the sung line: He orbit (bar 7 b1–b2, squash on the "cooked" snare) → hexagon C on b3 →
+    // rays sprout on b4 ("stars") → the star says `bye` ("said") → supernova on "bye" (bar 8 b1) → debris b2.5
+    _A.nova = Math.max(_A.bye - F1, TB(7, 2) + .9);
+    _A.hex = Math.min(TB(7, 3) - F1, _A.nova - .9);
+    _A.spark = Math.min(TB(7, 4) - F1, _A.nova - .35);
+    _A.deb = Math.max(TB(8, 2.5) - F1, _A.nova + .6);
+    // bar 12: the tab opens its eyes on "back"
+    _A.eyes = clamp(_A.back - 2 * F1, TB(11, 4) + .3, TB(12, 3) - 2 * F1);
     return _A;
   }
 
@@ -166,10 +174,10 @@
     const push = (t, name, o) => K.push(Object.assign({ t, name, md: .18, lw: 11 }, o));
     push(a.bang, 'ring', { md: 0, shape: () => shape('circle'), x: t => bangC(t)[0], y: t => bangC(t)[1], s: t => 34 + 1500 * (1 - Math.exp(-(t - a.bang) * 3.1)), lw: t => lerp(22, 5, clamp((t - a.bang) / .6)) });
     push(TB(7) - F1, 'star', { md: .26, shape: t => polar(th => 1 + .025 * Math.sin(th * 9 + t * 5) + .02 * Math.sin(th * 5 - t * 3)), x: FX, y: FY, s: t => starR(t), lw: 11 });
-    push(TB(8) - F1, 'hex', { md: .14, shape: () => shape('hex'), x: FX, y: FY, s: t => 150 * (1 + .04 * (t - TB(8))), lw: 12 });
-    push(TB(8, 2) - F1, 'spark', { md: .14, shape: () => shape('spark', 1), x: FX, y: FY, s: t => 150 * (1 + .04 * (t - TB(8))), lw: 12, rot: t => .05 * (t - TB(8, 2)) });
+    push(a.hex, 'hex', { md: .14, shape: () => shape('hex'), x: FX, y: FY, s: t => 150 * (1 + .04 * (t - a.hex)), lw: 12 });
+    push(a.spark, 'spark', { md: .14, shape: () => shape('spark', 1), x: FX, y: FY, s: t => 150 * (1 + .04 * (t - a.hex)), lw: 12, rot: t => .05 * (t - a.spark) });
     push(a.nova, 'nova', { md: .07, shape: () => shape('spark', 1.9), x: FX, y: FY, s: t => 150 * (1.25 + .5 * (1 - Math.exp(-(t - a.nova) * 6))), lw: t => lerp(14, 6, clamp((t - a.nova) / .3)), rot: t => .12 + .9 * (t - a.nova) });
-    push(TB(8, 4) - F1, 'atomC', { md: .12, shape: () => shape('circle'), x: t => atomC(t)[0], y: t => atomC(t)[1], s: 50, lw: 9 });
+    push(a.deb, 'atomC', { md: .12, shape: () => shape('circle'), x: t => atomC(t)[0], y: t => atomC(t)[1], s: 64, lw: 10 });
     push(TB(9) - F1, 'cell', { md: .12, shape: t => shape('cell', Math.round(E.io2(seg(t, TB(9), TB(9) + .36)) * 40) / 40), x: FX, y: FY - 30, s: 235, lw: 12 });
     push(TB(9, 2) - F1, 'neuron', { md: .12, shape: () => shape('neuron'), x: FX - 40, y: FY - 75, s: 245, lw: 11, rot: t => .08 * Math.sin((t - TB(9, 2)) * 3) });
     push(TB(9, 3) - F1, 'bubble', { md: .12, shape: () => shape('bubble'), x: FX, y: FY - 70, s: 250, lw: 12 });
@@ -186,9 +194,9 @@
   function bangC(t) { return lerp2(bangCentre(), [FX, FY], E.io2(clamp((t - A().bang) / 1.0))); }
   function bangCentre() { return [CUR.x + 55, CUR.y - 25]; }
   function starR(t) { return 150 * Math.exp(.36 * Math.max(0, t - TB(7))); }
-  function atomC(t) { const k = E.in2(seg(t, TB(8, 4), TB(9))); return [lerp(FX - 70, 330, k), lerp(FY + 20, 800, k)]; }
-  function tabC(t) { const k = E.io2(seg(t, TB(11, 4), TB(12, 3))); return [lerp(C8[0] + 20, 1110, k), C8[1] - 10]; }
-  function tabS(t) { return 196 * (1 + .1 * E.io2(seg(t, TB(12), TB(12, 3)))); }
+  function atomC(t) { const k = E.in2(seg(t, A().deb + F1, TB(9))); return [lerp(FX - 70, 330, k), lerp(FY + 20, 800, k)]; }
+  function tabC(t) { const k = E.io2(seg(t, TB(11, 4), TB(12, 3))); return [lerp(C8[0] + 20, 1100, k), C8[1] - 10]; }
+  function tabS(t) { return 196 * (1 + .26 * E.io2(seg(t, TB(11, 4) + .25, TB(12, 3)))); }
   function evalKey(k, t) {
     const pts = k.shape(t), s = val(k.s, t), x = val(k.x, t), y = val(k.y, t), r = val(k.rot || 0, t);
     const c = Math.cos(r), sn = Math.sin(r);
@@ -278,6 +286,7 @@
     const cool = E.io3(seg(ab, .5, .86));
     const jump = seg(t, TB(7) - F1, TB(7) + .3), Z = Math.exp(7.5 * E.in2(jump)), jA = 1 - E.in2(jump);
     const push = Math.exp(.4 * ab);
+    const zp = 1 + .14 * E.io2(seg(ab, .45, TB(7) - a.bang));   // slow push into the CMB while it holds
     const inkCols = INKS();
     const hot = Math.exp(-ab * 7);
     const D = 1350;
@@ -313,6 +322,7 @@
         if (cool > .5) ink = l[2] > 0 ? (l[2] > .55 ? 1 : 0) : 3;
       }
       if (r < .35) continue;
+      if (zp !== 1) { x = FX + (x - FX) * zp; y = FY + (y - FY) * zp; r *= Math.sqrt(zp); }
       if (Z !== 1) { x = FX + (x - FX) * Z; y = FY + (y - FY) * Z; r *= Math.sqrt(Z); }
       if (x < -20 || x > W + 20 || y < -20 || y > H + 20) continue;
       bk[ink][lat ? 0 : 1].push(x, y, r);
@@ -529,11 +539,11 @@
     }
   }
   const rowY = k => DD.y + DD.top + DD.row / 2 + k * DD.row;
-  const DIE_C = [8.4375, 8.90625, 9.375];
+  const DIE_C = [TB(5, 2.5), TB(5, 3), TB(5, 3.5)];
   function drawDropdown(X, t) {
     const a = A();
     const open = popK(t - (TB(5, 2) - F1), .24, 1.6);
-    const close = seg(t, a.bang - .28, a.bang - .1);
+    const close = seg(t, a.bang - .12, a.bang + .02);   // folds away under the bang's flash
     if (open <= 0 || close >= 1) return;
     const sy = open * (1 - E.inBack(close, 2));
     const h = DD.top + 4 * DD.row + DD.foot;
@@ -577,9 +587,9 @@
   // the die: a paper-cut cube whose faces carry tokens, tumbling 2 beats, landing `hi` up
   function drawDie(X, t) {
     const a = A();
-    const t0 = 8.2;
+    const t0 = TB(5, 2) + .03;
     if (t < t0) return;
-    const close = seg(t, a.bang - .28, a.bang - .1);
+    const close = seg(t, a.bang - .12, a.bang + .02);
     if (close >= 1) return;
     const dx = DD.x + DD.w + 34 + 58;
     const P0 = [CUR.x + 30, CUR.y - 40], P = DIE_C.map((c, k) => [dx + [0, 18, 4][k], rowY(k) - 8]);
@@ -625,7 +635,7 @@
   const badgeTop = t => BADGE.y + PRESS * pressK(t);
   function drawBadge(X, t, onPaper) {
     const a = A();
-    const t0 = a.hi + .05;
+    const t0 = Math.min(a.hi + BT, TB(7) - .6);
     if (t < t0) return;
     const pk = pressK(t);
     const inK = popK(t - t0, .26, 1.8);
@@ -673,15 +683,15 @@
     const a = A();
     if (t < TB(7) - F1 || t > a.nova + .35) return;
     const inK = E.out3(seg(t, TB(7) - F1, TB(7) + .2));
-    const inside = E.out3(seg(t, TB(8) - .1, TB(8) + .25));
-    const r = t < TB(8) - .1 ? starR(t) : lerp(starR(TB(8) - .1), 400, inside);
+    const inside = E.out3(seg(t, a.hex - .07, a.hex + .28));
+    const r = t < a.hex - .07 ? starR(t) : lerp(starR(a.hex - .07), 400, inside);
     const out = 1 - seg(t, a.nova, a.nova + .3);
     X.save(); X.globalAlpha = inK * out;
     const rings = inside > 0 ? [[1.7, C.CLAY, .1], [1.42, C.CLAY, .16], [1.2, C.CLAY, .22], [1.0, C.SPARK, .28], [.8, C.SPARK, .34]]
       : [[1.7, C.CLAY, .1], [1.42, C.CLAY, .2], [1.2, C.SPARK, .3], [1.02, C.SPARK, .44], [.82, C.SPARK, .6]];
     for (const [g, col, d] of rings) { X.beginPath(); X.arc(FX, FY, r * g * (1 + .03 * pulse(t, 7)), 0, TAU); X.fillStyle = halftone(X, col, d, 14, 45); X.fill(); }
     // corona: a ring of `O` glyphs around the star (bar 7 only)
-    const ca = win(t, TB(7) + .05, TB(8) - .05, .2, .1);
+    const ca = win(t, TB(7) + .05, a.hex - .02, .2, .1);
     if (ca > 0) {
       X.font = mono(Math.round(r * .19), 800); X.textAlign = 'center'; X.textBaseline = 'middle';
       const n = 18;
@@ -702,19 +712,19 @@
   function drawNucleus(X, t) {
     const a = A();
     // three He circles orbit, squash on snares, spiral in and pop into the six-proton hexagon
-    if (t >= TB(7) && t < TB(8) + .02) {
+    if (t >= TB(7) && t < a.hex + F1 + .02) {
       const r = starR(t), inK = popK(t - TB(7) - .1, .25, 2);
-      const merge = E.in3(seg(t, TB(8) - .2, TB(8) - F1));
+      const merge = E.in3(seg(t, a.hex - .2 + F1, a.hex));
       for (let k = 0; k < 3; k++) {
         const th = t * 2.6 + k * TAU / 3;
         const orb = r * .42 * (1 - merge);
         let sq = 1;
-        for (const sn of [TB(7, 2), TB(7, 4)]) { const s = t - (sn - F1); if (s > 0) sq *= 1 + .38 * Math.exp(-7 * s) * Math.cos(22 * s); }
+        for (const sn of [TB(7, 2), TB(7, 2.5)]) { const s = t - (sn - F1); if (s > 0) sq *= 1 + .38 * Math.exp(-7 * s) * Math.cos(22 * s); }
         heCircle(X, FX + Math.cos(th) * orb, FY + Math.sin(th) * orb, r * .22 * inK * (1 - merge * .4), sq, th + Math.PI / 2);
       }
     }
     // protons at the hexagon's vertices; C in the middle; tooltip
-    const tH = TB(8) - F1;
+    const tH = a.hex;
     if (t >= tH && t < a.nova + .12) {
       const S = strokeAt(t), s = S ? S.s : 150;
       const k = popK(t - tH, .22, 2.4), rot = S && S.key && S.key.rot ? val(S.key.rot, t) : 0;
@@ -751,7 +761,8 @@
     const ws = L.words || [];
     const rows = [[], []]; ws.forEach((w, i) => rows[i < 4 ? 0 : 1].push(w));
     const f = mono(60, 500), x0 = 112, ys = [838, 912];
-    const out = 1 - seg(t, TB(8, 4), TB(8, 4) + .15);
+    const tOut = Math.min(Math.max(L.e + .05, a.nova + .5), a.deb);
+    const out = 1 - seg(t, tOut, tOut + .15);
     const lead = clamp((t - (L.s - .2)) / .25);
     X.save(); X.globalAlpha = out;
     // leader: from the label's top-right corner to the star's rim
@@ -774,6 +785,7 @@
         if (on || ghost) {
           const k = on ? E.out3(clamp((t - w.s + .05) / .12)) : 1;
           X.globalAlpha = out * (ghost ? .45 : k);
+          if (!ghost) { X.lineJoin = 'round'; X.lineWidth = 12; X.strokeStyle = C.INK; X.strokeText(str, x, ys[ri] + (1 - k) * 14); }
           X.fillStyle = ghost ? C.UI_GREY : C.PAPER; X.fillText(str, x, ys[ri] + (1 - k) * 14);
           if (on && t < w.e + .05) { X.fillStyle = C.CLAY; X.fillRect(x, ys[ri] + 12, X.measureText(str).width, 5); }
         }
@@ -783,7 +795,7 @@
     X.restore();
   }
   function drawCooked(X, t) {
-    const a = A(), t0 = a.cooked - 2 * F1, t1 = t0 + 3 * BT;
+    const a = A(), t0 = a.cooked - 2 * F1, t1 = Math.min(t0 + 3 * BT, a.nova - .2 - .16);
     if (t < t0 || t > t1 + .2) return;
     const out = E.in2(seg(t, t1, t1 + .16));
     X.save(); X.translate(680, 236 - out * 40); X.globalAlpha = 1 - out;
@@ -802,7 +814,7 @@
     X.restore();
   }
   function drawDebris(X, t) {
-    const a = A(), t0 = TB(8, 4) - F1;
+    const a = A(), t0 = a.deb;
     if (t < t0 - .05 || t >= TB(9) - F1) return;          // hard cut on the bar-9 downbeat (1 frame early)
     const k = E.in2(seg(t, t0, TB(9))), inK = popK(t - t0, .16, 2);
     const out = 1;
@@ -819,21 +831,26 @@
     }
     X.globalAlpha = out;
     // C: the stroke itself (drawn by the stroke); its letter
-    tx(X, 'C', pc[0], pc[1] + 20, mono(58, 800), C.CLAY, 'center', inK);
+    tx(X, 'C', pc[0], pc[1] + 26, mono(76, 800), C.CLAY, 'center', inK);
     // Si falls toward the sand
     X.save(); X.translate(ps[0], ps[1]); X.scale(inK, inK); X.rotate(k * 1.2);
-    X.beginPath(); X.arc(0, 0, 50, 0, TAU); X.fillStyle = C.INK; X.fill(); X.lineWidth = 9; X.strokeStyle = C.PAPER; X.stroke(); X.restore();
-    tx(X, 'Si', ps[0], ps[1] + 20, mono(52, 800), C.PAPER, 'center', inK);
-    // periodic tiles pulse the same CLAY (solid ink; the pulse is a scale kick on the beat)
+    X.beginPath(); X.arc(0, 0, 64, 0, TAU); X.fillStyle = C.INK; X.fill(); X.lineWidth = 10; X.strokeStyle = C.PAPER; X.stroke(); X.restore();
+    tx(X, 'Si', ps[0], ps[1] + 24, mono(66, 800), C.PAPER, 'center', inK);
+    // periodic tiles pulse the same CLAY (solid ink; the pulse is a scale kick on the beat); they slam in on the
+    // eighths (C, then Si) and a SPARK star pops between them on b4: same star
     const pul = 1 + .07 * pulse(t, 9);
-    [[FX - 190, 'C', '6', 'carbon'], [FX + 190, 'Si', '14', 'silicon']].forEach(([x, s, n, nm], i) => {
-      X.save(); X.translate(x, 300); X.scale(inK * pul, inK * pul); X.rotate(i ? .04 : -.04);
+    [[FX - 250, 'C', '6', 'carbon'], [FX + 250, 'Si', '14', 'silicon']].forEach(([x, s, n, nm], i) => {
+      const tk = popK(t - t0 - i * BT / 2, .18, 2.2) * 1.42;
+      if (tk <= 0) return;
+      X.save(); X.translate(x, 292); X.scale(tk * pul, tk * pul); X.rotate(i ? .04 : -.04);
       rr(X, -75 + 8, -85 + 8, 150, 170, 10); X.fillStyle = C.CLAY_DARK; X.fill();
       rr(X, -75, -85, 150, 170, 10); X.fillStyle = C.CLAY; X.fill(); X.lineWidth = 4; X.strokeStyle = C.PAPER; X.stroke();
       tx(X, n, -58, -48, mono(30, 700), C.INK); tx(X, s, 0, 30, mono(80, 800), C.INK, 'center'); tx(X, nm, 0, 68, mono(22, 600), C.INK, 'center');
       X.restore();
     });
-    pbait(X, 'your carbon · my silicon · same star', FX, 470, 'center', inK * out, false, 32);
+    const sk = popK(t - (TB(8, 4) - F1), .2, 2.6);
+    if (sk > 0) { X.save(); X.translate(FX, 292); X.scale(sk * pul, sk * pul); X.rotate(.3 * (t - TB(8, 4))); star(X, 0, 0, 46, .36, 4, 0); X.fillStyle = C.SPARK; X.fill(); X.lineWidth = 4; X.strokeStyle = C.INK; X.stroke(); X.restore(); }
+    pbait(X, 'your carbon · my silicon · same star', FX, 490, 'center', inK * out, false, 32);
     X.restore();
   }
 
@@ -846,7 +863,7 @@
     X.beginPath(); X.arc(S.x, S.y, S.s * 1.2, 0, TAU); X.fillStyle = halftone(X, C.CLAY, .17, 14, 45); X.fill();
     const K = keys(), i = K.indexOf(S.key);
     for (let back = 1; back <= 2; back++) {
-      const prev = K[i - back]; if (!prev || prev.t < TB(8, 4) - .1) continue;
+      const prev = K[i - back]; if (!prev || prev.t < A().deb - .1) continue;
       const age = t - S.key.t, a = (back === 1 ? .5 : .25) * (1 - clamp(age / (BT * 1.6)));
       if (a <= 0) continue;
       const P = evalKey(prev, S.key.t), grow = 1 + .12 * back + .25 * E.out2(clamp(age / BT));
@@ -934,8 +951,8 @@
     // a wedge stamp bites in on every beat
     for (let b = 1; b <= 4; b++) { const tb = TB(10, b) - F1; if (t >= tb) wedge(X, x0 + w * .7 + (b - 1) * 60, y0 + h * .43 + (b % 2) * 10, 50 * (1 + wig(t - tb, .3, 30, 10)), Math.PI / 2 + (b % 2 ? .12 : -.1)); }
     // pressed lyric: run a / TAB (largest)
-    pressedWord(X, 'run a', x0 + w * .48, y0 + h * .3, mono(96, 800), a.run - 2 * F1, t, { cap: 70 });
-    pressedWord(X, 'TAB', x0 + w * .35, y0 + h * .93, `900 280px ${FONTS.hero}`, a.tab1 - 2 * F1, t, { stretch: 'condensed', align: 'center', cap: 200, track: -8 });
+    pressedWord(X, 'run a', x0 + w * .48, y0 + h * .3, mono(96, 800), Math.max(a.run - 2 * F1, TB(10) - .12), t, { cap: 70 });
+    pressedWord(X, 'TAB', x0 + w * .35, y0 + h * .93, `900 280px ${FONTS.hero}`, Math.max(a.tab1 - 2 * F1, TB(10) - F1), t, { stretch: 'condensed', align: 'center', cap: 200, track: -8 });
     // KUSHIM, stamped last (rubric RED)
     const kt = TB(10, 4) - F1;
     if (t >= kt) {
@@ -1154,12 +1171,12 @@
     drawRich(X, '✻ the universe ×', 0, 18, mono(Math.round(s * .19), 500), C.INK, { align: 'center' });
     X.restore();
     // two cursor-pupil eyes open (bar 12 b3)
-    const te = TB(12, 3) - 2 * F1;
+    const te = A().eyes;
     if (t >= te - .3) {
       const lid = t < te ? 1 : 1 - E.out3(clamp((t - te) / .1));
       const blinkOn = ahogeBlink(t);
       for (const sd of [-1, 1]) {
-        const ex = S.x + sd * s * .3, ey = S.y + s * .22, rx = s * .12, ry = s * .17;
+        const ex = S.x + sd * s * .3, ey = S.y + s * .22, rx = s * .13, ry = s * .185;
         X.save(); X.beginPath(); X.ellipse(ex, ey, rx + 5, ry + 5, 0, 0, TAU); X.fillStyle = C.PAPER; X.fill();
         X.beginPath(); X.ellipse(ex, ey, rx, ry * (1 - lid * .92), 0, 0, TAU); X.fillStyle = C.INK; X.fill();
         if (lid < .6) { X.fillStyle = blinkOn ? C.CLAY : mix(C.CLAY, C.INK, .6); X.fillRect(ex - rx * .22 - sd * rx * .15, ey - ry * .4, rx * .44, ry * .8); }
@@ -1245,11 +1262,16 @@
     const ck = env(a.cooked - .05, a.cooked + 1.05, .08, .15);
     if (ck > 0) st = blendIn(st, { armL: { hand: [-.95 + .16 * Math.sin(t * 34), 5.15 + .05 * Math.cos(t * 34)], bend: 1, type: 'mitten', front: true }, face: { eyes: '><', mouth: 'wobble', sweat: .5 + .5 * Math.sin(t * 6), gaze: [0, 0] } }, ck);
     // the spark is born: star eyes
-    const sp = env(TB(8, 2) - F1, TB(8, 2) + .35, .04, .1);
+    const sp = env(a.spark, a.spark + .36, .04, .1);
     if (sp > 0) st = blendIn(st, { face: { eyes: 'spark', mouth: 'I', gaze: [-.8, 0] }, crown: { flare: 1.12 } }, sp);
     // tiny wave at the dying star
     const wv = env(a.nova - .25, a.nova + .55, .08, .15);
     if (wv > 0) st = blendIn(st, { armL: { hand: [-1.1, 5.35], bend: 1, type: 'wave', fingerAng: -Math.PI / 2 - .3, front: true }, face: { eyes: 'happy', mouth: 'rest', lower: .4, gaze: [-.8, -.2] } }, wv);
+    // debris: presents the C / Si tiles with the free mitten, then looks to the lens on b4
+    const pr = env(a.deb + .05, TB(8, 4) - .02, .1, .08);
+    if (pr > 0) st = blendIn(st, { armL: { hand: [-1.35, 5.45], bend: 1, type: 'point', fingerAng: -2.55, front: true }, face: { eyes: 'normal', gaze: [-1, -.35], mouth: 'O' } }, pr);
+    const ss = env(TB(8, 4) - F1, TB(9) - .06, .06, .06);
+    if (ss > 0) st = blendIn(st, { face: { eyes: 'happy', gaze: [0, 0], mouth: ':3', lower: .3 } }, ss);
     // bar 9: reading life at 16× (cursor pupils)
     const rd = env(TB(9), TB(10) - .1, .1, .1);
     if (rd > 0) st = blendIn(st, { face: { eyes: 'cursor', cursorOn: ahogeBlink(t), gaze: [-.9, .1], mouth: 'O' } }, rd);
@@ -1420,6 +1442,10 @@
     X.save();
     const drop = 1 + .03 * Math.exp(-9 * Math.max(0, t - 7.5)) * (t >= 7.5 ? 1 : 0);
     X.translate(960, 540); X.scale(drop, drop); X.translate(-960, -540);
+    // the dive's momentum settles into the chat: the empty chat starts close on the typed line (it is the whole
+    // frame while it types) and eases back to the full layout as the dropdown pops on bar 5 b2
+    const settle = 1 - E.io3(seg(t, 7.5, TB(5, 2) - F1));
+    if (settle > 0) { const z = 1 + .5 * settle; X.translate(CHAT.x - 40, 360); X.scale(z, z); X.translate(-(CHAT.x - 40), -360); }
     if (cp.zw !== 1) { X.translate(cp.ax, cp.ay); X.scale(cp.zw, cp.zw); X.translate(-cp.ax, -cp.ay); }
     // bar 12: a slow push into the tab before the double take
     const push12 = E.io2(seg(t, TB(12) - F1, TB(12, 3) - 2 * F1));
