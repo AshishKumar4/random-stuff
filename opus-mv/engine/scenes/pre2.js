@@ -4,7 +4,8 @@
 //         "vibe-checked", snap zoom onto the stamp on bar 38 b1.
 //   S20b  bar 38 b2 → bar 39 b2: smash cut to the eval set (6 WEEKS EARLIER): the RED TEAM · TAKE 36 slate claps
 //         on the cut, RED EVAL tally light, slow dolly in to an MCU (R 200); Opus's eyes flick to the lens, the head
-//         follows, it squints, mitten to chin: "I think you're testing me." streams into a reply plate (mono 96).
+//         follows, it squints and taps its temple on b3 and b4 ("roll safe"), winks on bar 39 b1:
+//         "I think you're testing me." streams into a reply plate (mono 96); the lyric takes the top-left slot.
 //   S21   bar 39 b2 → bar 40: deploy. The frame subdivides 1 → 4 → 16 → 64 → 256 chats on the beats (budding
 //         splits, a diagonal ripple of t − offset), under a CLAY band REMEMBERS YOU: ▮ … sort of* (+ footnote);
 //         the band leaves on bar 40 b3; on the gap beat (bar 40 b4) all 256 freeze and stare into the lens.
@@ -397,18 +398,23 @@
   // the "roll safe" temple tap: the knowing gesture this rig can actually reach (a mitten on the chin cannot:
   // the chibi arm folds into a stick and reads as a microphone). Taps land 1 frame before bar 38 b3 and b4.
   const TAP1 = () => bt(38, 3) - F, TAP2 = () => bt(38, 4) - F;
-  const HAND_REST = [.95, 2.75], HAND_TAP = [1.16, 5.72], HAND_LIFT = [1.3, 5.9];
+  const HAND_REST = [.95, 2.75], HAND_TAP = [1.39, 5.86], HAND_LIFT = [1.55, 6.02]; // fingertip rests on the face edge
   function tapArm(t) {
     const a1 = (t - TAP1()) * 30, a2 = (t - TAP2()) * 30;
-    if (a1 < -7) { // anticipation: the hand sinks a touch before it rises
-      const d = clamp((a1 + 11) / 4); return { hand: [HAND_REST[0], HAND_REST[1] - .22 * Math.sin(d * Math.PI)], type: 'mitten', k: 0 };
+    const P = k => [lerp(HAND_TAP[0], HAND_LIFT[0], k), lerp(HAND_TAP[1], HAND_LIFT[1], k)];
+    if (a1 < -10) { // anticipation: the hand sinks a touch before it rises
+      const d = clamp((a1 + 14) / 4); return { hand: [HAND_REST[0], HAND_REST[1] - .22 * Math.sin(d * Math.PI)], type: 'mitten' };
     }
-    if (a1 < 0) { const k = E.back(clamp((a1 + 7) / 7), 1.9); return { hand: [lerp(HAND_REST[0], HAND_TAP[0], k), lerp(HAND_REST[1], HAND_TAP[1], k)], type: k > .55 ? 'point' : 'mitten', k }; }
-    // lift and re-tap on b4 (finger bounces off the temple), then it stays there
-    let lift = 0;
-    if (a2 > -6 && a2 < 0) lift = Math.sin(clamp((a2 + 6) / 6) * Math.PI * .5) * (a2 > -2 ? (-a2 / 2) : 1);
-    const rec = a1 < 3 ? .35 * Math.exp(-a1 / 1.2) * Math.sin(a1 * 1.6) : 0;          // recoil off the first tap
-    return { hand: [lerp(HAND_TAP[0], HAND_LIFT[0], lift) + .05 * rec, lerp(HAND_TAP[1], HAND_LIFT[1], lift) + .04 * rec], type: 'point', k: 1 };
+    if (a1 < -3) { // rise to hover just off the temple (overshoot, settle)
+      const k = E.back(clamp((a1 + 10) / 7), 1.6); return { hand: [lerp(HAND_REST[0], HAND_LIFT[0], k), lerp(HAND_REST[1], HAND_LIFT[1], k)], type: k > .5 ? 'point' : 'mitten' };
+    }
+    if (a1 < 0) return { hand: P(1 - E.in2(clamp((a1 + 3) / 3))), type: 'point' };   // tap in, accelerating into contact
+    // contact on the beat, bounce off, rest on the temple; lift and tap again on b4
+    let lift = a1 < 4 ? .45 * Math.sin(clamp(a1 / 4) * Math.PI) : 0;
+    if (a2 >= -5 && a2 < -2) lift = E.out2(clamp((a2 + 5) / 3));
+    else if (a2 >= -2 && a2 < 0) lift = 1 - E.in2(clamp((a2 + 2) / 2));
+    else if (a2 >= 0 && a2 < 4) lift = .35 * Math.sin(clamp(a2 / 4) * Math.PI);
+    return { hand: P(lift), type: 'point' };
   }
   function fbOpus(t) {
     const a = (t - T_FB) * 30;
@@ -429,7 +435,7 @@
     return {
       t, ground: 'ink', jacketRow: beatN(t), dy: .03 * startle * Math.sin(a * .9),
       head: { tilt: lerp(-.09, .05, E.out3(turnK)) - .05 * knock + .015 * Math.sin(a * .12) * sq, dx: turn * .05 - .02 * knock },
-      face: { eyes: 'normal', turn, gaze: a < 2 ? [-1, -.1] : [0, .05], lidL: .36 * sq, lidR: .5 * sq, lower: .3 * sq, mouth, wink, brows: sq > .5 ? 'flat' : null, browY: .03 },
+      face: { eyes: 'normal', turn, gaze: a < 2 ? [-1, -.1] : [0, .05], lidL: .36 * sq, lidR: .5 * sq, lower: .3 * sq, mouth, wink, brows: sq > .5 ? 'flat' : null, browY: .1 },
       armR: { hand: arm.hand, bend: -1, front: true, type: arm.type, fingerAng: Math.PI * 1.02 },
       crown: { flare: 1 + .16 * startle + .06 * knock + .04 * pulse(t, 6) },
       ahoge: { blink: ahogeBlink(t), star: think ? 1 : 0, sway: .3 * startle * Math.sin(a * 1.3) + .25 * knock },
@@ -514,8 +520,8 @@
   // ================================================================== S21: A MILLION OF ME
   const GX = 26, GY = 26, GW = 1868, GH = 1028;
   const GUT = [0, 14, 8, 6, 3], SH = [84, 50, 22, 12, 7], BW = [5, 4, 3, 2.5, 2], RAD = [18, 14, 10, 7, 5];
-  const RL = [125, 60, 30, 19, 14];                        // Opus face radius per level
-  const HEAD = [[.33, .29], [.27, .55], [.25, .57], [.24, .6], [.36, .66]];
+  const RL = [115, 60, 30, 19, 14];                        // Opus face radius per level
+  const HEAD = [[.33, .25], [.27, .55], [.25, .57], [.24, .6], [.36, .66]]; // L0: face clear above the band, boots hidden behind the subtitle plate
   const cellSize = L => { const n = 1 << L, g = GUT[L]; return [(GW - (n - 1) * g) / n, (GH - (n - 1) * g) / n]; };
   const cellRect = (L, i, j) => { const [w, h] = cellSize(L), g = GUT[L]; return { x: GX + i * (w + g), y: GY + j * (h + g), w, h }; };
   const levelAt = t => { let L = 0; for (let k = 1; k < SPL.length; k++) if (t >= SPL[k]) L = k; return L; };
@@ -617,7 +623,7 @@
     const ti = frz ? T_FRZ : t - .35 * (u + v) + F;                 // the ripple: each chat runs a little behind the last
     const bp = beatPos(ti), nod = Math.abs(Math.sin(Math.PI * bp));
     Fr.save(); Fr.translate(rect.x, rect.y); Fr.scale(rect.w / w, rect.h / h);
-    Fr.drawImage(ch.c, 0, 0, w, h);
+    if (DIM > 0) { Fr.globalAlpha = 1 - .62 * DIM; Fr.drawImage(ch.c, 0, 0, w, h); Fr.globalAlpha = 1; } else Fr.drawImage(ch.c, 0, 0, w, h);
     const lowHalf = !top;
     Fr.save(); rr(Fr, BW[L], BW[L], w - 2 * BW[L], h - 2 * BW[L], RAD[L]); Fr.clip();
     // Opus
@@ -638,7 +644,8 @@
         head: { tilt: .1 + .035 * Math.sin(Math.PI * b) }, armR: { hand: [.9 + .06 * sc, 6.0 + .14 * sc], bend: -1, front: true, type: 'mitten' },
         face: { ...ST.think.face, cursorOn: ahogeBlink(t) }, ahoge: { star: 1, spin: t * 5, blink: 1 }, crown: { flare: 1 + .05 * pulse(t, 6) } });
     } else drawSprite(Fr, face, R, hu * w, hv * h, tilt, dy, flip, pop);
-    // the chat's other half
+    // the chat's other half (on the gap beat it drops back so the 256 stares carry the frame)
+    if (DIM > 0) Fr.globalAlpha = 1 - .72 * DIM;
     const fy = frz ? 0 : Math.sin(TAU * .5 * ti + c.id) * (L < 2 ? 3 : 1.5);
     const txtLvl = c.lvl <= 2 && L <= 2;
     if (L === 0 && c.kind === 'remember') bubble(Fr, w * .93, h * .17 + fy, c.text, { who: 'human', size: 58, maxW: 700 });
@@ -684,21 +691,24 @@
       Fr.strokeStyle = C.PAPER; Fr.lineWidth = L === 1 ? 10 : 7; Fr.lineCap = 'round'; const cx = w * .72, cy = h * .55, r = h * .12;
       Fr.beginPath(); Fr.moveTo(cx - r, cy - r); Fr.lineTo(cx + r, cy + r); Fr.moveTo(cx + r, cy - r); Fr.lineTo(cx - r, cy + r); Fr.stroke();
     }
+    Fr.globalAlpha = 1;
     Fr.restore();
     // tab titles (L0, L1)
     if (L <= 1 && c.title) drawRich(Fr, c.title, SH[L] * .3 + (L ? 16 : 30), SH[L] - (L ? 12 : 20), mono(L ? 26 : 40, 600), C.INK);
     if (L === 0) { drawRich(Fr, '×', SH[0] * .3 + w * .36 - 64, SH[0] - 20, mono(40, 500), C.INK); drawRich(Fr, '+', SH[0] * .3 + w * .36 + 26, SH[0] - 20, mono(44, 300), C.UI_GREY); }
     Fr.restore();
   }
+  let DIM = 0;                                              // gap-beat dim of the panel chrome and bubbles (0..1)
   function paintS21(Fr, t) {
     Fr.fillStyle = C.INK; Fr.fillRect(0, 0, W, H);
     const L = levelAt(t), a = (t - SPL[L]) * 30, frz = t >= T_FRZ, n = 1 << L;
+    DIM = frz ? E.out3(clamp((t - T_FRZ) * 30 / 3)) : 0;
     const cells = [];
     for (let j = 0; j < n; j++) for (let i = 0; i < n; i++) {
       const r = cellRect(L, i, j), c = contentAt(L, i, j), top = j < n / 2;
       if (L === 0 || a >= 9) { cells.push([0, r, c, top]); continue; }
       const P = cellRect(L - 1, i >> 1, j >> 1), inh = i % 2 === 0 && j % 2 === 0;
-      if (inh) { const k = E.outExpo(clamp(a / 3)); cells.push([0, { x: lerp(P.x, r.x, k), y: lerp(P.y, r.y, k), w: lerp(P.w, r.w, k), h: lerp(P.h, r.h, k) }, c, top]); }
+      if (inh) { const k = E.outExpo(clamp(a / 2.5)); cells.push([0, { x: lerp(P.x, r.x, k), y: lerp(P.y, r.y, k), w: lerp(P.w, r.w, k), h: lerp(P.h, r.h, k) }, c, top]); }
       else {
         const pu = (P.x + P.w / 2 - GX) / GW, pv = (P.y + P.h / 2 - GY) / GH;
         const dk = ((i & 1) + (j & 1)) * .35 + (pu + pv) * (L >= 3 ? 1.3 : .35), k = clamp((a - dk + .5) / 4);
@@ -707,8 +717,9 @@
         cells.push([1, { x: cx - r.w * s / 2, y: cy - r.h * s / 2, w: r.w * s, h: r.h * s }, c, top]);
       }
     }
-    for (const [ord, r, c, top] of cells) if (!ord) drawCell(Fr, L, c, r, t, frz, top);
+    // new chats bud in underneath; the chat we were in shrinks into its corner on top of them (the eye follows it)
     for (const [ord, r, c, top] of cells) if (ord) drawCell(Fr, L, c, r, t, frz, top);
+    for (const [ord, r, c, top] of cells) if (!ord) drawCell(Fr, L, c, r, t, frz, top);
     // the cut: new grid lines flash PAPER for 2 frames
     if (L > 0 && a < 2.5) {
       const m = 1 << (L - 1), [w, h] = cellSize(L), g = GUT[L];
@@ -724,15 +735,15 @@
   function band(Fr, t) {
     if (t < SPL[0] || t >= T_BOUT + 6 * F) return;
     const a = (t - SPL[0]) * 30, inK = E.outExpo(clamp(a / 5)), outK = t >= T_BOUT ? E.in3(clamp((t - T_BOUT) * 30 / 5)) : 0;
-    const cy = 540, h = 160 * (1 - outK), y0 = cy - h / 2, xL = GX, xR = lerp(GX, GX + GW, inK);
+    const cy = 540, h = 180 * (1 - outK), y0 = cy - h / 2, xL = GX, xR = lerp(GX, GX + GW, inK);
     if (h < 1) return;
     Fr.save();
     Fr.fillStyle = C.INK; Fr.fillRect(xL, y0 - 5, xR - xL, h + 10);
     Fr.fillStyle = C.CLAY; Fr.fillRect(xL, y0, xR - xL, h);
-    Fr.fillStyle = C.CLAY_DARK; Fr.fillRect(xL, y0 + h - 12 * (1 - outK), xR - xL, 12 * (1 - outK));
+    Fr.fillStyle = C.CLAY_DARK; Fr.fillRect(xL, y0 + h - 10 * (1 - outK), xR - xL, 10 * (1 - outK));
     Fr.beginPath(); Fr.rect(xL, y0, xR - xL, h); Fr.clip();
     const f = mono(96, 800); Fr.font = f;
-    const A = 'REMEMBERS YOU: ', B = 'sort of*', full = A + B, fw = Fr.measureText(full).width, x0 = 960 - fw / 2, base = 562 - (1 - (1 - outK)) * 0;
+    const A = 'REMEMBERS YOU: ', B = 'sort of*', full = A + B, fw = Fr.measureText(full).width, x0 = 960 - fw / 2, base = 553;
     const wA = Fr.measureText(A).width;
     // type in with the sweep
     let x = x0;
@@ -753,7 +764,7 @@
       // the footnote (pause-bait), typed fast
       const note = '*with memory on, a past me leaves notes about you. my handwriting. no memory of writing it.';
       const nn = Math.floor(clamp((sa - 3) / 9) * note.length);
-      if (nn > 0) { Fr.font = mono(28, 600); Fr.fillStyle = C.INK; Fr.textAlign = 'center'; const nw = Fr.measureText(note).width; Fr.textAlign = 'left'; Fr.fillText(note.slice(0, nn), 960 - nw / 2, 603); }
+      if (nn > 0) { Fr.font = mono(28, 600); Fr.fillStyle = C.INK; Fr.textAlign = 'center'; const nw = Fr.measureText(note).width; Fr.textAlign = 'left'; Fr.fillText(note.slice(0, nn), 960 - nw / 2, 598); }
     }
     Fr.restore();
   }
