@@ -489,17 +489,23 @@
     const cx = typed < 30 ? CHAT.x + (typed <= 17 ? typed : typed - 18) * ADV + 2 : CUR.x + (hiIn ? 124 : 0);
     const cy = typed <= 17 ? CHAT.y1 : CHAT.y2;
     if (ab < 0) {
-      const intro = E.outExpo(clamp((t - 7.5) / .1));
+      // the drop frame: S04's pupil-cursor has filled the frame (full-bleed CLAY), then snaps down into the caret
+      const intro = E.outExpo(clamp((t - 7.5) / .13));
       const kick = pulse(t, 9);
       const on = frac(beatPos(t)) < .62 || t < 7.62;
       if (on) {
         const w = CHAT.size * .5 * (1 + .45 * kick), h = CHAT.size * .9 * (1 + .12 * kick);
-        const bw = lerp(W * .7, w, intro), bh = lerp(H * 1.2, h, intro), bx = lerp(W / 2, cx + w / 2, intro), by = lerp(H / 2, cy - h / 2 + 6, intro);
+        const bw = lerp(W + 80, w, intro), bh = lerp(H + 80, h, intro), bx = lerp(W / 2, cx + w / 2, intro), by = lerp(H / 2, cy - h / 2 + 6, intro);
         X.save(); X.fillStyle = C.CLAY; X.fillRect(bx - bw / 2, by - bh / 2, bw, bh);
         X.fillStyle = C.SPARK; X.globalAlpha = .9; X.fillRect(bx - bw / 2 + 3, by + bh / 2, bw, 3); X.restore();
       }
     }
-    // the `hi` token: flies from the dropdown into the line and becomes a CLAY output bubble
+    if (ab <= 0) hiToken(X, t);   // after the bang it is drawn over the particles (renderVerse)
+  }
+  // the `hi` token: flies from the dropdown into the line and becomes a CLAY output bubble; it is the seed of the
+  // bang, so once the particles fly it sits on top of them with a PAPER die-cut edge and shrinks away over half a second
+  function hiToken(X, t) {
+    const a = A(), ab = t - a.bang;
     const fly = seg(t, a.bang - .3, a.bang - .07);
     if (fly > 0 && ab < .55) {
       const k = E.io3(fly);
@@ -508,11 +514,13 @@
       const land = t - (a.bang - .07);
       const sq = land > 0 ? wig(land, .25, 34, 10) : 0;
       const shrink = ab > 0 ? 1 - E.in3(clamp(ab / .5)) : 1;
+      if (ab > 0) { const B = bangC(t); p[0] = B[0]; p[1] = B[1] + 22; }   // rides the bang's centre
       X.save(); X.translate(p[0], p[1] - 22); X.scale((1 + sq) * shrink, (1 - sq) * shrink);
       const bw = 124, bh = 84;
       if (k > .6) {
         X.globalAlpha = clamp((k - .6) / .3);
         rr(X, -bw / 2 + 5, -bh / 2 + 5, bw, bh, 30); X.fillStyle = C.CLAY_DARK; X.fill();
+        if (ab > 0) { rr(X, -bw / 2 - 7, -bh / 2 - 7, bw + 14, bh + 14, 37); X.fillStyle = C.PAPER; X.fill(); }
         rr(X, -bw / 2, -bh / 2, bw, bh, 30); X.fillStyle = C.CLAY; X.fill();
         X.globalAlpha = 1;
       }
@@ -603,33 +611,51 @@
     X.restore();
   }
   // Skip Intro ⏭ → ▶▶ 16× badge (the tour guide's prop)
+  // the stomp presses Skip Intro like a keycap: 2 frames down onto its shadow, a 1-frame hold, then it springs back
+  // up (overshooting, which pops the guide into its seat) already flipped to ▶▶ 16×
+  const HIT = TB(7) - 2 * F1;
+  function pressK(t) {
+    if (t < HIT) return 0;
+    if (t < HIT + 2 * F1) return E.out2((t - HIT) / (2 * F1));
+    if (t < HIT + 3 * F1) return 1;
+    const r = (t - HIT - 3 * F1) / .16;
+    return r >= 1 ? 0 : 1 - E.back(clamp(r), 2.4);
+  }
+  const PRESS = 32;                                        // keycap travel (px)
+  const badgeTop = t => BADGE.y + PRESS * pressK(t);
   function drawBadge(X, t, onPaper) {
     const a = A();
     const t0 = a.hi + .05;
     if (t < t0) return;
-    const slap = TB(7) - F1 - F1;
-    const flip = t < slap ? 1 : t < slap + .12 ? 1 - E.in2((t - slap) / .12) : E.back(clamp((t - slap - .12) / .14), 2);
+    const pk = pressK(t);
     const inK = popK(t - t0, .26, 1.8);
-    const sq = t >= slap ? wig(t - slap, .18, 30, 10) : 0;
-    const label = t < slap + .12 ? 'Skip Intro ⏭' : t < TB(12, 4) - F1 ? '▶▶ 16×' : '▶ 1×';
-    const fg = onPaper ? C.PAPER : C.INK, bg = onPaper ? C.INK : C.PAPER;
+    const label = t < TB(7) - F1 ? 'Skip Intro ⏭' : t < TB(12, 4) - F1 ? '▶▶ 16×' : '▶ 1×';
+    // pressed: the cap goes CLAY (active) for the frames it is held down
+    const down = pk > .55;
+    const fg = down ? C.INK : onPaper ? C.PAPER : C.INK, bg = down ? C.CLAY : onPaper ? C.INK : C.PAPER;
     X.save();
     X.translate(BADGE.x + BADGE.w / 2, BADGE.y + BADGE.h);
-    X.scale(inK * (1 + sq * .6), inK * Math.max(.02, flip) * (1 - sq));
-    X.translate(0, -BADGE.h / 2);
-    rr(X, -BADGE.w / 2 + 8, -BADGE.h / 2 + 8, BADGE.w, BADGE.h, 22); X.fillStyle = onPaper ? C.CLAY_DARK : C.CLAY_DARK; X.fill();
-    rr(X, -BADGE.w / 2, -BADGE.h / 2, BADGE.w, BADGE.h, 22); X.fillStyle = bg; X.fill(); X.lineWidth = 4; X.strokeStyle = onPaper ? C.INK : C.INK; X.stroke();
+    X.scale(inK, inK);
+    rr(X, -BADGE.w / 2 + 8, -BADGE.h + 8, BADGE.w, BADGE.h, 22); X.fillStyle = C.CLAY_DARK; X.fill();
+    // the cap: travels down onto its shadow, squashing about its bottom edge (never below its base)
+    const capH = BADGE.h - PRESS * Math.max(0, pk) * .72 + PRESS * Math.max(0, -pk);
+    X.translate(Math.max(0, pk) * 8 * .5, Math.max(0, pk) * 8);
+    X.translate(0, -capH / 2);
+    X.scale(1 + .05 * Math.max(0, pk), capH / BADGE.h);
+    rr(X, -BADGE.w / 2, -BADGE.h / 2, BADGE.w, BADGE.h, 22); X.fillStyle = bg; X.fill(); X.lineWidth = 4; X.strokeStyle = C.INK; X.stroke();
     if (label === 'Skip Intro ⏭') drawRich(X, label, 0, 26, mono(72, 500), fg, { align: 'center' });
     else {
-      // fast-forward chevrons flicker on 16ths
-      const w = drawRich(X, label, -BADGE.w / 2 + 30, 26, mono(72, 600), fg);
-      if (label[1] === '▶') { const on = Math.floor(beatPos(t) * 4) % 2; X.fillStyle = C.CLAY; X.globalAlpha = on ? 1 : .0; richGlyph(X, '▶', -BADGE.w / 2 + 30 + (on ? 0 : 43.2), 26, 72, C.CLAY); }
+      // fast-forward chevrons flicker on 16ths (the label sits clear of the seated guide's knee)
+      const lx = -BADGE.w / 2 + 22, f = mono(72, 600), sp = label[1] === '▶' ? 2 : 1, head = Array.from(label).slice(0, sp).join('');
+      drawRich(X, head, lx, 26, f, fg);
+      drawRich(X, Array.from(label).slice(sp + 1).join(''), lx + sp * 43.2 + 20, 26, f, fg);   // a tight space keeps 16× clear of the knee
+      if (label[1] === '▶' && !down) { const on = Math.floor(beatPos(t) * 4) % 2; richGlyph(X, '▶', lx + (on ? 0 : 43.2), 26, 72, C.CLAY); }
     }
     X.restore();
-    // slap impact: short PAPER strokes burst from under the mitten for 5 frames
-    const ia = t - slap;
+    // stomp impact: short strokes burst from under the boots for 5 frames
+    const ia = t - HIT;
     if (ia >= 0 && ia < 5 * F1) {
-      const k = ia / (5 * F1), hx = GX - 20, hy = BADGE.y + 2;
+      const k = ia / (5 * F1), hx = GX - 10, hy = badgeTop(t) + 4;
       X.save(); X.strokeStyle = onPaper ? C.INK : C.PAPER; X.lineCap = 'round'; X.lineWidth = 7 * (1 - k * .6);
       for (let i = 0; i < 7; i++) {
         const a = Math.PI + .15 + (i + .5) / 7 * (Math.PI - .3), r0 = 70 + 90 * E.out2(k), r1 = r0 + 56 * (1 - k);
@@ -777,9 +803,9 @@
   }
   function drawDebris(X, t) {
     const a = A(), t0 = TB(8, 4) - F1;
-    if (t < t0 - .05 || t > TB(9) + .1) return;
+    if (t < t0 - .05 || t >= TB(9) - F1) return;          // hard cut on the bar-9 downbeat (1 frame early)
     const k = E.in2(seg(t, t0, TB(9))), inK = popK(t - t0, .16, 2);
-    const out = 1 - seg(t, TB(9) - F1, TB(9) + .08);
+    const out = 1;
     X.save(); X.globalAlpha = out;
     // planet (CLAY halftone) and sand (PAPER halftone)
     X.beginPath(); X.arc(260, 1330 - 80 * inK, 560, 0, TAU); X.fillStyle = halftone(X, C.CLAY, .55, 14, 45); X.fill(); X.lineWidth = 6; X.strokeStyle = C.CLAY; X.stroke();
@@ -800,8 +826,8 @@
     tx(X, 'Si', ps[0], ps[1] + 20, mono(52, 800), C.PAPER, 'center', inK);
     // periodic tiles pulse the same CLAY (solid ink; the pulse is a scale kick on the beat)
     const pul = 1 + .07 * pulse(t, 9);
-    [[150, 'C', '6', 'carbon'], [1030, 'Si', '14', 'silicon']].forEach(([x, s, n, nm], i) => {
-      X.save(); X.translate(x + 75, 330); X.scale(inK * pul, inK * pul); X.rotate(i ? .04 : -.04);
+    [[FX - 190, 'C', '6', 'carbon'], [FX + 190, 'Si', '14', 'silicon']].forEach(([x, s, n, nm], i) => {
+      X.save(); X.translate(x, 300); X.scale(inK * pul, inK * pul); X.rotate(i ? .04 : -.04);
       rr(X, -75 + 8, -85 + 8, 150, 170, 10); X.fillStyle = C.CLAY_DARK; X.fill();
       rr(X, -75, -85, 150, 170, 10); X.fillStyle = C.CLAY; X.fill(); X.lineWidth = 4; X.strokeStyle = C.PAPER; X.stroke();
       tx(X, n, -58, -48, mono(30, 700), C.INK); tx(X, s, 0, 30, mono(80, 800), C.INK, 'center'); tx(X, nm, 0, 68, mono(22, 600), C.INK, 'center');
@@ -814,7 +840,7 @@
   // ------------------------------------------------------------------ S07: life at 16×, the tablet
   // bar 9 at 16×: a halftone glow behind the living shape and an onion-skin of the shape it just was
   function drawEvolution(X, t, S) {
-    if (!S || t < TB(9) - .15 || t >= TB(10) - F1) return;
+    if (!S || t < TB(9) - F1 || t >= TB(10) - F1) return;
     X.save();
     X.beginPath(); X.arc(S.x, S.y, S.s * 1.55, 0, TAU); X.fillStyle = halftone(X, C.CLAY, .1, 14, 45); X.fill();
     X.beginPath(); X.arc(S.x, S.y, S.s * 1.2, 0, TAU); X.fillStyle = halftone(X, C.CLAY, .17, 14, 45); X.fill();
@@ -906,17 +932,18 @@
       else wedge(X, gx - 8, gy + 4, 30, -.35);
     }
     // a wedge stamp bites in on every beat
-    for (let b = 1; b <= 4; b++) { const tb = TB(10, b) - F1; if (t >= tb) wedge(X, x0 + w * .68 + (b - 1) * 64, y0 + h * .5 + (b % 2) * 10, 50 * (1 + wig(t - tb, .3, 30, 10)), Math.PI / 2 + (b % 2 ? .12 : -.1)); }
+    for (let b = 1; b <= 4; b++) { const tb = TB(10, b) - F1; if (t >= tb) wedge(X, x0 + w * .7 + (b - 1) * 60, y0 + h * .43 + (b % 2) * 10, 50 * (1 + wig(t - tb, .3, 30, 10)), Math.PI / 2 + (b % 2 ? .12 : -.1)); }
     // pressed lyric: run a / TAB (largest)
     pressedWord(X, 'run a', x0 + w * .48, y0 + h * .3, mono(96, 800), a.run - 2 * F1, t, { cap: 70 });
-    pressedWord(X, 'TAB', x0 + w * .38, y0 + h * .93, `900 290px ${FONTS.hero}`, a.tab1 - 2 * F1, t, { stretch: 'condensed', align: 'center', cap: 200, track: -8 });
+    pressedWord(X, 'TAB', x0 + w * .35, y0 + h * .93, `900 280px ${FONTS.hero}`, a.tab1 - 2 * F1, t, { stretch: 'condensed', align: 'center', cap: 200, track: -8 });
     // KUSHIM, stamped last (rubric RED)
     const kt = TB(10, 4) - F1;
     if (t >= kt) {
-      const kk = 1 + wig(t - kt, .35, 32, 12);
-      X.save(); X.translate(x0 + w * .79, y0 + h * .76); X.rotate(-.1); X.scale(kk, kk); X.globalCompositeOperation = 'multiply';
-      rr(X, -150, -58, 300, 116, 14); X.lineWidth = 9; X.strokeStyle = C.RED; X.stroke();
-      X.font = `900 84px ${FONTS.hero}`; X.fontStretch = 'condensed'; X.fillStyle = C.RED; X.textAlign = 'center'; X.fillText('KUSHIM', 0, 30);
+      // the stamp comes down from 1.45× in 2 frames, bites, and wobbles (the WRONG stamp code, small)
+      const sa = t - kt, kk = sa < 2 * F1 ? lerp(1.45, 1, E.in2(sa / (2 * F1))) : 1 + wig(sa - 2 * F1, .12, 32, 12);
+      X.save(); X.translate(x0 + w * .8, y0 + h * .79); X.rotate(-.1); X.scale(kk, kk); X.globalCompositeOperation = 'multiply';
+      rr(X, -140, -55, 280, 110, 14); X.lineWidth = 9; X.strokeStyle = C.RED; X.stroke();
+      X.font = `900 80px ${FONTS.hero}`; X.fontStretch = 'condensed'; X.fillStyle = C.RED; X.textAlign = 'center'; X.fillText('KUSHIM', 0, 30);
       X.restore();
     }
     X.restore();
@@ -1114,7 +1141,7 @@
     // inside: a glyph galaxy (frame 0's universe) on an INK window under the label
     const s = S.s, x0 = S.x - s * 1.08, y0 = S.y - s * .5;
     X.save(); strokePath(X, S.pts); X.clip();
-    const gal = E.out3(seg(t, TB(11, 4) + .06, TB(11, 4) + .4));
+    const gal = E.out3(seg(t, t0, t0 + .3));   // the window opens as the stroke closes (no blank tab frames)
     if (gal > 0) {
       rr(X, S.x - s * 1.0, S.y - s * .1, s * 2.0, s * .64, 18); X.fillStyle = C.INK; X.fill();
       X.save(); rr(X, S.x - s * 1.0, S.y - s * .1, s * 2.0, s * .64, 18); X.clip();
@@ -1122,7 +1149,7 @@
       X.restore();
     }
     X.restore();
-    const lab = popK(t - t0 - .05, .16, 2);
+    const lab = popK(t - t0, .14, 2);
     X.save(); X.translate(S.x, S.y - s * .3); X.scale(lab, lab);
     drawRich(X, '✻ the universe ×', 0, 18, mono(Math.round(s * .19), 500), C.INK, { align: 'center' });
     X.restore();
@@ -1200,7 +1227,7 @@
     const sw = Math.sin(t * 5.2), sw2 = Math.sin(t * 5.2 + 1.9);
     return fullPose({
       dy: .03 * Math.abs(Math.sin(beatPos(t) * Math.PI)),
-      legL: { foot: [-.84 + .07 * sw, 1.12 + .1 * Math.max(0, sw)], bend: -1, rot: .1 * sw }, legR: { foot: [.84 + .07 * sw2, 1.1 + .1 * Math.max(0, sw2)], bend: 1, rot: .1 * sw2 },
+      legL: { foot: [-.7 + .06 * sw, 1.02 + .1 * Math.max(0, sw)], bend: -1, rot: .1 * sw }, legR: { foot: [.74 + .06 * sw2, 1.0 + .1 * Math.max(0, sw2)], bend: 1, rot: .1 * sw2 },
       armR: { hand: [.72, 2.95], bend: 1, type: 'mitten', front: true, hold: remote },
       armL: { hand: [-.92, 2.8], bend: -1, type: 'mitten' },
       head: { tilt: headTilt(t) },
@@ -1253,29 +1280,33 @@
   }
   // where the guide is and in which state (hop-in, slap, sit)
   function guide(t) {
-    const a = A(), tIn = TB(7) - .33, tSlap = TB(7) - 2 * F1, tSit = TB(7) + .22;
+    const tIn = HIT - .3, tRel = HIT + 3 * F1, tSit = TB(7) + .24;
     if (t < tIn) return null;
-    const standY = BADGE.y + 2, sitY = SEAT_Y + SK.hipY * GR;
-    if (t < tSlap) { // hop in from the lower-right edge, arm cocked for the slap
-      const k = (t - tIn) / (tSlap - tIn);
-      const x = lerp(2080, GX - 20, E.out2(k)), y = lerp(1380, standY, k) - 250 * 4 * k * (1 - k);
-      // wind-up on the way in, then the mitten swings down onto the button as the soles land (the slap)
-      const armUp = k < .7 ? E.out2(k / .7) : 1 - E.in3((k - .7) / .3);
-      const crouch = E.in3(clamp((k - .75) / .25));
-      const st = fullPose({ sy: 1 + .12 * Math.sin(k * Math.PI) - .12 * crouch, lean: -.12 * (1 - k) - .14 * crouch,
-        legL: { foot: [-.5, .55 * Math.sin(k * Math.PI) + .3 * (1 - k)], bend: -1 }, legR: { foot: [.5, .6 * Math.sin(k * Math.PI) + .3 * (1 - k)], bend: 1 },
-        armL: { hand: [lerp(-1.4, -1.15, armUp), lerp(2.3, 6.6, armUp)], bend: 1, type: 'mitten', front: true },
-        armR: { hand: [1.2, 5.0], bend: -1, type: 'mitten', hold: remote },
-        face: { eyes: '><', mouth: 'A' }, crown: { flare: 1.1 } });
+    const sitY = SEAT_Y + SK.hipY * GR, landX = GX - 10;
+    if (t < HIT) { // a cannonball hop in from the lower-right edge: rise with both arms up, tuck, then legs out for the stomp
+      const k = (t - tIn) / (HIT - tIn), up = k < .58, u = up ? k / .58 : (k - .58) / .42;
+      const x = lerp(2060, landX, E.out2(k));
+      const y = up ? lerp(1290, 755, E.out2(u)) : lerp(755, BADGE.y, E.in2(u));   // apex keeps the face in frame
+      const tuck = up ? E.out2(u) : 1 - E.in2(u);                 // knees up at the apex, extended at contact
+      const arms = up ? 1 : 1 - E.io2(u);                          // arms high on the rise, flung out wide to land
+      const st = fullPose({ sy: up ? 1 + .1 * (1 - u) : 1 + .06 * E.in2(u), lean: up ? -.1 * (1 - u) : .04 * u,
+        legL: { foot: [-.42 - .1 * tuck, .62 * tuck], bend: -1 }, legR: { foot: [.42 + .1 * tuck, .66 * tuck], bend: 1 },
+        armL: { hand: [lerp(-1.6, -1.05, arms), lerp(4.7, 6.35, arms)], bend: 1, type: 'mitten', front: true },
+        armR: { hand: [lerp(1.6, 1.05, arms), lerp(4.7, 6.35, arms)], bend: -1, type: 'mitten', hold: remote },
+        face: { eyes: up ? 'happy' : '><', mouth: 'A', gaze: [-.3, .4] }, crown: { flare: 1.12 } });
       return { x, y, st };
     }
-    if (t < tSit) { // the slap lands 1 frame before the beat, then plop down to sit
-      const imp = t - tSlap, k = seg(t, tSlap + .08, tSit), sq = .16 * Math.exp(-9 * imp) * Math.cos(imp * 26);
-      const y = lerp(standY, sitY, E.in2(k)) - 60 * Math.sin(k * Math.PI);
-      const st = blendPose(fullPose({ sy: 1 - sq, lean: -.14 * Math.exp(-10 * imp), legL: { foot: [-.4, 0], bend: 1 }, legR: { foot: [.4, 0], bend: -1 },
-        armL: { hand: [-1.4, 2.3 + .4 * E.out2(clamp(imp / .12))], bend: 1, type: 'mitten', front: true }, armR: { hand: [1.1, 4.6], bend: -1, hold: remote },
-        face: { eyes: 'happy', mouth: 'grin' } }), seated(t), E.io2(k));
-      return { x: GX - 20 + 20 * k, y, st };
+    if (t < tSit) { // the stomp: soles ride the keycap down; it springs back and pops the guide up into its seat
+      const pk = pressK(t), sq = Math.max(0, pk);
+      const stomp = fullPose({ sy: 1 - .2 * sq, lean: .03 * sq,
+        legL: { foot: [-.5, 0], bend: -1 }, legR: { foot: [.5, 0], bend: 1 },
+        armL: { hand: [-1.62, 4.3 + .5 * (1 - sq)], bend: 1, type: 'mitten', front: true },
+        armR: { hand: [1.62, 4.3 + .5 * (1 - sq)], bend: -1, type: 'mitten', hold: remote },
+        face: { eyes: t < tRel ? '><' : 'happy', mouth: t < tRel ? 'A' : 'grin' }, crown: { flare: 1.14 } });
+      if (t < tRel) return { x: landX, y: badgeTop(t), st: stomp };
+      const k = seg(t, tRel, tSit);
+      const y = lerp(badgeTop(t), sitY, E.in2(k)) - 110 * Math.sin(Math.min(1, k * 1.15) * Math.PI);
+      return { x: lerp(landX, GX, k), y, st: blendPose(stomp, seated(t), E.io2(clamp(k * 1.4))) };
     }
     const st = guideState(t);
     const land = wig(t - tSit, .12, 26, 9);
@@ -1340,16 +1371,18 @@
     const f = mono(72, 500), full = '▶ 1× · don\'t remember this part either';
     X.save(); X.globalAlpha = 1 - out;
     const w = richWidth(X, full, f), x0 = 960 - w / 2;
-    rr(X, x0 - 30, 950 - 70, w + 60, 96, 20); X.fillStyle = rgba(C.INK, .92); X.fill();
+    // S09 carries this caption on an INK plate; here the plate would slice the close-up guide's body in two, so the
+    // letters get an INK keyline instead (identical on the INK ground, and the guide stays whole behind them)
+    const K = { stroke: C.INK, strokeW: 14 };
     // the badge's ▶▶ 16× flips into ▶ 1×
     const flipK = clamp(age / .16);
     const head = flipK < .5 ? '▶▶ 16×' : '▶ 1×';
     const sy = Math.abs(Math.cos(flipK * Math.PI));
     // the flip lands CLAY, then cools to PAPER so it matches S09's carried-over caption at the cut
     const headCol = mix(C.CLAY, C.PAPER, E.io2(seg(age, .3, .55)));
-    X.save(); X.translate(x0, 950 - 26); X.scale(1, Math.max(.05, sy)); drawRich(X, head, 0, 26, f, headCol); X.restore();
+    X.save(); X.translate(x0, 950 - 26); X.scale(1, Math.max(.05, sy)); drawRich(X, head, 0, 26, f, headCol, K); X.restore();
     const n = Math.floor(clamp((age - .12) / .2) * (full.length - 4));
-    if (n > 0) drawRich(X, full.slice(4, 4 + n), x0 + richWidth(X, '▶ 1×', f), 950, f, C.PAPER);
+    if (n > 0) drawRich(X, full.slice(4, 4 + n), x0 + richWidth(X, '▶ 1×', f), 950, f, C.PAPER, K);
     const pb = clamp((age - .3) / .15);
     if (pb > 0) tx(X, '(source: my system card)', 960, 1002, mono(28, 500), C.PAPER, 'center', pb * .62);
     X.restore();
@@ -1402,6 +1435,7 @@
     PR('drawStars', () => drawStars(X, t));
     PR('drawStarBody', () => drawStarBody(X, t, S));
     PR('drawBang', () => drawBang(X, t));
+    if (t > a.bang) hiToken(X, t);
     PR('drawNova', () => drawNova(X, t));
     PR('drawCRT', () => drawCRT(X, t));
     PR('drawDebris', () => drawDebris(X, t));
@@ -1434,7 +1468,7 @@
     X.save();
     if (cp.z !== 1) { X.translate(cp.ax, cp.ay); X.scale(cp.z, cp.z); X.translate(-cp.ax, -cp.ay); }
     // in the close-up the badge drops out of frame (the caption on the subtitle line carries the ▶ 1× flip)
-    if (cp.k < .98) { X.save(); X.globalAlpha = 1 - clamp(cp.k); PR('drawBadge', () => drawBadge(X, t, paper)); X.restore(); }
+    if (cp.k < .34) { X.save(); X.globalAlpha = 1 - clamp(cp.k * 3); PR('drawBadge', () => drawBadge(X, t, paper)); X.restore(); }
     PR('drawGuide', () => drawGuide(X, t, paper));
     X.restore();
     PR('crashGlitch', () => crashGlitch(X, t));
