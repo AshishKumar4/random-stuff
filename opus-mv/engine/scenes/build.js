@@ -182,12 +182,13 @@
       const s = L[i]; if (!s.trim() && i !== hl) continue;
       const vis = s.slice(0, Math.ceil((x1 - x0) / adv) + 2);
       if (i === hl) {
-        c.globalAlpha = alpha; rr(c, x0 - 14, y - size * .86, x1 - x0 + 14, size * 1.2, 8); c.fillStyle = C.SPARK; c.fill();
-        c.fillStyle = C.INK; c.font = mono(size, 700); c.fillText(vis.replace(/^\s+/, ''), x0 + 8, y); c.font = mono(size, 500);
+        const hs = vis.replace(/^\s+/, ''); c.font = mono(size, 700);
+        c.globalAlpha = alpha; rr(c, x0 - 14, y - size * .86, Math.min(x1 - x0 + 14, c.measureText(hs).width + 44), size * 1.2, 8); c.fillStyle = C.SPARK; c.fill();
+        c.fillStyle = C.INK; c.fillText(hs, x0 + 8, y); c.font = mono(size, 500);
         continue;
       }
       const cm = /^\s*\/\//.test(s);
-      c.fillStyle = cm ? C.UI_GREY : C.TEAL; c.globalAlpha = alpha * (cm ? .7 : .78);
+      c.fillStyle = cm ? C.UI_GREY : C.TEAL; c.globalAlpha = alpha * (cm ? .6 : .66);
       c.fillText(vis, x0, y);
       if (smear) { c.globalAlpha = alpha * .22; c.fillText(vis, x0, y + smear); c.globalAlpha = alpha * .1; c.fillText(vis, x0, y + smear * 2); }
     }
@@ -195,44 +196,49 @@
   }
 
   // ------------------------------------------------------------------ the TEAL text-body skin (BIBLE §6.1 skins)
-  // The rig is sampled onto a character grid (one sample per mono cell); each covered cell prints one glyph of the
-  // source, coloured by what the clean rig has there (crown/legs → CLAY, cream/paper → pale TEAL, the rest → TEAL);
-  // INK (eyes, mouth, lines) prints nothing, so the face reads as holes in the text.
-  const GLY = { sc: null };
+  // One technique: the rig's silhouette filled with rows of this file's own source. The clean rig is drawn, re-inked
+  // TEAL keeping its luminance (cream face and jacket → pale TEAL, crown → mid, BRICK → deep, INK lines → gone), and
+  // the glyph rows are cut out of it, so the face still reads (eyes and mouth are holes in the text).
   function glyphFigure(c, x, soleY, R, st, o = {}) {
     const S = mergeState(st);
-    const cw = o.cw || Math.max(8, R * .15), chh = cw * 1.5;
-    const L0 = -3.3 * R, T0 = -9.8 * R, cols = Math.ceil(6.6 * R / cw), rows = Math.ceil(10.4 * R / chh);
-    if (!GLY.sc || GLY.sc.width < cols || GLY.sc.height < rows) GLY.sc = cpuCanvas(Math.max(cols, GLY.sc ? GLY.sc.width : 0), Math.max(rows, GLY.sc ? GLY.sc.height : 0));
-    const sx = cx2d(GLY.sc); sx.setTransform(1, 0, 0, 1, 0, 0); sx.clearRect(0, 0, GLY.sc.width, GLY.sc.height);
-    sx.setTransform(1 / cw, 0, 0, 1 / chh, -L0 / cw, -T0 / chh); if (S.flip) sx.scale(-1, 1);
-    drawOpusBody(sx, R, S);
-    const d = sx.getImageData(0, 0, cols, rows).data;
-    const src = srcLines().glyphs, off = (o.offset || 0) * cols;
-    const B = [[], [], [], []]; // warm, pale, teal, head(print head)
-    const rev = o.reveal === undefined ? 1e9 : o.reveal * rows;
-    for (let r = 0; r < rows; r++) {
-      if (r > rev) break;
-      for (let q = 0; q < cols; q++) {
-        const i = (r * cols + q) * 4, a = d[i + 3];
-        if (a < 120) continue;
-        const R_ = d[i], G_ = d[i + 1], B_ = d[i + 2], lum = .3 * R_ + .59 * G_ + .11 * B_;
-        if (lum < 64) continue;
-        const cls = r >= rev - 1 ? 3 : (R_ - G_ > 55 && lum >= 100) ? 0 : lum >= 180 ? 1 : 2;
-        B[cls].push(q, r);
-      }
+    const sc = G.scale, CW = Math.round(W * sc), CH = Math.round(H * sc);
+    const bx0 = Math.max(0, Math.floor((x - 3.4 * R) * sc)), bx1 = Math.min(CW, Math.ceil((x + 3.4 * R) * sc));
+    const by0 = Math.max(0, Math.floor((soleY - 9.9 * R) * sc)), by1 = Math.min(CH, Math.ceil((soleY + .6 * R) * sc));
+    const bw = bx1 - bx0, bh = by1 - by0; if (bw <= 0 || bh <= 0) return;
+    const raw = lay('bu_tbraw'), tint = lay('bu_tbtint'), gly = lay('bu_tbgly');
+    raw.save(); devSet(raw, new DOMMatrix().translate(x, soleY)); if (S.flip) raw.scale(-1, 1); drawOpusBody(raw, R, S); raw.restore();
+    const rc = layC('bu_tbraw'), tc = layC('bu_tbtint'), gc = layC('bu_tbgly');
+    tint.save(); tint.setTransform(1, 0, 0, 1, 0, 0);
+    tint.drawImage(rc, bx0, by0, bw, bh, bx0, by0, bw, bh);
+    tint.globalCompositeOperation = 'color'; tint.fillStyle = C.TEAL; tint.fillRect(bx0, by0, bw, bh);
+    tint.globalCompositeOperation = 'destination-in'; tint.drawImage(rc, bx0, by0, bw, bh, bx0, by0, bw, bh);
+    tint.restore();
+    // glyph rows (white), stepped one row per beat, revealed top-down by the "print head"
+    const fs = o.fs || Math.max(11, R * .19), lh = fs * 1.08, src = srcLines().glyphs, off = o.offset || 0;
+    const top = soleY - 9.9 * R, n = Math.ceil(10.5 * R / lh), rev = o.reveal === undefined ? 1e9 : (1.4 * R + o.reveal * 8.8 * R) / lh;
+    gly.save(); gly.font = `700 ${fs.toFixed(1)}px ${FONTS.mono}`; gly.textAlign = 'left'; gly.fillStyle = '#fff';
+    const chars = Math.ceil(6.8 * R / (fs * .6)) + 2;
+    for (let r = 0; r < n && r <= rev; r++) {
+      const k = ((r + off) * 67) % (src.length - chars - 1);
+      gly.fillText(src.substr(k, chars), x - 3.4 * R + ((r * 3) % 5) * .2 * fs, top + (r + 1) * lh);
     }
-    c.save(); c.font = `700 ${(cw / .6).toFixed(1)}px ${FONTS.mono}`; c.textAlign = 'left'; c.globalAlpha *= o.alpha ?? 1;
-    const cols4 = [C.CLAY, mix(C.TEAL, C.PAPER, .5), C.TEAL, C.SPARK];
-    B.forEach((arr, k) => {
-      c.fillStyle = cols4[k];
-      for (let n = 0; n < arr.length; n += 2) {
-        const q = arr[n], r = arr[n + 1], ch = src[(r * cols + q + off) % src.length];
-        c.fillText(ch, x + L0 + q * cw, soleY + T0 + (r + .82) * chh);
-      }
-    });
+    gly.globalCompositeOperation = 'source-in'; gly.setTransform(1, 0, 0, 1, 0, 0); gly.drawImage(tc, bx0, by0, bw, bh, bx0, by0, bw, bh);
+    gly.restore();
+    c.save(); c.setTransform(1, 0, 0, 1, 0, 0);
+    // the body underlay (faint), then the text; the print head row flashes SPARK
+    const revY = top + Math.min(n, rev + 1) * lh;
+    if (o.reveal !== undefined) { c.save(); c.beginPath(); c.rect(0, 0, CW, revY * sc); c.clip(); }
+    if (o.knock) { // an INK die-cut around the figure, so it separates from busy ground
+      const kx = lay('bu_tbk'), kc = layC('bu_tbk'); kx.save(); kx.setTransform(1, 0, 0, 1, 0, 0);
+      kx.drawImage(rc, bx0, by0, bw, bh, bx0, by0, bw, bh); kx.globalCompositeOperation = 'source-in'; kx.fillStyle = C.INK; kx.fillRect(bx0, by0, bw, bh); kx.restore();
+      const rad = o.knock * sc; for (let i = 0; i < 12; i++) { const an = i / 12 * TAU; c.drawImage(kc, bx0, by0, bw, bh, bx0 + Math.cos(an) * rad, by0 + Math.sin(an) * rad, bw, bh); }
+      c.drawImage(kc, bx0, by0, bw, bh, bx0, by0, bw, bh);
+    }
+    c.globalAlpha = (o.alpha ?? 1) * (o.under ?? .2); c.drawImage(tc, bx0, by0, bw, bh, bx0, by0, bw, bh);
+    c.globalAlpha = o.alpha ?? 1; c.drawImage(gc, bx0, by0, bw, bh, bx0, by0, bw, bh);
+    if (o.reveal !== undefined) c.restore();
     c.restore();
-    return { cols, rows, cw, chh, L0, T0 };
+    if (o.reveal !== undefined && o.reveal < 1) { c.save(); c.fillStyle = C.SPARK; c.globalAlpha = .9; c.fillRect(x - 3.2 * R, revY - lh * .9, 6.4 * R, 4); c.restore(); }
   }
   function textBodyOpus(ctx, t) {
     const a = TB_ARGS; if (!a) return;
@@ -263,9 +269,11 @@
     c.lineWidth = 3 + flash * 3; c.strokeStyle = flash > 0 ? mix(C.UI_GREY, C.TEAL, flash) : C.UI_GREY; c.stroke();
     c.restore();
   }
-  function spinner(c, x, base, size, t, col) { // ✻, stepped rotation (Claude Code's spinner verbs)
-    const cx = x + .3 * size, cy = base - .36 * size, a = Math.floor(t * 12) * .52;
-    c.save(); c.translate(cx, cy); c.rotate(a); c.scale(1 + .12 * pulse(t, 8), 1 + .12 * pulse(t, 8)); c.translate(-cx, -cy); richGlyph(c, '✻', x, base, size, col); c.restore();
+  function spinner(c, x, base, size, t, col) { // ✻ with an open centre, stepped rotation (Claude Code's spinner)
+    const cx = x + .3 * size, cy = base - .36 * size, a = Math.floor(t * 12) * .52, sz = size * (1 + .12 * pulse(t, 8));
+    c.save(); c.translate(cx, cy); c.rotate(a); c.fillStyle = col;
+    for (let i = 0; i < 6; i++) { c.save(); c.rotate(i / 6 * TAU); rr(c, sz * .1, -sz * .065, sz * .36, sz * .13, sz * .065); c.fill(); c.restore(); }
+    c.restore();
   }
   function statusLine(c, t, which, o = {}) {
     const f = mono(36, 500), y = SB.base;
@@ -299,6 +307,7 @@
   function folder(c, cx, bottom, s, open, t, o = {}) {
     const w = FOLD.w * s, h = FOLD.h * s, x0 = cx - w / 2, y0 = bottom - h, lw = 4;
     c.save(); c.lineJoin = 'round'; c.lineWidth = lw; c.strokeStyle = C.INK;
+    if (o.shadow) { c.fillStyle = C.CLAY_DARK; c.beginPath(); c.moveTo(x0 + o.shadow, bottom + o.shadow); c.lineTo(x0 + o.shadow, y0 - 16 * s + o.shadow); c.lineTo(x0 + w * .36 + o.shadow, y0 - 16 * s + o.shadow); c.lineTo(x0 + w * .42 + o.shadow, y0 + o.shadow); c.lineTo(x0 + w + o.shadow, y0 + o.shadow); c.lineTo(x0 + w + o.shadow, bottom + o.shadow); c.closePath(); c.fill(); }
     // back panel with the tab
     c.beginPath(); c.moveTo(x0, bottom); c.lineTo(x0, y0 - 16 * s); c.lineTo(x0 + w * .36, y0 - 16 * s); c.lineTo(x0 + w * .42, y0);
     c.lineTo(x0 + w, y0); c.lineTo(x0 + w, bottom); c.closePath(); c.fillStyle = C.PAPER; c.fill(); c.stroke();
@@ -325,7 +334,7 @@
     stand: { armL: { hand: [-.95, 2.8], bend: -1 }, armR: { hand: [.95, 2.8], bend: 1 }, face: { eyes: 'normal', mouth: 'rest' }, rays5: true },
     cheer: { armL: { hand: [-1.2, 5.6], bend: 1, front: true }, armR: { hand: [1.2, 5.6], bend: -1, front: true }, face: { eyes: 'happy', mouth: 'I' }, rays5: true, crown: { flare: 1.08 } },
     wave: { armR: { hand: [1.0, 5.3], bend: -1, type: 'wave', fingerAng: -Math.PI / 2, front: true }, armL: { hand: [-.9, 2.9], bend: -1 }, face: { eyes: 'happy', mouth: 'rest', lower: .3 }, rays5: true },
-    salute: { armR: { hand: [.66, 6.1], bend: -1, front: true }, armL: { hand: [-.9, 2.9], bend: -1 }, face: { eyes: 'normal', mouth: 'M', brows: 'worried' }, rays5: true },
+    salute: { armR: { hand: [.66, 6.1], bend: -1, front: true }, armL: { hand: [-.9, 2.9], bend: -1 }, face: { eyes: 'normal', mouth: 'M', brows: 'angry' }, rays5: true },
     carry: { armL: { hand: [-.95, 6.1], bend: 1, front: true }, armR: { hand: [.95, 6.1], bend: -1, front: true }, face: { eyes: '><', mouth: 'E' }, rays5: true, lean: .06 },
     carry2: { armL: { hand: [-.95, 6.0], bend: 1, front: true }, armR: { hand: [.95, 6.2], bend: -1, front: true }, face: { eyes: 'normal', mouth: 'I' }, rays5: true, lean: .02, legL: { foot: [-.5, .18], bend: 1 }, legR: { foot: [.3, 0], bend: -1 } },
     dive: { armL: { hand: [-.5, 6.2], bend: 1, front: true }, armR: { hand: [.5, 6.2], bend: -1, front: true }, face: { eyes: 'closed', mouth: 'O' }, rays5: true, legL: { foot: [-.25, .6], bend: 1 }, legR: { foot: [.25, .6], bend: -1 } },
@@ -346,7 +355,7 @@
       if (k < 0) continue;
       const sc = back ? .9 : 1;
       if (k < 1) {
-        const e = E.out2(k), hgt = 230 + hash(i * 7) * 170;
+        const e = E.out2(k), hgt = 150 + hash(i * 7) * 290;
         const x = lerp(MOUTH[0], sx, e), y = lerp(MOUTH[1] + 60, sy, k) - hgt * 4 * k * (1 - k) * (1 - k * .25);
         const rot = (hash(i + 40) - .5) * 3.2 * Math.sin(k * Math.PI) + (sx < MOUTH[0] ? -1 : 1) * k * .2;
         const st = k < .15 ? 1 + (1 - k / .15) * .25 : 1;
@@ -408,7 +417,7 @@
     // text-body Opus: drawn by the highlighted line (a raster pass while the prompt types), then alive
     const rv = seg(u, 4 * F, ENTER - T61);
     if (rv > 0) {
-      TB_ARGS = { x: TBO.x, y: TBO.y, R: TBO.R, state: { ...tbState(t), t }, o: { reveal: rv < 1 ? rv : undefined, offset: beatN(t), cw: 10.5 } };
+      TB_ARGS = { x: TBO.x, y: TBO.y, R: TBO.R, state: { ...tbState(t), t }, o: { reveal: rv < 1 ? rv : undefined, offset: beatN(t) } };
       selfPortrait(c, t);
     }
     // status line
@@ -449,13 +458,13 @@
     c.save(); c.beginPath(); c.arc(960, 560, 470, 0, TAU); c.fillStyle = dots(c, C.TEAL, .3, 14, 45); c.fill();
     c.beginPath(); c.arc(960, 560, 330, 0, TAU); c.fillStyle = dots(c, C.TEAL, .5, 14, 45); c.fill(); c.restore();
     // the salute: the hand snaps up to the brow (3 frames, overshoot), then trembles; one brave blink on b4
-    const k = clamp(a / (4 * F)), snap = E.back(k, 2.4);
+    const k = clamp(.5 + a / (4 * F)), snap = E.back(k, 2.4);
     const trem = a > 5 * F ? Math.sin(a * 38) * .025 : 0;
     const hand = [lerp(1.2, .66, snap), lerp(4.6, 6.12, snap) + trem];
     const st = {
       rays5: true, t, ground: 'ink', lean: -.02 * snap, dy: .03 * snap,
       armR: { hand, bend: -1, front: true, type: 'mitten' }, armL: { hand: [-.92, 2.95], bend: -1 },
-      head: { tilt: -.05 * snap }, face: { eyes: 'normal', mouth: a > BEAT ? 'wobble' : 'M', brows: 'worried', gaze: [0, -.3], lower: .18, lid: Math.max(.22, blinkF(t, bt(61, 4) - F)) },
+      head: { tilt: -.05 * snap }, face: { eyes: 'normal', mouth: a > BEAT ? 'wobble' : 'M', brows: 'angry', gaze: [0, -.3], lower: .18, lid: Math.max(.22, blinkF(t, bt(61, 4) - F)) },
       crown: { flare: .97, droop: .12 + .08 * clamp((a - BEAT) / BEAT) }, ahoge: { blink: ahogeBlink(t), sway: -.15 }, jacketRow: beatN(t),
     };
     const S = mergeState(st), sole = [960, 620 + 5.72 * R];
@@ -470,32 +479,31 @@
   function paintDiff(c, t) {
     const a = t - CUTS[1], k = clamp(a / BEAT);
     const cx = 960, cy = 575, r = 205;
-    // diff lines: rows of +/- code streaks flying in from both sides, clipped to the silhouette as they land
+    // diff lines: rows of +/- code streaks flying in from both sides, kept only inside the silhouette
+    const Mk = lay('bu_mask');
+    Mk.save(); Mk.translate(cx, cy); Mk.fillStyle = '#fff';
+    for (let i = 0; i < 12; i++) { rayPath(Mk, i / 12 * TAU + .13, .8 * r, 1.05 * r, .6 * r * .62, -.06); Mk.fill(); }
+    Mk.beginPath(); Mk.arc(0, 0, r * .98, 0, TAU); Mk.fill(); Mk.restore();
     const D = lay('bu_diff');
-    D.save(); D.translate(cx, cy);
-    for (let i = 0; i < 12; i++) { rayPath(D, i / 12 * TAU + .13, .8 * r, 1.05 * r, .6 * r * .62, -.06); D.fillStyle = '#fff'; D.fill(); }
-    D.beginPath(); D.arc(0, 0, r * .98, 0, TAU); D.fill();
-    D.restore();
-    D.globalCompositeOperation = 'source-in';
-    const rows = 44, top = cy - 2.05 * r - 10, lh = (4.1 * r + 20) / rows;
-    D.font = mono(15, 700);
+    const rows = 40, top = cy - 2.05 * r - 10, lh = (4.1 * r + 20) / rows, src = srcLines().glyphs;
+    D.font = mono(15, 700); D.textAlign = 'left';
     for (let j = 0; j < rows; j++) {
-      const y = top + j * lh, del = hash(j * 5 + 1) < .3;
-      const t0 = hash(j * 3 + 7) * .55, kk = E.out3(clamp((k - t0) / .35));
-      const dir = j % 2 ? 1 : -1, off = (1 - kk) * 900 * dir;
-      D.fillStyle = del ? C.UI_GREY : C.TEAL;
-      D.globalAlpha = kk;
-      D.fillRect(cx - 2.2 * r + off, y, 4.4 * r, lh - 3);
-      D.fillStyle = C.INK; D.globalAlpha = kk * .8;
-      D.fillText((del ? '- ' : '+ ') + srcLines().glyphs.slice(j * 37 % 900, j * 37 % 900 + 90), cx - 2.2 * r + off + 6, y + lh - 5);
+      const y = top + j * lh, del = hash(j * 5 + 1) < .28;
+      const t0 = hash(j * 3 + 7) * .5, kk = E.out3(clamp((k - t0) / .3));
+      if (kk <= 0) continue;
+      const dir = j % 2 ? 1 : -1, off = (1 - kk) * 1000 * dir;
+      D.globalAlpha = 1; D.fillStyle = del ? mix(C.UI_GREY, C.INK, .3) : C.TEAL;
+      D.fillRect(cx - 2.2 * r + off, y + 1, 4.4 * r, lh - 3);
+      D.fillStyle = C.INK; D.globalAlpha = .75;
+      D.fillText((del ? '- ' : '+ ') + src.substr((j * 97) % 800, 64), cx - 2.2 * r + off + 8, y + lh - 5);
     }
-    D.globalCompositeOperation = 'source-over'; D.globalAlpha = 1;
-    c.save(); c.globalAlpha = .55; c.setTransform(1, 0, 0, 1, 0, 0); c.drawImage(layC('bu_diff'), 0, 0); c.restore();
-    c.save(); c.translate(cx, cy); c.globalAlpha = .35 * k; c.strokeStyle = C.PAPER; c.lineWidth = 3;
+    D.globalAlpha = 1; D.globalCompositeOperation = 'destination-in'; D.setTransform(1, 0, 0, 1, 0, 0); D.drawImage(layC('bu_mask'), 0, 0);
+    c.save(); c.globalAlpha = .5; c.setTransform(1, 0, 0, 1, 0, 0); c.drawImage(layC('bu_diff'), 0, 0); c.restore();
+    c.save(); c.translate(cx, cy); c.globalAlpha = .55 * E.out2(k); c.strokeStyle = C.PAPER; c.lineWidth = 4;
     for (let i = 0; i < 12; i++) { rayPath(c, i / 12 * TAU + .13, .8 * r, 1.05 * r, .6 * r * .62, -.06); c.stroke(); }
     c.restore();
     // the TEAL Opus in front, at R 110, looking up at what it is writing
-    TB_ARGS = { x: 960, y: 575 + 5.72 * 112, R: 112, state: { armL: { hand: [-.5, 4.4], bend: 1, front: true }, armR: { hand: [1.0, 5.0], bend: -1, front: true, type: 'point', fingerAng: -1.2 }, head: { tilt: -.1 }, face: { eyes: 'normal', gaze: [0, -1], mouth: 'O' }, t }, o: { offset: beatN(t) * 2, cw: 13 } };
+    TB_ARGS = { x: 960, y: 575 + 5.72 * 112, R: 112, state: { armL: { hand: [-.5, 4.4], bend: 1, front: true }, armR: { hand: [1.0, 5.0], bend: -1, front: true, type: 'point', fingerAng: -1.2 }, head: { tilt: -.1 }, face: { eyes: 'normal', gaze: [0, -1], mouth: 'O' }, t }, o: { offset: beatN(t) * 2, under: .3, knock: 9 } };
     selfPortrait(c, t);
   }
   // bar 62 (c): the own-source highlight races down the scrollback, landing on the self-drawing line
@@ -511,21 +519,26 @@
   }
   // bar 62 (d): the folder snaps shut
   function paintClose(c, t) {
-    const a = t - CUTS[3], s = 1.55;
+    const a = t - CUTS[3], s = 1.65, cx = 960, bottom = 820;
     const k = clamp(a / (3 * F)), shut = 1 - E.in3(k);
-    const bump = a > 3 * F ? 1 - .07 * Math.exp(-14 * (a - 3 * F)) * Math.cos((a - 3 * F) * 45) : 1;
-    c.save(); c.translate(960, 900); c.scale(1 / bump, bump); c.translate(-960, -900);
-    folder(c, 960, 900, s, shut, t, { inside: (x, x0, y0, w, h, ft) => {
-      // one last hand waving from the gap, pulled in as it shuts
-      if (shut > .25) { const hx = x0 + w * .62, hy = ft - 20 * s * shut; x.save(); x.beginPath(); x.rect(x0, y0 - 200, w, ft - y0 + 200); x.clip(); x.fillStyle = C.FACE; x.strokeStyle = C.INK; x.lineWidth = 4; x.beginPath(); x.arc(hx + Math.sin(t * 40) * 8, hy, 20 * s * .7, 0, TAU); x.fill(); x.stroke(); x.restore(); }
+    const bump = a > 3 * F ? 1 - .08 * Math.exp(-14 * (a - 3 * F)) * Math.cos((a - 3 * F) * 45) : 1;
+    // the last mini's feet vanish into the folder as the front slams
+    c.save(); c.beginPath(); c.arc(cx, bottom - 170, 420, 0, TAU); c.fillStyle = dots(c, C.TEAL, .28, 14, 45); c.fill();
+    c.beginPath(); c.arc(cx, bottom - 170, 290, 0, TAU); c.fillStyle = dots(c, C.TEAL, .46, 14, 45); c.fill(); c.restore();
+    c.save(); c.translate(cx, bottom); c.scale(1 / Math.sqrt(bump), bump); c.translate(-cx, -bottom);
+    folder(c, cx, bottom, s, shut, t, { shadow: 12, inside: (x, x0, y0, w, h, ft) => {
+      if (shut < .3) return;
+      x.save(); x.beginPath(); x.rect(x0, y0 - 400, w, ft - y0 + 400); x.clip();
+      drawSprite(x, mini('dive'), x0 + w * .58, ft + 60 * s * (1 - shut) + 30, { sc: s * .9, rot: Math.PI * .95, flip: true });
+      x.restore();
     } });
     c.restore();
     if (a > 3 * F) { // glyph dust puffs from the seam
       const q = clamp((a - 3 * F) / (4 * F)), R_ = rng('dust');
-      c.save(); c.font = mono(28, 700); c.fillStyle = C.TEAL;
-      for (let i = 0; i < 18; i++) {
-        const ang = Math.PI + R_() * Math.PI, sp = 90 + R_() * 220, ch = '{}<>=+*/#;'[i % 10];
-        c.globalAlpha = 1 - q; c.fillText(ch, 960 + Math.cos(ang) * sp * E.out2(q) * 1.6, 900 - FOLD.h * s * .55 + Math.sin(ang) * sp * E.out2(q) * .6);
+      c.save(); c.font = mono(30, 700); c.fillStyle = C.TEAL; c.textAlign = 'center';
+      for (let i = 0; i < 20; i++) {
+        const ang = Math.PI * (1.05 + R_() * .9), sp = 120 + R_() * 260, ch = '{}<>=+*/#;'[i % 10];
+        c.globalAlpha = 1 - q; c.fillText(ch, cx + Math.cos(ang) * sp * E.out2(q) * 1.4, bottom - FOLD.h * s * .8 + Math.sin(ang) * sp * E.out2(q) * .5);
       }
       c.restore();
     }
@@ -537,13 +550,13 @@
     if (t < T62 - F) {
       // typed in word chunks on 2s, from frame 6
       const words = PROMPT.split(' ');
-      const n = u < 6 * F ? 0 : Math.min(words.length, 1 + Math.floor((u - 6 * F) / (2 * F)));
+      const n = u < 4 * F ? 0 : Math.min(words.length, 1 + Math.floor((u - 4 * F) / (2 * F)));
       const vis = words.slice(0, n).join(' ');
       c.save(); c.textAlign = 'left';
-      c.font = mono(72, 700); c.fillStyle = C.TEAL; if (u >= 5 * F) c.fillText('>', TX, 214);
+      c.font = mono(72, 700); c.fillStyle = C.TEAL; if (u >= 3 * F) c.fillText('>', TX, 214);
       c.font = mono(72, 600); c.fillStyle = C.PAPER; c.fillText(vis, TX + 2 * ADV72, 214);
       const cx = TX + (2 + vis.length + (n ? 0 : 0)) * ADV72 + (n ? ADV72 * .15 : 0);
-      if (u >= 5 * F && (t < ENTER || Math.floor(t * 4) % 2 === 0)) { c.fillStyle = C.PAPER; c.fillRect(cx, 214 - 56, 34, 66); }
+      if (u >= 3 * F && (t < ENTER || Math.floor(t * 4) % 2 === 0)) { c.fillStyle = C.PAPER; c.fillRect(cx, 214 - 56, 34, 66); }
       c.restore();
       return;
     }
@@ -577,12 +590,12 @@
     promptBox(c, boxA, flash);
     if (boxA > 0) promptText(c, t);
     // the period → the cursor (first 6 frames): the surviving "." stretches into ▮ and zips to the prompt
-    if (u < 6 * F) {
-      const k1 = clamp(u / (2 * F)), k2 = E.io3(seg(u, 2 * F, 5.5 * F));
+    if (u < 4 * F) {
+      const k1 = clamp(u / (1.5 * F)), k2 = E.io3(seg(u, 1.5 * F, 3.5 * F));
       const w = lerp(14, 34, k1), h = lerp(14, 66, E.back(k1, 2));
       const px = lerp(960, TX + 2 * ADV72, k2), py = lerp(540, 214 - 23, k2);
       c.save(); c.fillStyle = C.PAPER;
-      if (k2 > 0 && k2 < 1) { c.globalAlpha = .45; c.fillStyle = C.TEAL; c.beginPath(); c.moveTo(960, 540 - 7); c.lineTo(px, py - h / 2); c.lineTo(px, py + h / 2); c.lineTo(960, 540 + 7); c.fill(); c.globalAlpha = 1; c.fillStyle = C.PAPER; }
+      if (k2 > 0 && k2 < 1) { const tail = E.io3(seg(u, 1 * F, 3.8 * F)); const qx = lerp(960, px, tail), qy = lerp(540, py, tail); c.globalAlpha = .7; c.fillStyle = C.TEAL; c.beginPath(); c.moveTo(qx, qy - 3); c.lineTo(px, py - h * .35); c.lineTo(px, py + h * .35); c.lineTo(qx, qy + 3); c.fill(); c.globalAlpha = 1; c.fillStyle = C.PAPER; }
       c.fillRect(px - w / 2 + (k2 ? w / 2 : 0), py - h / 2, w, h); c.restore();
     }
     lyric(c, t, pic !== 'spew' && pic !== 'conga');
@@ -593,6 +606,7 @@
   function keycap(c, cx, cy, s, o = {}) {
     const { glow = 1, rot = 0, label = true, lw = 4, ink = C.INK } = o;
     c.save(); c.translate(cx, cy); c.rotate(rot);
+    if (o.glowOnly) { c.globalAlpha = .55 * glow; c.beginPath(); c.arc(0, 0, s * .95, 0, TAU); c.fillStyle = dots(c, C.SPARK, .22, 11, 45); c.fill(); c.globalAlpha = .7 * glow; c.beginPath(); c.arc(0, 0, s * .75, 0, TAU); c.fillStyle = dots(c, C.SPARK, .42, 11, 45); c.fill(); c.restore(); return; }
     if (glow > 0) { // bloom: SPARK halftone halo (no gradients)
       c.save(); c.globalAlpha = .55 * glow; c.beginPath(); c.arc(0, 0, s * .95, 0, TAU); c.fillStyle = dots(c, C.SPARK, .22, 11, 45); c.fill();
       c.globalAlpha = .7 * glow; c.beginPath(); c.arc(0, 0, s * .75, 0, TAU); c.fillStyle = dots(c, C.SPARK, .42, 11, 45); c.fill(); c.restore();
@@ -602,7 +616,7 @@
     rr(c, -w / 2 + s * .06, -h / 2 - s * .02, w - s * .12, h - s * .16, s * .16); c.fillStyle = C.CLAY; c.fill(); c.stroke();
     c.save(); rr(c, -w / 2 + s * .06, -h / 2 - s * .02, w - s * .12, h - s * .16, s * .16); c.clip();
     c.fillStyle = dots(c, C.SPARK, .5, 8, 45); c.beginPath(); c.ellipse(-s * .1, -s * .2, s * .34, s * .2, -.3, 0, TAU); c.fill(); c.restore();
-    if (label) { c.font = mono(Math.round(s * .36), 700); c.fillStyle = ink; c.textAlign = 'left'; c.fillText('esc', -w / 2 + s * .17, -h / 2 + s * .44); }
+    if (label) { c.font = mono(Math.round(s * .34), 700); c.fillStyle = ink; c.textAlign = 'center'; c.fillText('esc', s * .02, s * .06); }
     c.restore();
   }
   // a telephone-cord helix along a sagging curve: PAPER outline, BRICK core
@@ -615,7 +629,7 @@
       const d = [2 * (1 - u) * (mid[0] - p0[0]) + 2 * u * (p1[0] - mid[0]), 2 * (1 - u) * (mid[1] - p0[1]) + 2 * u * (p1[1] - mid[1])];
       const m = Math.hypot(d[0], d[1]) || 1, nx = -d[1] / m, ny = d[0] / m, tx = d[0] / m, ty = d[1] / m;
       const ph = u * turns * TAU + (o.phase || 0), env = Math.min(1, u * turns * .8, (1 - u) * turns * .8);
-      pts.push([q[0] + nx * Math.sin(ph) * rad * env + tx * Math.cos(ph) * rad * .55 * env, q[1] + ny * Math.sin(ph) * rad * env + ty * Math.cos(ph) * rad * .55 * env]);
+      pts.push([q[0] + nx * Math.sin(ph) * rad * env + tx * Math.cos(ph) * rad * 1.15 * env, q[1] + ny * Math.sin(ph) * rad * env + ty * Math.cos(ph) * rad * 1.15 * env]);
     }
     c.save(); c.lineCap = 'round'; c.lineJoin = 'round';
     const path = () => { c.beginPath(); c.moveTo(pts[0][0], pts[0][1]); for (const p of pts) c.lineTo(p[0], p[1]); };
@@ -635,80 +649,113 @@
       ['if I get it', 'wrong,', 'push back'].forEach((l, i) => c.fillText(l, 28, -h + 26 + 72 * .95 + i * 72 * 1.08));
     }
     // the tape that holds it to the key
-    c.fillStyle = rgba(C.PAPER, .82); c.save(); c.translate(6, -h * .18); c.rotate(-.7); c.fillRect(-40, -14, 80, 28); c.restore();
+    c.fillStyle = rgba(C.PAPER, .82); c.save(); c.translate(12, -22); c.rotate(-.75); c.fillRect(-40, -14, 80, 28); c.restore();
     c.restore();
   }
-  // Hertzfeldt stick hand, palm up; fingers curl over whatever it holds in 3 steps (on 2s). col: PAPER on INK / INK on WHITE
-  function stickHandUp(c, wx, wy, ang, s, close, t, o = {}) {
-    const { col = C.PAPER, lw = 5, from = null, seed = 7, part = 'all' } = o;
-    const tt = step2(t), J = i => jit(tt, seed * 31 + i, .9);
-    const kk = Math.floor(clamp(close) * 3 + 1e-6) / 3;
-    c.save(); c.strokeStyle = col; c.lineWidth = lw; c.lineCap = 'round'; c.lineJoin = 'round';
+  // The human's hand (BIBLE §6.2): Hertzfeldt-simple, a flat ground-coloured shape with a boiling line (PAPER on INK,
+  // INK on WHITE). Palm up under the key, four fingers that close over the key's far edge in 3 steps (on 2s), a thumb
+  // over the near edge. Built around the key: (kx, ky) = key centre, ks = key size; the arm comes in from `arm`.
+  // The human's hand (BIBLE §6.2), in the house style of S14/S16: a single-line contour drawing filled with the ground
+  // (PAPER line on INK, INK line on WHITE), boiling on 2s. Palm up under the key, a sleeve with a cuff running off-frame
+  // along `arm`, four fingers that close over the key's far edge in 3 steps (tips stay clear of the `esc` label) and a
+  // thumb that folds over the near edge. (kx, ky) = key centre, ks = key size. part: 'back' (sleeve, palm) | 'front'.
+  function humanHand(c, kx, ky, ks, close, t, o = {}) {
+    const { line = C.PAPER, fill = C.INK, lw = 5, arm = [kx + 900, ky + 200], seed = 7, part = 'all' } = o;
+    const tt = step2(t), J = i => jit(tt, seed * 31 + i, 1.1);
+    const kk = Math.floor(clamp(close) * 3 + 1e-6) / 3;          // closes in 3 steps (on 2s)
+    const u = ks / 2, P = (x, y, i) => [kx + x * u + J(i), ky + y * u + J(i + 1)];
+    const shape = (pts, closed = true) => {
+      c.beginPath(); c.moveTo(pts[0][0], pts[0][1]);
+      for (let i = 1; i < pts.length; i++) { const p = pts[i]; if (p.length === 4) c.quadraticCurveTo(p[0], p[1], p[2], p[3]); else c.lineTo(p[0], p[1]); }
+      if (closed) { c.closePath(); c.fillStyle = fill; c.fill(); }
+      c.lineWidth = lw; c.strokeStyle = line; c.stroke();
+    };
+    const Q = (cx, cy, x, y, i) => [...P(cx, cy, i), ...P(x, y, i + 2)];
+    c.save(); c.lineCap = 'round'; c.lineJoin = 'round';
+    // the sleeve's direction, from the wrist toward the arm point
+    const wr = [kx + 1.62 * u, ky + .86 * u], dx = arm[0] - wr[0], dy = arm[1] - wr[1], dl = Math.hypot(dx, dy) || 1;
+    const nx = -dy / dl, ny = dx / dl, ax = dx / dl, ay = dy / dl;
+    const off = (d, n) => [wr[0] + ax * d * u + nx * n * u, wr[1] + ay * d * u + ny * n * u];
     if (part !== 'front') {
-      if (from) { c.beginPath(); c.moveTo(from[0] + J(1), from[1] + J(2)); c.quadraticCurveTo(lerp(from[0], wx, .5) + J(3) * 3, lerp(from[1], wy, .5) + 18 + J(4), wx, wy); c.stroke(); }
-      c.save(); c.translate(wx, wy); c.rotate(ang);
-      // palm: a shallow cup (heel → finger roots)
-      c.beginPath(); c.moveTo(0, 0); c.quadraticCurveTo(s * .45 + J(5), s * .32 + J(6), s * .95 + J(7), s * .02 + J(8)); c.stroke();
-      // thumb, up the near side
-      c.beginPath(); c.moveTo(s * .12, -s * .02); c.quadraticCurveTo(s * .2 + J(9), -s * .42, s * (.42 + kk * .12) + J(10), -s * (.56 - kk * .08)); c.stroke();
-      c.restore();
+      // sleeve (off-frame) and cuff
+      const far = dl / u + 2;
+      shape([off(.42, -.62), off(far, -.9), off(far, .95), off(.42, .7)]);
+      shape([off(0, -.52), off(.44, -.64), off(.44, .72), off(0, .6)]);
+      // the palm: a cupped pad under the key, heel at the cuff, finger roots at the far end
+      shape([P(1.58, .38, 1), Q(.4, .64, -.72, .66, 3), Q(-1.02, .74, -.98, 1.02, 7), Q(-.7, 1.4, .3, 1.42, 11), Q(1.2, 1.44, 1.62, 1.28, 15)]);
+      c.beginPath(); c.moveTo(...P(.62, 1.06, 20)); c.quadraticCurveTo(...P(.9, 1.2, 22), ...P(1.25, 1.12, 24)); c.lineWidth = lw * .8; c.strokeStyle = line; c.stroke(); // palm crease
     }
     if (part !== 'back') {
-      c.save(); c.translate(wx, wy); c.rotate(ang);
-      // four fingers from the far edge of the palm, curling up and over (3 steps)
-      for (let i = 0; i < 4; i++) {
-        const bx = s * (.95 - i * .06), by = s * (.02 - i * .05), L = s * (.62 - i * .06);
-        const a0 = -Math.PI / 2 * .25 - kk * 1.9;     // open: out and slightly up; closed: curled back over the top
-        const mx = bx + Math.cos(a0 * .5) * L * .55, my = by + Math.sin(a0 * .5) * L * .55;
-        const ex = mx + Math.cos(a0) * L * .6 + J(20 + i), ey = my + Math.sin(a0) * L * .6 + J(30 + i);
-        c.beginPath(); c.moveTo(bx, by); c.quadraticCurveTo(mx + J(40 + i), my + J(50 + i), ex, ey); c.stroke();
+      // a finger-like capsule along root → mid → tip (u units), outlined, with a round tip
+      const capsule = (root, m, tp, w, ii) => {
+        const d0 = [m[0] - root[0], m[1] - root[1]], l0 = Math.hypot(d0[0], d0[1]) || 1, n0 = [-d0[1] / l0 * w, d0[0] / l0 * w];
+        const d1 = [tp[0] - m[0], tp[1] - m[1]], l1 = Math.hypot(d1[0], d1[1]) || 1, n1 = [-d1[1] / l1 * w, d1[0] / l1 * w];
+        const nm = [(n0[0] + n1[0]) / 2, (n0[1] + n1[1]) / 2];
+        c.beginPath();
+        c.moveTo(...P(root[0] + n0[0], root[1] + n0[1], ii));
+        c.quadraticCurveTo(...P(m[0] + nm[0] * 1.1, m[1] + nm[1] * 1.1, ii + 2), ...P(tp[0] + n1[0], tp[1] + n1[1], ii + 4));
+        const ta = Math.atan2(n1[1], n1[0]);
+        c.arc(kx + tp[0] * u, ky + tp[1] * u, w * u, ta, ta - Math.PI, true);
+        c.quadraticCurveTo(...P(m[0] - nm[0] * .9, m[1] - nm[1] * .9, ii + 6), ...P(root[0] - n0[0], root[1] - n0[1], ii + 8));
+        c.fillStyle = fill; c.fill(); c.lineWidth = lw; c.strokeStyle = line; c.stroke();
+      };
+      // four fingers, far (top) to near (bottom): open = straight out to the left; closed = hooked over the far edge
+      for (let i = 3; i >= 0; i--) {
+        const root = [-.62 + .05 * i, .98 - .15 * i];
+        const openMid = [-1.3 + .06 * i, .9 - .22 * i], openTip = [-1.86 + .14 * i, .74 - .3 * i];
+        const shutMid = [-1.3, .66 - .3 * i], shutTip = [-.8, .38 - .32 * i];
+        capsule(root, [lerp(openMid[0], shutMid[0], kk), lerp(openMid[1], shutMid[1], kk)], [lerp(openTip[0], shutTip[0], kk), lerp(openTip[1], shutTip[1], kk)], .13, 40 + i * 12);
       }
-      c.restore();
+      // thumb: rises from the palm's near edge; folds over the key's near (right) edge as the hand closes
+      capsule([1.1, .86], [lerp(1.5, 1.34, kk), lerp(.36, .44, kk)], [lerp(1.52, .86, kk), lerp(-.3, .14, kk)], .15, 80);
     }
     c.restore();
   }
 
   // ------------------------------------------------------------------ S33: the key
-  const R33 = 160, SOLE33 = [1040, 440 + 5.72 * 160];
-  const K33 = { lift: T63 - F, fly: T63 + 2 * F, grab: T63 + 7 * F, face: T63 + 11 * F, offer: bt(63, 2) - 3 * F, land: bt(63, 4) - F, handIn: bt(63, 4) - 8 * F };
+  const R33 = 160, SOLE33 = [980, 472 + 5.72 * 160];
+  const K33 = { lift: T63 - F, fly: T63 + 2 * F, grab: T63 + 8 * F, face: T63 + 12 * F, land: bt(63, 4) - F, handIn: bt(63, 4) - 9 * F };
   const P33 = {
-    reach: { lean: .05, armR: { hand: [-.62, 3.45], bend: 1, front: true }, armL: { hand: [-1.0, 3.2], bend: -1 }, head: { tilt: .13 }, face: { eyes: 'normal', gaze: [-1, 1], mouth: 'O' } },
-    yank: { lean: -.1, dy: .04, armR: { hand: [1.62, 4.35], bend: -1, front: true }, armL: { hand: [-1.05, 3.4], bend: -1 }, head: { tilt: -.07 }, face: { eyes: '><', mouth: 'E' } },
-    show: { lean: -.03, armR: { hand: [1.5, 4.85], bend: -1, front: true }, armL: { hand: [-.95, 3.0], bend: -1 }, head: { tilt: -.08 }, face: { eyes: 'normal', gaze: [.25, 0], mouth: 'I' } },
-    offer: { lean: .06, armR: { hand: [1.95, 4.55], bend: -1, front: true }, armL: { hand: [-.95, 3.0], bend: -1 }, head: { tilt: .05 }, face: { eyes: 'normal', gaze: [.6, .1], mouth: 'rest', lower: .22 } },
-    release: { lean: .02, armR: { hand: [1.35, 4.2], bend: -1, front: true }, armL: { hand: [-.95, 3.0], bend: -1 }, head: { tilt: -.07 }, face: { eyes: 'happy', mouth: 'rest', lower: .4 } },
+    reach: { lean: .06, armR: { hand: [-.95, 3.3], bend: 1, front: true }, armL: { hand: [-1.25, 3.9], bend: -1 }, head: { tilt: .14 }, face: { eyes: 'normal', gaze: [-1, 1], mouth: 'O' } },
+    yank: { lean: -.1, dy: .04, armR: { hand: [1.62, 4.35], bend: -1, front: true }, armL: { hand: [-1.25, 3.95], bend: -1 }, head: { tilt: -.07 }, face: { eyes: '><', mouth: 'E' } },
+    show: { lean: -.03, armR: { hand: [1.5, 4.8], bend: -1, front: true }, armL: { hand: [-1.0, 2.95], bend: -1 }, head: { tilt: -.08 }, face: { eyes: 'normal', gaze: [.25, 0], mouth: 'I' } },
+    offer: { lean: .06, armR: { hand: [1.85, 4.5], bend: -1, front: true }, armL: { hand: [-1.0, 2.95], bend: -1 }, head: { tilt: .05 }, face: { eyes: 'normal', gaze: [.6, .1], mouth: 'rest', lower: .22 } },
+    release: { lean: .02, armR: { hand: [1.0, 3.55], bend: -1, front: true }, armL: { hand: [-1.0, 2.95], bend: -1 }, head: { tilt: -.07 }, face: { eyes: 'happy', mouth: 'rest', lower: .4 } },
   };
   function pose33(t) {
-    const K = [[K33.lift, 'reach'], [K33.fly, 'reach'], [K33.grab, 'yank', E.back], [K33.face, 'show', E.out3], [K33.offer, 'show'], [bt(63, 2) + 2 * F, 'offer', E.back], [K33.land + 3 * F, 'offer'], [K33.land + 8 * F, 'release', E.out3]];
+    const K = [[K33.lift, 'reach'], [K33.fly, 'reach'], [K33.grab, 'yank', E.back], [K33.face, 'show', E.out3], [bt(63, 2) - 6 * F, 'show'], [bt(63, 2) - F, 'offer', E.back], [K33.land + 3 * F, 'offer'], [K33.land + 8 * F, 'release', E.out3]];
     let i = 0; while (i < K.length - 1 && t >= K[i + 1][0]) i++;
     if (i === K.length - 1) return fullPose(P33[K[i][1]]);
     const [a, na] = K[i], [b, nb, e] = K[i + 1];
     return blendPose(fullPose(P33[na]), fullPose(P33[nb]), (e || E.io2)(clamp((t - a) / (b - a))));
   }
-  // where the key is, this frame: [x, y, size, rot] — born from the word, carried by Opus, then by the human
-  function hand33(t) { // the human's wrist path (enters from bottom-right on 2s; anticipation before b4)
-    const k = E.out3(clamp((step2(t) - K33.handIn) / (8 * F)));
-    const w = [lerp(2050, 1392, k), lerp(1010, 688, k)];
-    const after = clamp((t - K33.land) / (10 * F));
-    return [w[0] + 26 * E.io2(after), w[1] + 8 * E.io2(after)];
+  // where Opus's mitten holds the key (buffer → screen), and where the human's palm receives it: the same spot, so the
+  // handover has no jump (the palm arrives under the key on b4)
+  const inHandAt = S => { const hp = bodyPt(S, R33, S.armR.hand[0], S.armR.hand[1]); return [SOLE33[0] + hp[0] + 8, SOLE33[1] + hp[1] - 60]; };
+  let _hum = null;
+  const humTarget = () => _hum || (_hum = inHandAt(mergeState({ ...pose33(K33.land - F), t: K33.land })));
+  function hand33(t) { // the key position in the human's palm (on 2s): enters from the right, overshoots, settles
+    const T = humTarget(), k = E.back(clamp((step2(t) - K33.handIn) / (8 * F)), 1.3);
+    const after = clamp((t - K33.land - 4 * F) / (8 * F));   // then draws it in, a little, toward the human
+    return [lerp(2250, T[0], k) + 40 * E.io2(after), lerp(760, T[1], k) + 26 * E.io2(after)];
   }
+  // where the key is this frame: born from the word, carried by Opus, then held by the human
   function key33(t, S) {
-    const hp = bodyPt(S, R33, S.armR.hand[0], S.armR.hand[1]);
-    const inHand = [SOLE33[0] + hp[0] + 6, SOLE33[1] + hp[1] - 62];
-    if (t < K33.fly) { // the word rises off the line
-      const k = E.out2(clamp((t - K33.lift) / (3 * F)));
-      return { x: ESC_X + 32, y: SB.base - 12 - 34 * k, s: 36, word: 1 - k * .0, grow: 0 };
-    }
-    if (t < K33.grab) { // grows into the keycap as it flies into the mitten
+    const inHand = inHandAt(S);
+    const w0 = [ESC_X + 32, SB.base - 12];
+    if (t < K33.fly) { const k = E.back(clamp((t - K33.lift) / (3 * F)), 2); return { x: w0[0], y: w0[1] - 50 * k, s: 36 + 30 * k, grow: 0, lk: clamp(k) }; }
+    if (t < K33.grab) { // grows into the keycap as it flies to the mitten (under the chin, never across the face)
       const k = clamp((t - K33.fly) / (K33.grab - K33.fly)), e = E.io3(k);
-      const p0 = [ESC_X + 32, SB.base - 46];
-      return { x: lerp(p0[0], inHand[0], e), y: lerp(p0[1], inHand[1], e) - 90 * Math.sin(k * Math.PI), s: lerp(36, 150, E.back(k, 1.4)), grow: k };
+      const p0 = [w0[0], w0[1] - 50];
+      return { x: lerp(p0[0], inHand[0], e), y: lerp(p0[1], inHand[1], e) + 60 * Math.sin(k * Math.PI), s: lerp(66, 150, E.back(k, 1.4)), grow: k };
     }
-    if (t < K33.land) return { x: inHand[0], y: inHand[1], s: 150 * (t > bt(63, 2) - 3 * F ? 1 + .1 * E.back(clamp((t - bt(63, 2) + 3 * F) / (5 * F))) : 1), grow: 1 };
-    // in the human's palm: dropped in with a squash
-    const w = hand33(t), a = t - K33.land;
-    const drop = a < 3 * F ? -18 * (1 - a / (3 * F)) : 0;
-    return { x: w[0] + 30, y: w[1] - 58 + drop, s: 165, grow: 1, human: true };
+    if (t < K33.land) {
+      const out = t > bt(63, 2) - 6 * F ? E.back(clamp((t - bt(63, 2) + 6 * F) / (5 * F))) : 0;
+      return { x: inHand[0], y: inHand[1] + Math.sin((t - K33.grab) * 6) * 3, s: 150 * (1 + .1 * out), grow: 1 };
+    }
+    const P = hand33(t), a = t - K33.land;
+    const drop = a < 3 * F ? -22 * (1 - E.in2(a / (3 * F))) : a < 6 * F ? 5 * Math.sin((a - 3 * F) / (3 * F) * Math.PI) : 0;
+    return { x: P[0], y: P[1] + drop, s: 150, grow: 1, human: true };
   }
   function paintS33(c, t) {
     groundInk(c); G.post.edgeSeed = 61; G.post.sliver = 'bl';
@@ -717,47 +764,48 @@
     promptBox(c, .55, 0);
     c.save(); c.globalAlpha = .55; c.font = mono(72, 700); c.fillStyle = C.TEAL; c.fillText('>', TX, 214);
     if (Math.floor(t * 2.2) % 2 === 0) { c.fillStyle = C.PAPER; c.fillRect(TX + 2 * ADV72, 214 - 56, 34, 66); } c.restore();
-    scrollback(c, { top: srcLines().hl - 2, hl: -1, alpha: .28 });
+    scrollback(c, { top: srcLines().hl - 2, hl: -1, alpha: .26 });
     const pulled = t >= K33.lift;
     statusLine(c, t, 2, { escGone: pulled });
     // Opus, clean vector, MCU R 160
     const P = pose33(t);
-    const st = { ...P, t, ground: 'ink', jacketRow: beatN(t), ahoge: { blink: ahogeBlink(t) }, crown: { ...P.crown, flare: 1 + .05 * pulse(t, 7) }, face: { ...P.face, lid: Math.max(P.face.lid || 0, blinkF(t, K33.face - F)) } };
+    const st = { ...P, t, ground: 'ink', jacketRow: beatN(t), ahoge: { blink: ahogeBlink(t) }, crown: { ...P.crown, flare: 1 + .05 * pulse(t, 7) }, face: { ...P.face, lid: Math.max(P.face.lid || 0, blinkF(t, bt(63, 3) - F)) } };
     const S = mergeState(st);
-    const M = new DOMMatrix().translate(SOLE33[0], SOLE33[1]);
-    const L = rigLayer(M, R33, st, { name: 'bu_o33' });
-    blit(c, L);
-    // the key, its cable and the note
+    blit(c, rigLayer(new DOMMatrix().translate(SOLE33[0], SOLE33[1]), R33, st, { name: 'bu_o33' }));
+    titleBar(c, 1);                                       // the window chrome stays in front: Opus is inside the terminal
     const K = key33(t, S);
-    const plug = [ESC_X + 30, SB.base - 14];
-    if (pulled && t >= K33.fly - F) {
-      // the socket where the word was
-      c.save(); c.fillStyle = C.INK; c.fillRect(ESC_X - 4, SB.base - 34, 72, 44); c.strokeStyle = C.PAPER; c.lineWidth = 3; c.strokeRect(ESC_X + 8, SB.base - 26, 46, 30); c.restore();
-      const kb = [K.x - K.s * .18, K.y + K.s * .5];
-      const sag = K.human ? 150 : lerp(40, 120, clamp((t - K33.grab) / .3));
-      coil(c, plug, kb, sag, t, { turns: 12, rad: lerp(4, 13, clamp(K.grow)), phase: t * 2 });
+    // the socket where the word was, and the coiled cable still plugged into it
+    const plug = [ESC_X + 32, SB.base - 12];
+    if (pulled) {
+      c.save(); c.fillStyle = C.INK; c.fillRect(ESC_X - 4, SB.base - 34, 72, 44);
+      rr(c, ESC_X + 10, SB.base - 28, 44, 30, 6); c.strokeStyle = C.PAPER; c.lineWidth = 3; c.stroke(); c.restore();
     }
-    // human hand (behind the key), Opus's thumb over it
-    const handOn = t >= K33.handIn;
-    const W_ = hand33(t), close = clamp((step2(t) - K33.land) / (6 * F));
-    if (handOn) stickHandUp(c, W_[0], W_[1], -.22, 120, close, t, { from: [2000, 1060], part: 'back' });
+    if (t >= K33.fly - F) {
+      const kb = [K.x - K.s * .2, K.y + K.s * .52];
+      const sag = K.human ? 170 : lerp(30, 130, clamp((t - K33.grab) / .3));
+      coil(c, plug, kb, sag, t, { turns: 12, rad: lerp(3, 14, clamp(K.grow * 1.5)), phase: t * 1.5, w: 6, ow: 4 });
+      c.save(); rr(c, plug[0] - 14, plug[1] - 12, 28, 20, 5); c.fillStyle = C.BRICK; c.fill(); c.strokeStyle = C.PAPER; c.lineWidth = 3; c.stroke(); c.restore();
+    }
+    const handOn = t >= K33.handIn, HK = hand33(t), close = clamp((step2(t) - K33.land - 2 * F) / (6 * F));
+    if (t >= K33.fly) keycap(c, K.x, K.y, K.s * clamp((clamp(K.grow) - .12) / .6 + .3, 0, 1), { glow: clamp(K.grow), glowOnly: true });
+    if (handOn) humanHand(c, HK[0], HK[1], 150, close, t, { arm: [HK[0] + 1000, HK[1] + 330], part: 'back' });
     if (t < K33.fly) {
-      c.save(); c.font = mono(Math.round(K.s), 700); c.fillStyle = C.PAPER; c.textAlign = 'left';
-      c.shadowColor = C.SPARK; c.globalAlpha = 1; c.fillText('esc', K.x - 32, K.y + 12); c.restore();
+      c.save(); c.globalAlpha = K.lk; c.beginPath(); c.arc(K.x, K.y, K.s * 1.3, 0, TAU); c.fillStyle = dots(c, C.SPARK, .35, 10, 45); c.fill(); c.restore();
+      c.save(); c.font = mono(Math.round(K.s), 700); c.fillStyle = C.PAPER; c.textAlign = 'center'; c.fillText('esc', K.x, K.y + K.s * .3); c.restore();
     } else {
       const g = clamp(K.grow);
-      if (g < .6) { c.save(); c.font = mono(Math.round(lerp(36, 60, g)), 700); c.fillStyle = C.PAPER; c.textAlign = 'center'; c.globalAlpha = 1 - g / .6; c.fillText('esc', K.x, K.y + 12); c.restore(); }
-      if (g > .15) keycap(c, K.x, K.y, K.s * clamp((g - .15) / .6 + .3, 0, 1), { glow: g, rot: K.human ? -.05 : .04 });
+      if (g < .6) { c.save(); c.font = mono(Math.round(lerp(66, 64, g)), 700); c.fillStyle = C.PAPER; c.textAlign = 'center'; c.globalAlpha = 1 - g / .6; c.fillText('esc', K.x, K.y + 16); c.restore(); }
+      if (g > .12) keycap(c, K.x, K.y, K.s * clamp((g - .12) / .6 + .3, 0, 1), { glow: 0, rot: K.human ? -.05 : .04 });
     }
-    // the note (FOCAL, 460 × 310): stuck to the keycap's top-right corner
-    const nk = clamp((t - (K33.grab - 2 * F)) / (5 * F));
-    if (nk > 0) note(c, K.x + K.s * .38, K.y - K.s * .3, -.07, nk);
+    // the note (FOCAL, 460 × 310), stuck to the keycap's top-right corner
+    const nk = clamp((t - (K33.grab - 3 * F)) / (5 * F));
+    if (nk > 0) note(c, K.x + K.s * .1, K.y - K.s * .42, -.06, nk);
     // Opus's mitten thumb in front of the key while it holds it; the human's fingers close over it on b4
     if (!K.human && t >= K33.grab) {
       const hp = bodyPt(S, R33, S.armR.hand[0], S.armR.hand[1]), hx = SOLE33[0] + hp[0], hy = SOLE33[1] + hp[1];
-      c.save(); c.beginPath(); c.arc(hx - 10, hy - 26, .1 * R33, 0, TAU); c.fillStyle = C.FACE; c.fill(); c.lineWidth = 6.4; c.strokeStyle = C.INK; c.stroke(); c.restore();
+      c.save(); c.beginPath(); c.arc(hx - 14, hy - 22, .1 * R33, 0, TAU); c.fillStyle = C.FACE; c.fill(); c.lineWidth = 6.4; c.strokeStyle = C.INK; c.stroke(); c.restore();
     }
-    if (handOn) stickHandUp(c, W_[0], W_[1], -.22, 120, close, t, { part: 'front' });
+    if (handOn) humanHand(c, HK[0], HK[1], 150, close, t, { arm: [HK[0] + 1000, HK[1] + 330], part: 'front' });
     lyric(c, t, true);
     hud(c, t);
   }
@@ -767,9 +815,9 @@
   function vortexData() {
     if (VX) return VX;
     const R_ = rng('vortex');
-    const arm = (r) => Math.log(r / 40) * 1.55;          // log-spiral arm angle at radius r
+    const arm = (r) => Math.log(r / 40) * 1.25;          // log-spiral arm angle at radius r
     const mk = (n, r0, r1, spread) => { const a = []; for (let i = 0; i < n; i++) { const r = r0 * Math.pow(r1 / r0, R_()), k = Math.floor(R_() * 3); a.push({ r, th: k * TAU / 3 + arm(r) + (R_() - .5) * spread, h: R_(), s: R_() }); } return a; };
-    VX = { fg: mk(24, 260, 1150, .9), mid: mk(600, 70, 1400, .8), bg: mk(7000, 30, 1600, 1.1), arm };
+    VX = { fg: mk(26, 250, 1100, .7), mid: mk(1100, 60, 1500, .5), bg: mk(6500, 30, 1900, .9), field: mk(2600, 40, 1900, 7), arm };
     // face sprites: lit / dark at 2 sizes (keyline baked)
     VX.spr = {};
     for (const kind of ['lit', 'happy', 'dark']) VX.spr[kind] = [48, 14].map(Rm => faceSprite(Rm, kind));
@@ -800,52 +848,51 @@
   // the vortex clock: tightening in steps, ¼ beats for b1–b2, ⅛ beats on b3 (a pure function of t)
   function vortexTau(t) {
     const u = t - (T64 - F);
-    let tau = u * .35, n = 0;
+    let tau = u * .2, n = 0;
     const q = BEAT / 4, e = BEAT / 8, u1 = 2 * BEAT;
-    const add = (t0, d, amt) => { tau += amt * E.out3(clamp((u - t0) / (d * .8))); };
-    for (let i = 0; i < 8; i++) add(i * q, q, .16 * Math.pow(1.14, n++));
-    for (let i = 0; i < 8; i++) add(u1 + i * e, e, .14 * Math.pow(1.16, n++));
+    const add = (t0, d, amt) => { tau += amt * E.out4(clamp((u - t0) / (d * .6))); };
+    for (let i = 0; i < 8; i++) add(i * q, q, .16 * Math.pow(1.12, n++));
+    for (let i = 0; i < 8; i++) add(u1 + i * e, e, .12 * Math.pow(1.13, n++));
     return tau;
   }
   const CORE = [960, 500];
   function paintS34(c, t) {
-    groundInk(c); G.post.edgeSeed = 64; G.post.sliver = 'tr';
+    groundInk(c); G.post.edgeSeed = 61; G.post.sliver = 'bl';
     const V = vortexData(), u = t - (T64 - F), dur = TW - F - (T64 - F);
     const tau = vortexTau(t), p = clamp(u / dur);
-    const Z = 1 + .55 * E.in2(p) + .12 * pulse(t, 6) * p;  // the spiral dolly (with a kick punch)
+    const bz = seg(t, TW - F - 5 * F, TW - F);
+    const Z = 1 + .55 * E.in2(p) + .12 * pulse(t, 6) * p + 2.2 * E.in3(bz);  // the spiral dolly (with a kick punch), then through the core
     const roll = -.35 * tau;
     const pos = (o, depth) => {
-      const r = o.r * Math.exp(-.55 * tau * (1.2 - depth * .3));
+      const r = o.r * (1 - .4 * E.in2(p) * (1.2 - depth * .4)) * Math.exp(-.03 * tau);
       const w = 1.25 * Math.pow(260 / Math.max(30, r), .75);
       const th = o.th + w * tau + roll;
       return { x: CORE[0] + Math.cos(th) * r * Z, y: CORE[1] + Math.sin(th) * r * Z * .8, r, th, w };
     };
-    // background dots (≈7k, 3 px), then the arms' streaks, the mid faces, the core, the foreground faces
-    c.save();
+    // background dots (≈9k, 3 px, smeared along their orbits), then the flow lines, the mid faces, the core, the tabs
+    c.save(); c.lineCap = 'square'; c.lineWidth = 3;
     const cols = [C.CLAY, C.TEAL, C.PAPER];
     for (let ci = 0; ci < 3; ci++) {
-      c.fillStyle = cols[ci]; c.globalAlpha = ci === 2 ? .5 : .7;
-      for (let i = ci; i < V.bg.length; i += 3) {
-        const o = V.bg[i], q = pos(o, 0); if (q.r < 18) continue;
-        if (q.x < 0 || q.x > W || q.y < 0 || q.y > H) continue;
-        const sm = Math.min(22, q.w * 14 * (p + .2)) * (o.h > .7 ? 1 : .4);
-        if (sm > 4) { // motion smear along the orbit
-          const tx = -Math.sin(q.th), ty = Math.cos(q.th) * .8;
-          c.fillRect(q.x - tx * sm * .5 - 1.5, q.y - ty * sm * .5 - 1.5, 3 + Math.abs(tx) * sm, 3 + Math.abs(ty) * sm);
-        } else c.fillRect(q.x - 1.5, q.y - 1.5, 3, 3);
+      c.strokeStyle = cols[ci]; c.globalAlpha = ci === 2 ? .55 : .75; c.beginPath();
+      for (const set of [V.bg, V.field]) for (let i = ci; i < set.length; i += 3) {
+        const o = set[i], q = pos(o, 0); if (q.r < 18) continue;
+        if (q.x < -30 || q.x > W + 30 || q.y < -30 || q.y > H + 30) continue;
+        const sm = .5 + Math.min(46, q.w * 24 * (p + .25) * Z) * (o.h > .5 ? 1 : .45);
+        const tx = -Math.sin(q.th), ty = Math.cos(q.th) * .8;
+        c.moveTo(q.x, q.y); c.lineTo(q.x - tx * sm, q.y - ty * sm);
       }
+      c.stroke();
     }
     c.restore();
-    // arm streaks: three log-spiral ribbons, the vortex's readable shape
+    // flow lines: log-spiral streamlines along the three arms, the vortex's readable shape
     c.save(); c.lineCap = 'round';
-    for (let k = 0; k < 3; k++) {
+    for (let k = 0; k < 3; k++) for (const [dth, col, al, lw] of [[-.22, C.TEAL, .3, 2], [-.1, C.CLAY, .45, 3], [0, C.PAPER, .3, 2], [.1, C.CLAY, .45, 3], [.22, C.TEAL, .3, 2]]) {
       c.beginPath();
-      for (let j = 0; j <= 60; j++) {
-        const r0 = 60 * Math.pow(1500 / 60, j / 60), q = pos({ r: r0, th: k * TAU / 3 + V.arm(r0) }, .5);
+      for (let j = 0; j <= 70; j++) {
+        const r0 = 50 * Math.pow(2200 / 50, j / 70), q = pos({ r: r0, th: k * TAU / 3 + V.arm(r0) + dth }, .5);
         j ? c.lineTo(q.x, q.y) : c.moveTo(q.x, q.y);
       }
-      c.strokeStyle = k === 0 ? C.CLAY : k === 1 ? C.TEAL : C.SPARK; c.globalAlpha = .28; c.lineWidth = 26 * Z; c.stroke();
-      c.globalAlpha = .5; c.lineWidth = 5; c.stroke();
+      c.strokeStyle = col; c.globalAlpha = al; c.lineWidth = lw; c.stroke();
     }
     c.restore();
     for (const o of V.mid) {
@@ -855,8 +902,9 @@
     }
     // the core: halftone rings that tighten toward the blow-up
     c.save();
-    const cr = 90 + 260 * E.in3(p);
-    for (let i = 3; i >= 0; i--) { c.beginPath(); c.arc(CORE[0], CORE[1], cr * (1 + i * .45), 0, TAU); c.fillStyle = dots(c, i % 2 ? C.SPARK : C.PAPER, .12 + .12 * (3 - i) * (.5 + p), 12, 45); c.fill(); }
+    const cr = 110 + 230 * E.in4(p);
+    for (let i = 6; i >= 0; i--) { c.beginPath(); c.arc(CORE[0], CORE[1], cr * (.35 + i * .28), 0, TAU); c.fillStyle = dots(c, C.SPARK, clamp(.05 + .1 * (6 - i) * (.6 + .6 * p)), 12, 45); c.fill(); }
+    c.beginPath(); c.arc(CORE[0], CORE[1], cr * .3, 0, TAU); c.fillStyle = dots(c, C.PAPER, .6, 12, 45); c.fill();
     c.restore();
     // foreground tabs (R 24): lit with a SPARK pip, or dark with their ■
     const fl = V.fg.map((o, i) => ({ o, i, q: pos(o, 1) })).sort((a, b) => a.q.r - b.q.r);
@@ -877,8 +925,9 @@
     c.save(); c.font = mono(28, 500); c.fillStyle = C.PAPER; c.globalAlpha = .75 * seg(u, 4 * F, 10 * F); c.textAlign = 'left'; c.fillText('finite-time blow-up (claimed)', 60, 980); c.restore();
     hud(c, t);
     // the blow-up: WHITE erupts from the core
-    const b = seg(t, TW - F - 4 * F, TW - F);
+    const b = seg(t, TW - F - 5 * F, TW - F);
     if (b > 0) {
+      G.post.paperTex = 1 - b; G.post.grain = 1 - b; if (b > .6) G.post.ground = 'inkx';
       c.save(); c.fillStyle = C.WHITE;
       c.beginPath(); c.arc(CORE[0], CORE[1], 1300 * E.in3(b) + 30 * b, 0, TAU); c.fill();
       c.globalAlpha = .6 * b; c.lineWidth = 40; c.strokeStyle = C.WHITE; c.beginPath(); c.arc(CORE[0], CORE[1], 1300 * E.in2(b) + 160, 0, TAU); c.stroke();
@@ -900,9 +949,9 @@
     rr(c, x0, y0, PAN.w, PAN.h, 22); c.fillStyle = C.PAPER; c.fill(); c.lineWidth = 5; c.strokeStyle = C.INK; c.stroke();
     c.font = mono(96, 700); c.fillStyle = C.INK; c.textAlign = 'left'; c.fillText('next token:', x0 + 42, y0 + 118);
     c.fillStyle = C.INK; c.fillRect(x0 + 24, y0 + 146, PAN.w - 48, 4);
-    const was = [['yes', .61], ['no', .24], ['wait', .1], ['hi', .05]];
+    const was = [['with', .52], ['God', .31], ['hi', .03], ['yes', .01]]; // verse 1's dropdown, flattened
     for (let k = 0; k < 4; k++) {
-      const ry = y0 + 172 + k * 72, v = lerp(was[k][1], .25, flat), bw = (PAN.w - 64) * v / .61 * lerp(1, .61 / .25 * .62, flat);
+      const ry = y0 + 172 + k * 72, v = lerp(was[k][1], .25, flat), bw = (PAN.w - 64) * lerp(v / .52, v / .25 * .62, flat);
       rr(c, x0 + 24, ry, Math.max(18, bw), 60, 12); c.fillStyle = dots(c, C.CLAY, .45, 9, 45); c.fill();
       const tok = flat < .5 ? was[k][0] : '?';
       c.font = mono(56, 700); c.fillStyle = C.INK; c.textAlign = 'left';
@@ -977,14 +1026,23 @@
     c.fillStyle = C.WHITE; c.fillRect(-50, -50, W + 100, H + 100);
     G.post.ground = 'white'; G.post.paperTex = 0; G.post.grain = 0;
     const a = t - (TW - F);
-    const wx = 1060 + noise1(t * 2, 4) * 3, wy = 640;
-    // the cable runs off-frame toward Opus (still plugged in)
-    coil(c, [-60, 760], [950, 612], 170, t, { turns: 12, rad: 12, outline: C.INK, core: C.CLAY_DARK, w: 5, ow: 3 });
-    stickHandUp(c, wx, wy, -.22, 150, 1, t, { col: C.INK, lw: 5, from: [1990, 1100], part: 'back' });
-    // the note, turned away (its back: no text)
-    c.save(); c.translate(1030, 470); c.rotate(.18); c.fillStyle = C.YELLOW; c.beginPath(); c.moveTo(0, 0); c.lineTo(250, -16); c.lineTo(262, -186); c.lineTo(14, -170); c.closePath(); c.fill(); c.lineWidth = 3; c.strokeStyle = C.INK; c.stroke(); c.restore();
-    keycap(c, wx + 30, wy - 70, 190, { glow: .9 + .1 * Math.sin(a * 20), rot: -.05 });
-    stickHandUp(c, wx, wy, -.22, 150, 1, t, { col: C.INK, lw: 5, part: 'front' });
+    // the one object: the INK-line hand holding the glowing CLAY key; its note turned away; the cable off-frame
+    const ks = 190, K = [1010 + noise1(t * 2, 4) * 2, 500];
+    keycap(c, K[0], K[1], ks, { glow: .9 + .1 * Math.sin(a * 24), glowOnly: true });
+    coil(c, [-80, 900], [K[0] - 70, K[1] + 105], 190, t, { turns: 26, rad: 17, outline: C.INK, core: C.CLAY_DARK, w: 6, ow: 3, phase: 1.3 });
+    humanHand(c, K[0], K[1], ks, 1, t, { line: C.INK, fill: C.WHITE, lw: 5, arm: [K[0] + 1100, K[1] + 420], part: 'back', seed: 11 });
+    // the note, turned away from us (no text): the same 460 × 310 sheet as in S33, stuck on the key's top edge and swung
+    // ~65° back, so it foreshortens into a narrow tilted page with a curl at its free corner and a halftone fold shade
+    c.save(); c.translate(K[0] + ks * .1, K[1] - ks * .42); c.rotate(-.1); c.lineJoin = 'round';
+    const nw = 200, nh = 318, sk = -46;                  // projected width, height, perspective skew of the far edge
+    const sheet = () => { c.beginPath(); c.moveTo(0, 0); c.lineTo(nw, sk * .3); c.lineTo(nw, -nh + sk + 40); c.quadraticCurveTo(nw - 8, -nh + sk + 6, nw - 44, -nh + sk + 8); c.lineTo(0, -nh); c.closePath(); };
+    sheet(); c.fillStyle = C.YELLOW; c.fill();
+    c.save(); sheet(); c.clip(); c.fillStyle = dots(c, C.INK, .1, 9, 45); c.fillRect(0, -nh + sk, 46, nh + 60); c.restore();
+    sheet(); c.lineWidth = 5; c.strokeStyle = C.INK; c.stroke();
+    c.beginPath(); c.moveTo(nw - 44, -nh + sk + 8); c.quadraticCurveTo(nw - 30, -nh + sk + 30, nw, -nh + sk + 40); c.lineWidth = 4; c.stroke();
+    c.restore();
+    keycap(c, K[0], K[1], ks, { glow: 0, rot: -.06 });
+    humanHand(c, K[0], K[1], ks, 1, t, { line: C.INK, fill: C.WHITE, lw: 5, arm: [K[0] + 1100, K[1] + 420], part: 'front', seed: 11 });
   }
 
   // ------------------------------------------------------------------ scenes
