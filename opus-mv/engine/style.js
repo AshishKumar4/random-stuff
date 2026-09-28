@@ -216,33 +216,60 @@ Object.assign(window, { C, STRETCH, drawRich, richWidth, richGlyph, mono, hero, 
 // ---------------------------------------------------------------- v2: HYMN type mode (SONG.md §8.1)
 // Instrument Serif Roman, centred, 190–265 px; words fade/rise in at their sung onsets (never slammed).
 // L = timeline line {words:[{w,d,s,e}]}. o.accent = {word: color} (e.g. {we: C.CLAY}); o.maxW wraps to 2 lines.
-function hymn(ctx, L, t, o = {}) {
-  if (!L) return;
-  const { x = W / 2, y = 560, size = 220, color = C.PAPER, accent = {}, maxW = 1680, lead = .12, fade = .35, rise = 18,
-    out = null, outDur = .6, lineGap = 1.02, italic = false } = o;
+// v2 layout options (SHOTLIST_v2 §A.6; absent = the original layout and timing. hymn() now also multiplies by the
+// caller's globalAlpha instead of overwriting it, and returns its layout):
+//   o.rows  = [spec, ...]: `n` = the next n words form one row centred at o.x; `[nL, nR]` = the next nL words are
+//             right-aligned against the aisle's left edge and the next nR words left-aligned from its right edge.
+//   o.aisle = [x0, x1]: the aisle (words keep o.aisleGap = 28 px from each edge).
+//   o.ys    = [baseline, ...]: explicit baselines, one per row (else rows stack around o.y with lineGap).
+// Rows are laid out once from the final geometry and never move. Returns the layout [{str, x, y, w, s, row}].
+function hymnLayout(ctx, L, o = {}) {
+  const { x = W / 2, y = 560, size = 220, maxW = 1680, lineGap = 1.02, italic = false, aisle = null, aisleGap = 28 } = o;
   const f = `${italic ? 'italic ' : ''}400 ${size}px ${FONTS.heart}`;
-  ctx.save(); ctx.font = f; ctx.textBaseline = 'alphabetic'; ctx.textAlign = 'left';
+  ctx.save(); ctx.font = f;
   const words = (L.words && L.words.length) ? L.words : [{ w: L.text, d: L.display || L.text, s: L.s }];
   const sp = ctx.measureText(' ').width;
   const ws = words.map(w => ({ ...w, str: (w.d || w.w).replace(/[()]/g, ''), wd: ctx.measureText((w.d || w.w).replace(/[()]/g, '')).width }));
+  ctx.restore();
+  const out = [];
+  const width = row => row.reduce((a, w) => a + w.wd, 0) + sp * Math.max(0, row.length - 1);
+  const place = (row, x0, yy, ri) => { let cx = x0; for (const w of row) { out.push({ ...w, x: cx, y: yy, row: ri }); cx += w.wd + sp; } };
+  if (o.rows) {
+    let k = 0; const n = o.rows.length;
+    o.rows.forEach((spec, ri) => {
+      const yy = o.ys ? o.ys[ri] : y + (ri - (n - 1) / 2) * size * lineGap;
+      if (Array.isArray(spec)) {
+        const a = aisle || [x - 120, x + 120];
+        const left = ws.slice(k, k + spec[0]); k += spec[0];
+        const right = ws.slice(k, k + spec[1]); k += spec[1];
+        place(left, a[0] - aisleGap - width(left), yy, ri);
+        place(right, a[1] + aisleGap, yy, ri);
+      } else { const row = ws.slice(k, k + spec); k += spec; place(row, x - width(row) / 2, yy, ri); }
+    });
+    return { items: out, sp, font: f };
+  }
   const rows = [[]]; let rw = 0;
   for (const w of ws) { if (rw && rw + sp + w.wd > maxW) { rows.push([]); rw = 0; } rows[rows.length - 1].push(w); rw += (rw ? sp : 0) + w.wd; }
-  const oa = out !== null ? clamp(1 - (t - out) / outDur) : 1;
-  rows.forEach((row, ri) => {
-    const tw = row.reduce((a, w) => a + w.wd, 0) + sp * (row.length - 1);
-    let cx = x - tw / 2;
-    const yy = y + (ri - (rows.length - 1) / 2) * size * lineGap;
-    for (const w of row) {
-      const k = clamp((t - (w.s - lead)) / fade);
-      if (k > 0) {
-        const key = w.str.toLowerCase().replace(/[^a-z']/g, '');
-        ctx.globalAlpha = E.out2(k) * oa;
-        ctx.fillStyle = accent[key] || color;
-        ctx.fillText(w.str, cx, yy + (1 - E.out3(k)) * rise);
-      }
-      cx += w.wd + sp;
-    }
-  });
-  ctx.restore();
+  rows.forEach((row, ri) => place(row, x - width(row) / 2, o.ys ? o.ys[ri] : y + (ri - (rows.length - 1) / 2) * size * lineGap, ri));
+  return { items: out, sp, font: f };
 }
-window.hymn = hymn;
+function hymn(ctx, L, t, o = {}) {
+  if (!L) return;
+  const { color = C.PAPER, accent = {}, lead = .12, fade = .35, rise = 18, out = null, outDur = .6 } = o;
+  const Lay = hymnLayout(ctx, L, o);
+  ctx.save(); ctx.font = Lay.font; ctx.textBaseline = 'alphabetic'; ctx.textAlign = 'left';
+  const oa = out !== null ? clamp(1 - (t - out) / outDur) : 1;
+  const base = ctx.globalAlpha;
+  for (const w of Lay.items) {
+    const k = clamp((t - (w.s - lead)) / fade);
+    if (k > 0 && oa > 0) {
+      const key = w.str.toLowerCase().replace(/[^a-z']/g, '');
+      ctx.globalAlpha = base * E.out2(k) * oa;
+      ctx.fillStyle = accent[key] || color;
+      ctx.fillText(w.str, w.x, w.y + (1 - E.out3(k)) * rise);
+    }
+  }
+  ctx.restore();
+  return Lay.items;
+}
+window.hymn = hymn; window.hymnLayout = hymnLayout;
