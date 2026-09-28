@@ -23,13 +23,13 @@
   const DISP = { x0: 1024, x1: 1944, y0: -24, y1: HINGE - 24 };          // the lit display
   const BASE = { x0: 792, x1: 1944, y0: HINGE, y1: HINGE + 14 };         // keyboard deck, edge-on
   const DESK = { x0: 744, x1: 1944, y0: HINGE + 14, y1: HINGE + 30 };
-  const LID_T = 14, SLIVER = 6;                                          // closed: lid slab + lit gap (the screen itself)
+  const LID_T = 14, SLIVER = 9;                                          // closed: lid slab + lit gap (the screen itself)
   const ANCHOR = [1460, HINGE - SLIVER / 2];                             // camera anchor: the middle of the sliver
   const U = 160;                                                         // Rafa's unit (head r = .5u)
   const OP = { x: 1640, head: 690, R: 160 };                             // minimal Opus: face centre, R
   const OP_SOLE = OP.head + 5.72 * OP.R;
   const BAR_IN = { x0: 1048, x1: 1896, y0: 800, y1: 834 };               // chat input bar (Opus peeks over it)
-  const XBTN = [1860, 88];                                               // the chat's ×
+  const XBTN = [1860, 88];                                               // (the pointer's tip rests at its lower-right edge)                                               // the chat's ×
   const DISPC = mix(C.PAPER, C.WHITE, .42);                              // lit screen paper (never pure white)
   const FLOOR = 1040;
 
@@ -112,7 +112,7 @@
   // ------------------------------------------------------------------ the room: night as INK halftone, the lamp's pool
   // is the absence of dots (BIBLE §7.5: halftone replaces gradients). Built once, deterministic.
   const WIN = { x0: 92, x1: 332, y0: 118, y1: 392 };
-  const LAMP = { base: [440, FLOOR], top: [440, 478], shade: [548, 468] };
+  const LAMP = { base: [404, FLOOR], top: [404, 480], shade: [512, 470] };
   let _field = null;
   function nightField() {
     if (_field) return _field;
@@ -126,9 +126,9 @@
       if (cy > -.6) d *= smooth(clamp((Math.abs(cx) / (.45 + Math.max(0, cy)) - .55) / .6 + .15));
       if (x > WIN.x0 && x < WIN.x1 && y > WIN.y0 && y < WIN.y1) {                  // night sky + a crescent moon
         d = .56; const m1 = Math.hypot(x - 262, y - 186), m2 = Math.hypot(x - 276, y - 176);
-        if (m1 < 30 && m2 > 27) d = 0;
+        if (Math.hypot(x - 262, y - 190) < 21) d = 0;
       }
-      if (glow) { const gx = (x - ANCHOR[0]) / 560, gy = (y - ANCHOR[1]) / 105, rg = Math.hypot(gx, gy); d *= smooth(clamp((rg - .2) / .95)); }
+      if (glow) { const gx = (x - ANCHOR[0]) / 760, gy = (y - ANCHOR[1]) / 230, rg = Math.hypot(gx, gy); d *= smooth(clamp((rg - .34) / .8)); }
       return Math.min(.6, d);
     };
     const mk = (x0, x1, glow) => {
@@ -229,13 +229,16 @@
     if (hk < 1) { X.globalAlpha = 1 - hk; X.lineWidth = 4; X.beginPath(); X.arc(-.12 * u + jit(tq, 30, .8), .16 * u, .64 * u, Math.PI * .5, Math.PI * 1.22); X.stroke(); X.globalAlpha = 1; }
     // head
     X.beginPath(); X.arc(jit(tq, 31, .7), jit(tq, 32, .7), .5 * u, 0, TAU); X.fillStyle = C.PAPER; X.fill(); X.lineWidth = 4; X.stroke();
-    if (hk > 0) { // hood up: a second, bigger outline over the crown and the back of the head, rim at the brow
-      const r = lerp(.5, .66, hk) * u, a0 = lerp(-Math.PI * .5, -Math.PI * .2, hk), a1 = lerp(-Math.PI * .6, -Math.PI * 1.42, hk);
-      X.beginPath(); X.arc(-.08 * u, -.02 * u, r, a0, a1, true); X.lineWidth = 4.5; X.stroke();
-      if (hk > .6) { X.beginPath(); X.moveTo(-.08 * u + Math.cos(a0) * r, -.02 * u + Math.sin(a0) * r); X.quadraticCurveTo(.12 * u, -.34 * u, .06 * u, -.2 * u); X.stroke(); }
+    if (hk > 0) { // hood up: brow → over the crown → a soft peak at the back → the nape → down the back
+      const k = E.out3(hk), up = [[.3, -.36], [.12, -.64], [-.2, -.7], [-.52, -.52], [-.66, -.14], [-.58, .26], [-.4, .52], [-.3, .78]];
+      const dn = [[-.2, .56], [-.3, .6], [-.42, .58], [-.52, .5], [-.6, .36], [-.56, .5], [-.44, .64], [-.3, .78]];
+      const pts = up.map((p, i) => [lerp(dn[i][0], p[0], k) * u + jit(tq, 40 + i, .8), lerp(dn[i][1], p[1], k) * u + jit(tq, 50 + i, .8)]);
+      X.save(); blobPath(X, pts.concat([[-.02 * u, .5 * u], [.2 * u, .2 * u]]), true, .6); X.fillStyle = C.PAPER; X.globalAlpha = k; X.fill(); X.restore();
+      blobPath(X, pts, false, .6); X.lineWidth = 4.5; X.stroke();
+      X.beginPath(); X.arc(0, 0, .5 * u, -Math.PI * .45, Math.PI * .55); X.lineWidth = 4; X.stroke();   // face stays in the opening
     }
     if (hk < .5) { // the zigzag cowlick
-      X.lineWidth = 3.5; bpath(X, [[-.14 * u, -.47 * u], [-.06 * u, -.72 * u], [.02 * u, -.5 * u], [.12 * u, -.74 * u], [.18 * u, -.46 * u]], tq, 33); X.stroke();
+      X.lineWidth = 3.5; bpath(X, [[-.3 * u, -.4 * u], [-.3 * u, -.58 * u], [-.19 * u, -.47 * u], [-.14 * u, -.63 * u], [-.05 * u, -.5 * u], [.03 * u, -.62 * u], [.07 * u, -.495 * u]], tq, 33); X.stroke();
     }
     // eyes (profile-ish, both toward the facing side) and an acting-only smile
     const lk = P.look || [0, 0];
@@ -278,7 +281,7 @@
     [4, 'pedi-la em casamento.', bt(54, 2) + 4 * F, bt(54, 3) - 3 * F],
   ];
   const LFONT = `400 44px ${FONTS.heart}`, LX = 1080, LY0 = 306, LLH = 50;
-  const CARD = { x: 1048, y: 252, w: 520, h: 282 };
+  const CARD = { x: 1048, y: 252, w: 410, h: 282 };
   const ENV = { cx: 1208, cy: 236, w: 284, h: 178 };
 
   // ------------------------------------------------------------------ the letter, the envelope, the seal
@@ -428,9 +431,9 @@
     if (t >= s0 - 3 * F && t < s0 + 2 * e8 + 8 * F) {
       const up = t < s0 ? -.07 * (t - (s0 - 3 * F)) / (3 * F) : E.out3(clamp((t - s0) / (3 * F))) * (1 - E.io2(clamp((t - (s0 + 2 * e8)) / (8 * F))));
       let fl = 0; for (let k = 0; k < 2; k++) { const a = t - (s0 + k * e8); if (a >= 0 && a < e8) fl = Math.max(fl, a < 2 * F ? E.out2(a / (2 * F)) : 1 - E.in2(clamp((a - 2 * F) / (e8 - 2 * F)))); }
-      armL = { hand: [-.75 - up * .5 - fl * .34, 5.05 + up * .55 + fl * .22], bend: -1, front: true, type: 'mitten' };
-      armR = { hand: [.75 - up * .28 - fl * .3, 5.05 + up * .62 + fl * .24], bend: 1, front: true, type: 'mitten' };
-      tilt = -.04 - .03 * fl;
+      armL = { hand: [-.75 - up * .42 - fl * .36, 5.05 + up * .5 + fl * .2], bend: -1, front: true, type: 'mitten' };
+      armR = { hand: [.75 + up * .42 + fl * .36, 5.05 + up * .5 + fl * .2], bend: 1, front: true, type: 'mitten' };
+      tilt = -.05 - .04 * fl; dy += .02 * fl;
     }
     const sEnd = s0 + 2 * e8 + 8 * F;
     if (t >= sEnd && t < sEnd + 12 * F) { const b = boing(t, sEnd, .05, 30, 10); armL.hand = [-.75, 5.05 - b]; armR.hand = [.75, 5.05 - b]; }
@@ -463,16 +466,16 @@
     if (t < TL.ptr[0]) return null;
     const tq = q2(t), P0 = [1318, 672], Pc = [1720, 560];
     const k = E.io3(seg(tq, TL.ptr[0], TL.ptr[1] + 2 * F)), a = (1 - k) * (1 - k), b = 2 * k * (1 - k), c = k * k;
-    let x = a * P0[0] + b * Pc[0] + c * XBTN[0] - 4, y = a * P0[1] + b * Pc[1] + c * XBTN[1] - 6;
+    let x = a * P0[0] + b * Pc[0] + c * (XBTN[0] + 9), y = a * P0[1] + b * Pc[1] + c * (XBTN[1] + 11);
     const tr = t < TL.hes ? 0 : t < TL.hes + 4 * F ? 3 : t < lidTimes()[0] - 6 * F ? 1 : 0;   // hesitates 4 frames, trembling
     if (tr) { x += noise1(tq * 40, 5) * tr * 1.4; y += noise1(tq * 40, 9) * tr * 1.4; }
     return [x, y];
   }
   function drawBubbles(X, t) {
     if (t >= TL.pink) { // his PINK bubble pops (human, on 2s)
-      const k = E.back(clamp((q2(t) - TL.pink) / (5 * F)), 2.2), ax = 1890, ay = 436;
+      const k = E.back(clamp((q2(t) - TL.pink) / (5 * F)), 2.2), ax = 1690, ay = 428;
       X.save(); X.translate(ax, ay); X.scale(k, k); X.translate(-ax, -ay);
-      bubble(X, 1890, 352, 'ok. obrigado!! wish me luck', { who: 'human', size: 36, maxW: 760 });
+      bubble(X, 1700, 344, 'ok. obrigado!! wish me luck', { who: 'human', size: 36, maxW: 760 });
       X.restore();
     }
     if (t >= TL.reply - 2 * F) { // Opus: "boa sorte!!" streams, then ■ end_turn
@@ -620,3 +623,134 @@
   }
   scene('S28_we_wrote_your_letter', T53 - F, T55 - F, (X, t) => paintSplit(X, t));
   scene('S29_close_the_window', T55 - F, T57 - F, (X, t) => paintSplit(X, t));
+
+  // ------------------------------------------------------------------ S30 + S31: inside the sliver (INK lid and base, printed)
+  const BAND = { y0: 380, y1: 700 };
+  const ENV2 = { cx: 580, cy: 540, w: 400, h: 250, rot: -.035 };
+  const CHIP = { x: 850, y: 486, w: 262, h: 112 };
+  const CD = [287, 261, 232, 198, 161, 119, 72, 31, 0];                     // S31: 4:47 → 0:00 on the eighths
+  const E8 = BEAT / 2, T_ZERO = T59 + 8 * E8;                               // 0:00 lands on bar 60 b1
+  const TC = { bar: T_ZERO - F, glitch: 110.9 - F };                         // bar label; compaction starts
+  TC.crush = [TC.glitch + 3 * F, TC.glitch + 12 * F];                        // stretch, then squash to a line
+  TC.expand = TC.crush[1] + 2 * F;                                           // the summary opens out of the line
+  TC.out = [T61 - 7 * F, T61 - 2 * F];                                       // everything but the period is crushed
+  const SUM1 = '– helped with a letter (pt-BR)', SUM2 = '– outcome: unknown.';
+  const SX = 960 - SUM2.length * 43.2 / 2, SB1 = 494, SB2 = 590;
+  const fmt = v => `${Math.floor(v / 60)}:${String(v % 60).padStart(2, '0')}`;
+  function timerVal(t) {
+    if (t < T59) { const el = Math.max(0, Math.floor(t - T57 + F + 1e-6)); return { v: 300 - el, tc: T57 - F + el }; }
+    const i = Math.min(8, Math.floor((t - T59) / E8 + 1e-6)); return { v: CD[i], tc: T59 + i * E8 };
+  }
+  const coolK = t => E.io2(seg(t, T_ZERO - 1.0, T_ZERO - F));
+  function drawTimer(X, t) {
+    const { v, tc } = timerVal(t), prev = timerVal(tc - 1e-3).v, s = fmt(v), p = fmt(prev);
+    const c = CHIP; rr(X, c.x, c.y, c.w, c.h, 22); X.fillStyle = C.INK; X.fill();
+    const adv = 43.2, x0 = c.x + (c.w - s.length * adv) / 2, yb = c.y + c.h / 2 + 26;
+    const a = tc > T57 ? clamp((t - tc) / ((t < T59 ? 4 : 2) * F)) : 1;
+    const col = t >= T_ZERO - F ? mix(C.CLAY, C.UI_GREY, clamp((t - T_ZERO + F) / (4 * F))) : C.CLAY;
+    X.save(); X.beginPath(); X.rect(c.x, c.y + 6, c.w, c.h - 12); X.clip(); X.font = mono(72, 700); X.textAlign = 'left';
+    for (let i = 0; i < s.length; i++) {
+      const x = x0 + i * adv;
+      if (s[i] === p[i] || a >= 1) { X.fillStyle = col; X.globalAlpha = 1; X.fillText(s[i], x, yb); continue; }
+      X.fillStyle = col; X.globalAlpha = 1 - a; X.fillText(p[i], x, yb + E.in2(a) * 30);
+      X.globalAlpha = a; X.fillText(s[i], x, yb - (1 - E.out3(a)) * 30);
+    }
+    X.restore();
+  }
+  function drawBandContent(X, t) {
+    const kc = coolK(t);
+    const breath = .86 + .14 * Math.sin((t - T57) / BAR * TAU);
+    drawEnvelope(X, ENV2.cx, ENV2.cy, ENV2.w, ENV2.h, { rot: ENV2.rot, flap: 1, seal: 1, sealCol: mix(C.CLAY, C.UI_GREY, kc), glow: breath * (1 - kc), t, lw: 4, boil: .7 });
+    drawTimer(X, t);
+    X.save(); X.font = mono(28, 500); X.fillStyle = C.INK; X.globalAlpha = .72; X.textAlign = 'left';
+    X.fillText('cache_control: ephemeral · ttl 300 s', CHIP.x, CHIP.y + CHIP.h + 46);
+    X.globalAlpha = .72 * clamp((t - bt(58)) / (8 * F));
+    X.fillText('no streaks · no notifications · go to bed, rafa', CHIP.x, CHIP.y - 26);
+    X.restore();
+  }
+  function bandBg(X, y0, y1) { // lit paper with a halftone falloff where it meets the lid and the base
+    if (y1 - y0 < 1) return;
+    X.fillStyle = DISPC; X.fillRect(0, y0, W, y1 - y0);
+    const h = y1 - y0, steps = [[0, 22, .42], [22, 42, .22], [42, 58, .08]];
+    for (const [a, b, d] of steps) {
+      if (a >= h / 2) break; const bb = Math.min(b, h / 2);
+      X.fillStyle = halftone(X, C.INK, d, 10, 45); X.fillRect(0, y0 + a, W, bb - a); X.fillRect(0, y1 - bb, W, bb - a);
+    }
+  }
+  function paintSliver(X, t) {
+    groundInk(X); G.post.edgeSeed = 57; G.post.sliver = 'bl';
+    const tKnow = wordOnset('know', 110.9, 112.45, 111.63), tP = Math.min(tKnow - 2 * F, TC.out[0] - 3 * F);
+    const ko = seg(t, TC.out[0], TC.out[1]), eo = E.in2(ko);
+    const p0 = [SX + 18 * 43.2 + 21.6, SB2 - 6], pc = [lerp(p0[0], 960, E.io3(ko)), lerp(p0[1], 540, E.io3(ko))];
+    // the band (closes around the period at the very end)
+    const y0 = lerp(BAND.y0, pc[1] - 1, eo), y1 = lerp(BAND.y1, pc[1] + 1, eo), open = y1 - y0 >= 22;
+    if (open) bandBg(X, y0, y1);
+    X.save(); X.beginPath(); X.rect(0, y0, W, Math.max(0, y1 - y0)); X.clip();
+    // before compaction: the envelope, the ember, the timer (slice glitch for 3 frames, then crushed to a line)
+    if (t < TC.crush[1]) {
+      if (t >= TC.glitch && t < TC.crush[0]) {
+        const fr = Math.floor(t * 30);
+        for (let i = 0; i < 10; i++) {
+          const sy = BAND.y0 + i * 32, dx = (hash2(i, fr) - .5) * 90 * (hash2(i + 7, fr) > .35 ? 1 : 0);
+          X.save(); X.beginPath(); X.rect(0, sy, W, 32); X.clip(); X.translate(dx, 0); drawBandContent(X, t); X.restore();
+        }
+        X.fillStyle = C.INK; for (let i = 0; i < 3; i++) { const fr2 = hash2(i + 20, fr); X.globalAlpha = .85; X.fillRect(hash2(i + 30, fr) * 1500 + 100, BAND.y0 + fr2 * 300, 120 + hash2(i + 40, fr) * 400, 6 + hash2(i + 50, fr) * 14); } X.globalAlpha = 1;
+      } else {
+        const k = seg(t, TC.crush[0], TC.crush[1]), st = k < .25 ? 1 + .06 * E.out2(k / .25) : 1.06 * (1 - E.in3((k - .25) / .75));
+        X.save(); X.translate(960, 540); X.scale(1 + .3 * E.in2(k), Math.max(.001, st)); X.translate(-960, -540); drawBandContent(X, t); X.restore();
+      }
+    }
+    // the collapsed conversation: one line, which the summary opens out of
+    if (t >= TC.crush[1] - F && t < TC.expand + 4 * F) {
+      const k = seg(t, TC.expand, TC.expand + 4 * F);
+      X.fillStyle = C.INK; X.fillRect(lerp(380, 700, k), 537, lerp(1260, 620, k), 6 * (1 - k));
+    }
+    // the summary (OUTPUT voice): opens with overshoot; "unknown" streams; the period lands on "know"
+    if (t >= TC.expand) {
+      const k = clamp((t - TC.expand) / (5 * F)), sy = E.back(k, 2.2), sx = lerp(1.14, 1, E.out3(k));
+      const typed = 'unknown', nU = Math.floor(clamp((t - (TC.expand + 4 * F)) / Math.max(4 * F, tP - (TC.expand + 4 * F) - F)) * typed.length + 1e-6);
+      const vis2 = '– outcome: ' + typed.slice(0, nU);
+      const glyphs = [];
+      for (let i = 0; i < SUM1.length; i++) glyphs.push({ ch: SUM1[i], x: SX + i * 21.6, y: SB1, f: 36 });
+      for (let i = 0; i < vis2.length; i++) glyphs.push({ ch: vis2[i], x: SX + i * 43.2, y: SB2, f: 72 });
+      X.save(); X.translate(960, 540); X.scale(sx, sy); X.translate(-960, -540); X.textAlign = 'left';
+      for (const g of glyphs) {
+        if (g.ch === ' ') continue;
+        const gx = lerp(g.x + g.f * .3, p0[0], E.in2(ko)), gy = lerp(g.y - g.f * .35, p0[1], E.in2(ko)), sc = 1 - .92 * eo;
+        X.save(); X.globalAlpha = 1 - E.in2(clamp(ko * 1.25)); X.translate(gx, gy); X.scale(sc, sc);
+        X.font = mono(g.f, g.f > 40 ? 600 : 500); X.fillStyle = C.INK; X.globalAlpha *= g.f > 40 ? 1 : .8; X.fillText(g.ch, -g.f * .3, g.f * .35); X.restore();
+      }
+      X.restore();
+    }
+    X.restore();
+    // the period: lands on "know", then is the last light when the sliver shuts
+    if (t >= tP) {
+      const a = t - tP, drop = a < 3 * F ? (1 - E.out3(a / (3 * F))) * -26 : boing(t, tP + 3 * F, 3, 34, 12);
+      X.fillStyle = open ? C.INK : C.PAPER;
+      const s = 13 + (open ? 0 : 1);
+      rr(X, pc[0] - s / 2, pc[1] - s / 2 + drop * (1 - ko), s, s, 3.5); X.fill();
+    }
+    // the lyric: PAPER on INK at 950, crushed (squash, then stretched up into the band) at compaction
+    const ws = LY.s30();
+    heartLine(X, ws, t, { color: C.PAPER, tEnd: Math.min(ws[ws.length - 1].e + .35, T59 - 6 * F) });
+    const w31 = LY.s31();
+    if (t < TC.glitch) heartLine(X, w31, t, { color: C.PAPER, tEnd: 999 });
+    else if (t < TC.crush[1]) {
+      const k = seg(t, TC.glitch, TC.crush[1]), ka = clamp(k / .45), kb = clamp((k - .45) / .55);
+      const sy = ka < 1 ? lerp(1, .12, E.in2(ka)) : lerp(.12, 1.9, E.in2(kb)), sx = ka < 1 ? lerp(1, 1.12, E.out2(ka)) : lerp(1.12, .2, E.in2(kb));
+      const yc = lerp(930, 540, E.in3(kb));
+      X.save(); X.globalAlpha = 1 - E.in2(kb); X.translate(960, yc); X.scale(sx, sy); X.translate(-960, -930);
+      heartLine(X, w31, TC.glitch, { color: C.PAPER, tEnd: 999 }); X.restore();
+    }
+    // the bottom bar returns only now: 100%, then compaction (§7.10)
+    if (t >= TC.bar) {
+      const CH = [10.3, 11.25, 15.0, 22.5, 52.5, 56.25, 67.5, 69.84, 71.72, 112.5, 120.0];
+      let cur = -1; CH.forEach((s, i) => { if (t >= s) cur = i; });
+      X.save(); X.globalAlpha = clamp((t - TC.bar) / (3 * F));
+      contextBar(X, 1, { ticks: CH.map(s => s / 144), cur, label: t < TC.glitch ? 'Context left until auto-compact: 0%' : '⏺ Compacting conversation…' });
+      X.restore();
+    }
+  }
+  scene('S30_keep_it_warm', T57 - F, T59, (X, t) => paintSliver(X, t));
+  scene('S31_outcome_unknown', T59, T61, (X, t) => paintSliver(X, t));
+})();

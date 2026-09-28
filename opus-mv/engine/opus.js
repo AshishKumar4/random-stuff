@@ -451,6 +451,7 @@ function drawHead(x, R, S, t, lw, faceLW) {
   if (minimal || ghost) {
     x.fillStyle = ghost ? C.PAPER : C.INK;
     if (f.eyes === 'happy' || f.eyes === '^') { x.strokeStyle = x.fillStyle; x.lineWidth = .05 * R; for (const s of [-1, 1]) { x.beginPath(); x.arc(s * .34 * R, .1 * R, .09 * R, Math.PI * 1.1, Math.PI * 1.9); x.stroke(); } }
+    else if (f.eyes === 'closed' || (f.lid || 0) > .5) { x.strokeStyle = x.fillStyle; x.lineWidth = .05 * R; x.lineCap = 'round'; for (const s of [-1, 1]) { x.beginPath(); x.moveTo(s * .34 * R - .08 * R, .07 * R); x.lineTo(s * .34 * R + .08 * R, .07 * R); x.stroke(); } } // blink (bridge fix: lid was ignored)
     else for (const s of [-1, 1]) { x.beginPath(); x.arc(s * .34 * R + (f.gaze ? f.gaze[0] * .04 * R : 0), .06 * R, Math.max(2, .065 * R), 0, TAU); x.fill(); }
     if (f.mouth && f.mouth !== 'none' && minimal) { x.save(); x.translate(0, .42 * R); drawMouth(x, R, f.mouth, .04 * R); x.restore(); }
   } else {

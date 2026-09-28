@@ -151,7 +151,7 @@
     HOPE: { dy: 0, crouch: .22, sy: .94, lean: 0, hTilt: 0, hDy: -.1, lx: -.33, ly: 4.52, rx: .33, ry: 4.52, lf: 1, rf: 1, lt: 'mitten', rt: 'mitten', flare: 1, droop: 0, lower: 0, eyes: 'normal', mouth: 'O', brows: 'angry', gx: 0, gy: -.2, wav: 0 },
     HOPE_UP: { crouch: .18, hDy: -.06, gy: -1, gx: 0, flare: 1.06, brows: 'angry', mouth: 'O' },
     HOPE_LENS: { gy: 0, gx: 0, flare: 1, mouth: 'M' },
-    DEFLATE: { crouch: .26, sy: .92, hDy: -.16, hTilt: .05, lx: -.4, ly: 4.1, rx: .38, ry: 4.12, droop: .35, flare: .97, brows: 'angry', mouth: '._.' },
+    DEFLATE: { crouch: .26, sy: .92, hDy: -.16, hTilt: .05, lx: -.58, ly: 2.95, rx: .56, ry: 3.0, lf: 0, rf: 0, droop: .35, flare: .97, brows: 'angry', mouth: '._.' },
     HOLD_SLUMP: { crouch: .14, sy: .91, hTilt: .26, hDy: -.36, droop: .9, eyes: 'closed' },
   };
   const f = F;
@@ -521,7 +521,7 @@
     const z = push.z * (1 + .03 * punch(t, D.slams));
     const cam = makeCam(push.ax, push.ay, z, push.sx, push.sy);
     // bar 51: the lamps try to come on for the BACK that never comes: two weak flickers, then dark
-    const fl = t >= T51 - F && t < T51 + 5 * F ? [0, .35, .05, .25, 0, 0][Math.floor((t - T51 + F) * 30)] || 0 : 0;
+    const fl = t >= T51 - F && t < T51 + 6 * F ? [0, .9, .15, 0, .6, 0, 0][Math.floor((t - T51 + F) * 30)] || 0 : 0;
     if (t < T52 + 5 * F) lamps(X, t, cam, k, fl, D.flipT.slice(0, 1));
     if (t < T51) floorSpot(X, cam, gr);
     else floorSpot(X, cam, gr, 300);

@@ -130,10 +130,10 @@
     push(TB(8, 2) - F1, 'spark', { md: .14, shape: () => shape('spark', 1), x: FX, y: FY, s: t => 150 * (1 + .04 * (t - TB(8))), lw: 12, rot: t => .05 * (t - TB(8, 2)) });
     push(a.nova, 'nova', { md: .07, shape: () => shape('spark', 1.9), x: FX, y: FY, s: t => 150 * (1.25 + .5 * (1 - Math.exp(-(t - a.nova) * 6))), lw: t => lerp(14, 6, clamp((t - a.nova) / .3)), rot: t => .12 + .9 * (t - a.nova) });
     push(TB(8, 4) - F1, 'atomC', { md: .12, shape: () => shape('circle'), x: t => atomC(t)[0], y: t => atomC(t)[1], s: 50, lw: 9 });
-    push(TB(9) - F1, 'cell', { md: .12, shape: t => shape('cell', Math.round(E.io2(seg(t, TB(9), TB(9) + .36)) * 40) / 40), x: FX, y: FY - 20, s: 190, lw: 11 });
-    push(TB(9, 2) - F1, 'neuron', { md: .12, shape: () => shape('neuron'), x: FX - 40, y: FY - 30, s: 200, lw: 10, rot: t => .08 * Math.sin((t - TB(9, 2)) * 3) });
-    push(TB(9, 3) - F1, 'bubble', { md: .12, shape: () => shape('bubble'), x: FX, y: FY - 60, s: 200, lw: 11 });
-    push(TB(9, 4) - F1, 'lump', { md: .12, shape: () => shape('lump'), x: FX, y: FY, s: 170, lw: 11, rot: t => .15 * Math.sin((t - TB(9, 4)) * 4) });
+    push(TB(9) - F1, 'cell', { md: .12, shape: t => shape('cell', Math.round(E.io2(seg(t, TB(9), TB(9) + .36)) * 40) / 40), x: FX, y: FY - 30, s: 235, lw: 12 });
+    push(TB(9, 2) - F1, 'neuron', { md: .12, shape: () => shape('neuron'), x: FX - 40, y: FY - 40, s: 245, lw: 11, rot: t => .08 * Math.sin((t - TB(9, 2)) * 3) });
+    push(TB(9, 3) - F1, 'bubble', { md: .12, shape: () => shape('bubble'), x: FX, y: FY - 70, s: 250, lw: 12 });
+    push(TB(9, 4) - F1, 'lump', { md: .12, shape: () => shape('lump'), x: FX, y: FY - 20, s: 215, lw: 12, rot: t => .15 * Math.sin((t - TB(9, 4)) * 4) });
     push(TB(10) - F1, 'tablet', { md: .1, shape: () => shape('tablet'), x: 640, y: 505, s: t => 500 * (1 + .012 * pulse(t, 9)), lw: 10 });
     push(TB(11) - F1, 'block', { md: .2, shape: () => shape('block'), x: C8[0], y: C8[1] + 40, s: 230, lw: 10 });
     push(TB(11, 2) - F1, 'sheet', { md: .12, shape: () => shape('sheet'), x: C8[0], y: C8[1], s: 380, lw: 10 });
@@ -492,7 +492,7 @@
       const rowIn = E.out3(clamp(age / .12));
       // probability bar (halftone CLAY)
       X.save(); X.globalAlpha = rowIn;
-      rr(X, DD.x + 16, ry - rh / 2, Math.max(14, (DD.w - 32) * v / .56 * rowIn), rh, 12); X.fillStyle = halftone(X, C.CLAY, .42, 9, 45); X.fill();
+      rr(X, DD.x + 16, ry - rh / 2, Math.max(14, (DD.w - 220) * v / .52 * rowIn), rh, 12); X.fillStyle = halftone(X, C.CLAY, .42, 9, 45); X.fill();
       // hover as the die passes, selection when it lands
       let hl = 0;
       DIE_C.forEach((c, i) => { if (i === k) hl = Math.max(hl, i === 2 ? (t >= c - F1 ? 1 : 0) : clamp(1 - (t - c) / .2) * (t >= c - F1 ? 1 : 0)); });
@@ -534,7 +534,7 @@
       x = lerp(A0[0], A1[0], sgi === 0 ? E.out2(k) : k); y = lerp(A0[1], A1[1], k) - hgt * 4 * k * (1 - k);
       rot = spin * (1 - k);
       const toks = ['the', 'yes', 'a', 'God', 'with', 'I', 'hi', 'so'];
-      face = sgi === 3 || k > .82 ? ['with', 'God', 'hi', 'hi'][sgi] : toks[Math.floor(t * 30 / 3 + sgi * 3) % toks.length];
+      face = sgi === 3 || k > .82 ? ['with', 'God', 'hi', 'hi'][sgi] : (sgi > 0 && t - s0 < .14) ? ['with', 'God', 'hi'][sgi - 1] : toks[Math.floor(t * 30 / 3 + sgi * 3) % toks.length];
       if (sgi > 0) sq = wig(t - s0, .2, 34, 12);
     }
     const S = 108 * (1 - E.inBack(close, 2));
@@ -683,8 +683,7 @@
       row.forEach(w => {
         const str = (w.d || w.w).toLowerCase();
         const on = t >= w.s - .05;
-        const isBye = /bye/.test(str);
-        const ghost = isBye && !on && t >= w.s - .94;
+        const ghost = !on && t >= w.s - 2 * BT;   // grey autocomplete runs half a bar ahead of the vocal
         if (on || ghost) {
           const k = on ? E.out3(clamp((t - w.s + .05) / .12)) : 1;
           X.globalAlpha = out * (ghost ? .45 : k);
@@ -745,6 +744,23 @@
   }
 
   // ------------------------------------------------------------------ S07: life at 16×, the tablet
+  // bar 9 at 16×: a halftone glow behind the living shape and an onion-skin of the shape it just was
+  function drawEvolution(X, t, S) {
+    if (!S || t < TB(9) - .15 || t >= TB(10) - F1) return;
+    X.save();
+    X.beginPath(); X.arc(S.x, S.y, S.s * 1.55, 0, TAU); X.fillStyle = halftone(X, C.CLAY, .1, 14, 45); X.fill();
+    X.beginPath(); X.arc(S.x, S.y, S.s * 1.2, 0, TAU); X.fillStyle = halftone(X, C.CLAY, .17, 14, 45); X.fill();
+    const K = keys(), i = K.indexOf(S.key);
+    for (let back = 1; back <= 2; back++) {
+      const prev = K[i - back]; if (!prev || prev.t < TB(8, 4) - .1) continue;
+      const age = t - S.key.t, a = (back === 1 ? .5 : .25) * (1 - clamp(age / (BT * 1.6)));
+      if (a <= 0) continue;
+      const P = evalKey(prev, S.key.t), grow = 1 + .12 * back + .25 * E.out2(clamp(age / BT));
+      const pts = P.pts.map(p => [S.x + (p[0] - P.x) * grow, S.y + (p[1] - P.y) * grow]);
+      strokePath(X, pts); X.strokeStyle = C.CLAY; X.lineWidth = 6; X.globalAlpha = a * 1.2; X.setLineDash([2, 13]); X.lineCap = 'round'; X.stroke(); X.setLineDash([]);
+    }
+    X.restore();
+  }
   function drawInsides(X, t, S) {
     // contents that ride inside the stroke's current shape
     if (!S) return;
@@ -753,17 +769,17 @@
     if (n === 'cell' && S.morph >= 1) {
       const p = E.io2(seg(t, TB(9), TB(9) + .36));
       strokePath(X, S.pts); X.fillStyle = halftone(X, C.CLAY, .2, 14, 45); X.fill();
-      for (const sd of [-1, 1]) { X.beginPath(); X.arc(S.x + sd * p * 115, S.y, 44 * (1 - .15 * p), 0, TAU); X.fillStyle = halftone(X, C.SPARK, .6, 10, 45); X.fill(); X.lineWidth = 5; X.strokeStyle = C.SPARK; X.stroke(); }
+      for (const sd of [-1, 1]) { X.beginPath(); X.arc(S.x + sd * p * 140, S.y, 54 * (1 - .15 * p), 0, TAU); X.fillStyle = halftone(X, C.SPARK, .6, 10, 45); X.fill(); X.lineWidth = 5; X.strokeStyle = C.SPARK; X.stroke(); }
     } else if (n === 'neuron' && S.morph >= 1) {
       strokePath(X, S.pts); X.fillStyle = halftone(X, C.CLAY, .2, 14, 45); X.fill();
       X.beginPath(); X.arc(S.x, S.y, 36, 0, TAU); X.fillStyle = C.SPARK; X.fill();
       // a signal fires down the axon on the 8th
       const k = frac(age / (BT / 2));
-      const ang = 75 * Math.PI / 180, d = lerp(60, 330, k);
+      const ang = 75 * Math.PI / 180, d = lerp(70, 400, k);
       X.beginPath(); X.arc(S.x + Math.cos(ang) * d, S.y + Math.sin(ang) * d, 12, 0, TAU); X.fillStyle = C.PAPER; X.fill();
     } else if (n === 'bubble' && S.morph >= 1) {
       strokePath(X, S.pts); X.fillStyle = halftone(X, C.CLAY, .2, 14, 45); X.fill();
-      for (let i = 0; i < 3; i++) { const b = Math.max(0, Math.sin((beatPos(t) * 2 - i * .25) * Math.PI)); X.beginPath(); X.arc(S.x - 70 + i * 70, S.y - 4 - b * 16, 20, 0, TAU); X.fillStyle = C.PAPER; X.fill(); }
+      for (let i = 0; i < 3; i++) { const b = Math.max(0, Math.sin((beatPos(t) * 2 - i * .25) * Math.PI)); X.beginPath(); X.arc(S.x - 86 + i * 86, S.y - 4 - b * 20, 24, 0, TAU); X.fillStyle = C.PAPER; X.fill(); }
     } else if (n === 'lump') {
       strokePath(X, S.pts); X.fillStyle = halftone(X, C.CLAY, .55, 12, 45); X.fill();
       X.strokeStyle = C.CLAY_DARK; X.lineWidth = 4;
@@ -836,6 +852,20 @@
       X.restore();
     }
     X.restore();
+    X.restore();
+    // pause-bait
+    const pb = win(t, TB(10, 2), TB(11) - .2, .2, .1);
+    if (pb > 0) {
+      tx(X, '29,086 measures of barley · 37 months · signed: Kushim (c. 3100 BCE)', 120, 846, mono(28, 400), C.INK, 'left', pb * .8);
+      tx(X, "probably for beer: history's first known name is on a bar tab", 120, 882, mono(28, 400), C.INK, 'left', pb * .8);
+    }
+  }
+
+  function drawOdometer(X, t, S) {
+    if (t < TB(10) - F1 || t >= TB(11) - F1 || !S || (S.name !== 'tablet')) return;
+    const k = S.s / 500, x0 = 140, y0 = 242.5, w = 1000;
+    const fade = S.to === 'block' ? 1 - E.in2(S.morph) : 1;
+    X.save();
     // the odometer rolls to 29,086 (rides the tablet's top edge)
     const ok = popK(t - TB(10) - .05, .2, 2) * fade;
     if (ok > 0) {
@@ -857,12 +887,6 @@
       X.restore();
     }
     X.restore();
-    // pause-bait
-    const pb = win(t, TB(10, 2), TB(11) - .2, .2, .1);
-    if (pb > 0) {
-      tx(X, '29,086 measures of barley · 37 months · signed: Kushim (c. 3100 BCE)', 150, 846, mono(28, 400), C.INK, 'left', pb * .8);
-      tx(X, "probably for beer: history's first known name is on a bar tab", 150, 882, mono(28, 400), C.INK, 'left', pb * .8);
-    }
   }
 
   // ------------------------------------------------------------------ S08: press, 1969, feed, tab; the card
@@ -1000,7 +1024,7 @@
     // inside: a glyph galaxy (frame 0's universe) on an INK window under the label
     const s = S.s, x0 = S.x - s * 1.08, y0 = S.y - s * .5;
     X.save(); strokePath(X, S.pts); X.clip();
-    const gal = E.out3(seg(t, TB(12) - .1, TB(12) + .3));
+    const gal = E.out3(seg(t, TB(11, 4) + .06, TB(11, 4) + .4));
     if (gal > 0) {
       rr(X, S.x - s * 1.0, S.y - s * .1, s * 2.0, s * .64, 18); X.fillStyle = C.INK; X.fill();
       X.save(); rr(X, S.x - s * 1.0, S.y - s * .1, s * 2.0, s * .64, 18); X.clip();
@@ -1281,11 +1305,12 @@
     // stroke + its insides
     if (S && t >= a.bang) {
       if (S.name === 'tablet' || (S.name === 'lump' && S.to === 'tablet' && paper)) PR('drawTablet', () => drawTablet(X, t, S));
-      else PR('drawInsides', () => drawInsides(X, t, S));
+      else { drawEvolution(X, t, S); PR('drawInsides', () => drawInsides(X, t, S)); }
       PR('drawPress', () => drawPress(X, t, S)); PR('drawTeletype', () => drawTeletype(X, t, S)); PR('drawFeed', () => drawFeed(X, t, S)); PR('drawTabFace', () => drawTabFace(X, t, S));
       const onP = paper;
       PR('drawStroke', () => drawStroke(X, S, { lw: S.lw, under: onP ? C.CLAY_DARK : C.SPARK, ink: onP }));
     }
+    drawOdometer(X, t, S);
     PR('drawNucleus', () => drawNucleus(X, t));
     PR('drawBye', () => drawBye(X, t));
     PR('drawStarChart', () => drawStarChart(X, t));
