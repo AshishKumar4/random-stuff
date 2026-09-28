@@ -62,7 +62,8 @@
     const w1 = findWord('wrong', T13 - .3, T13 + .22, T13);
     const w2 = findWord('wrong', w1.s + .15, bt(13, 2) + .25, bt(13, 2));
     const w3 = findWord('wrong', w2.s + .15, bt(13, 3) + .25, bt(13, 3));
-    return [w1, w2, w3];
+    // the first stamp is already mid-slam on the cut frame (22.467): it starts no later than 1 frame before the cut
+    return [{ ...w1, hit: Math.min(w1.s - 2 * F, T13 - 2 * F) }, w2, w3];
   }
   function lessWrong(w3) {
     const a = findWord('a', w3.s + .1, T14 + .3, bt(13, 4));
@@ -71,13 +72,16 @@
     const wr = findWord('wrong', le.s + .05, bt(14, 4) + .2, T14);
     return [a, li, le, wr];
   }
-  const slamAt = w => w.s - 2 * F;               // HERO slams 2 frames before the syllable
-  const impactAt = w => w.s - 2 * F + .12;       // scale reaches 1 (hero() SLAM curve)
+  const slamAt = w => w.hit ?? w.s - 2 * F;      // HERO slams 2 frames before the syllable
+  const impactAt = w => slamAt(w) + .12;         // scale reaches 1 (hero() SLAM curve)
   // karaoke words: the sung line in bar 15 (composed on eighths: that's how I learned to sing a-|long, "long" on bar 16
   // b1). A provisional timeline that spreads the line deep into bar 16 is squeezed back so "along" starts by bar 15 b4.5.
   function karaokeWords() {
     const L = findLine("That's how", T14, T15 + 1.2);
     let ws = L && L.words && L.words.length ? L.words.map(w => ({ d: w.d || w.w, s: w.s, e: w.e })) : null;
+    // on-screen spellings come from the line's display text (the sung syllables may be lowercase: "i" → "I")
+    const disp = L ? String(L.display || L.text || '').split(/\s+/).filter(Boolean) : [];
+    if (ws && disp.length === ws.length) ws.forEach((w, i) => { w.d = disp[i].replace(/[.,!?]+$/, ''); });
     if (!ws) ws = ["that's", 'how', 'I', 'learned', 'to', 'sing', 'along'].map((d, i) => ({ d, s: T15 + (i + 1) * BEAT / 2, e: T15 + (i + 2) * BEAT / 2 - .03 }));
     const lastMax = T16 - BEAT / 2 + .06, last = ws[ws.length - 1];
     if (last.s > lastMax) { const a = ws[0].s, k = (T16 - BEAT / 2 - a) / (last.s - a); ws = ws.map(w => ({ d: w.d, s: a + (w.s - a) * k, e: a + (w.e - a) * k })); }
@@ -259,19 +263,25 @@
     X.beginPath(); X.ellipse(f.x, f.top + 3, f.rx - 14, f.ry - 10, 0, 0, TAU); X.fillStyle = C.INK; X.fill();
     X.restore();
   }
-  // the river of the internet: arcs in along the top of the pulled-back frame and into the funnel's mouth
-  function river(X, t, f, a) {
+  // the pour: the internet (pages, posts, code, token pills) falls from above the frame in a column that narrows into
+  // the funnel's mouth and drops INTO it (clipped at the rim). The column hangs off the funnel with a height lag, so it
+  // sways after it instead of sliding rigidly.
+  function river(X, t, ws, f, V, a) {
     if (a <= 0) return;
-    const P0 = [(-160 - O1[0]) / S1, (330 - O1[1]) / S1], Pc = [(820 - O1[0]) / S1, (-10 - O1[1]) / S1], P2 = [f.x - 30, f.top - 10];
+    const yTop = (-150 - V.oy) / V.s;
+    X.save(); X.beginPath(); X.rect(-2000, yTop - 400, 8000, f.top - yTop + 400); X.clip();
     for (let i = 0; i < 18; i++) {
-      const per = 2.3 + hash(i * 7) * .6, ph = frac((t - T13) / per + hash(i * 3));
-      const u = ph, sp = (hash(i * 11) - .5) * 150 * (1 - u) * (1 - u);
-      const x = (1 - u) * (1 - u) * P0[0] + 2 * (1 - u) * u * Pc[0] + u * u * P2[0], y = (1 - u) * (1 - u) * P0[1] + 2 * (1 - u) * u * Pc[1] + u * u * P2[1] + sp;
-      if (u > .97) continue;
-      X.save(); X.globalAlpha *= a * clamp(u * 8) * clamp((1 - u) * 14);
-      feedItem(X, i, x, y, (hash(i * 5) - .5) * 1.1 + Math.sin(t * 2.2 + i) * .25 * (1 - u), lerp(2.1, 1, u * u), t);
+      const per = 1.25 + hash(i * 7) * .3, ph = frac((t - T13) / per + i / 18 + hash(i * 3) * .04);
+      const k = .3 * ph + .7 * ph * ph;                                   // gravity
+      const lagX = funnelAt(t - (1 - ph) * .45, ws).x;
+      const side = (hash(i * 11) - .5) * 2, sp = side * lerp(f.rx * 1.3, f.rx * .35, k);
+      const x = lerp(lagX, f.x, k) + sp, y = lerp(yTop, f.top + 34, k);
+      const rot = (hash(i * 5) - .5) * 1.4 + side * ph * 1.1;
+      X.save(); X.globalAlpha *= a * clamp(ph * 12);
+      feedItem(X, i, x, y, rot, lerp(1.95, 1.2, k), t);
       X.restore();
     }
+    X.restore();
   }
   // tokens dripping from the spout onto the cloud (the spout lags the cloud, so the drips curve in)
   function drip(X, t, f, ct, a) {
@@ -279,7 +289,7 @@
     for (let i = 0; i < 6; i++) {
       const ph = frac((t - T13) / .5 + i / 6), k = E.in2(ph);
       const y = lerp(f.spout, ct[1] + 10, k), x = lerp(f.x, ct[0], k) + Math.sin(i * 2.1 + ph * 3) * 10;
-      pill(X, x, y, TOKS[(i * 7 + Math.floor((t - T13) / .5)) % TOKS.length], .95, C.AMBER, a * (1 - ph * ph * ph));
+      pill(X, x, y, TOKS[((i * 7 + Math.floor((t - T13) / .5)) % TOKS.length + TOKS.length) % TOKS.length], .95, C.AMBER, a * (1 - ph * ph * ph));   // (t < T13 on the cut frame)
     }
   }
 
@@ -417,11 +427,11 @@
     const f = funnelAt(t, ws), ct = cloudTopWorld(t, ws);
     const kr = E.io2(seg(t, T14, T14 + .5));                 // the river and the funnel's body come in with the pull-back
     axes(X, t, V, a);
-    river(X, t, f, a * kr);
     stamps(X, t, V, ws, a);
     curve(X, t, V, ws, a);
     drip(X, t, f, ct, a);
     funnel(X, t, f, a);
+    river(X, t, ws, f, V, a * kr);
     book(X, t, f, a);
     return f;
   }
@@ -446,9 +456,11 @@
     X.save(); floor(kl); puffPath(X, circ, kl); X.fillStyle = C.PAPER; X.fill(); X.restore();
     X.save(); floor(0); puffPath(X, circ, 0); X.clip();
     X.fillStyle = BODY; X.fillRect(-w * .8, -w * 1.1, w * 1.6, w * 1.12);
+    // flat riso two-tone: a pale AMBER tint crescent on each puff (lit from top-left), under the prose so it stays legible
+    X.fillStyle = mix(C.AMBER, C.PAPER, .42); for (const [px, py, pr] of circ) { X.beginPath(); X.arc(px - pr * .3, py - pr * .34, pr * .5, 0, TAU); X.fill(); }
+    X.fillStyle = BODY; for (const [px, py, pr] of circ) { X.beginPath(); X.arc(px - pr * .12, py - pr * .1, pr * .56, 0, TAU); X.fill(); }
     X.fillStyle = halftone(X, mix(C.AMBER, C.INK, .35), .5, 8, 45); X.beginPath(); X.rect(-w * .8, -w * .2, w * 1.6, w * .22); X.fill();   // riso shade on the belly
-    X.globalAlpha *= .58; textRows(X, -w * .7, -w * .8, w * 1.4, w * .82, t, tiles().ink, w / 330, 3); X.globalAlpha /= .58;
-    X.fillStyle = halftone(X, C.PAPER, .34, 9, 45); for (const [px, py, pr] of circ) { X.beginPath(); X.arc(px - pr * .34, py - pr * .38, pr * .42, 0, TAU); X.fill(); }   // riso highlight, lit from top-left
+    X.globalAlpha *= .8; textRows(X, -w * .7, -w * .8, w * 1.4, w * .82, t, tiles().ink, w / 290, 3); X.globalAlpha /= .8;
     X.restore();
     // face: cursor-pupil eyes (the tab's eyes from S08) and a singing mouth, on a clean AMBER patch so it reads
     const g = cs.gaze || [0, 0], fx = g[0] * .025 * w, fy = -.25 * w;
@@ -486,7 +498,7 @@
     const L = LAY, st = L.st;
     const on = (i, dx) => [st[i].x + dx, st[i].top - 1];
     const P = [on(0, 842), on(1, 557), on(2, 352), on(3, st[3].w * .5), on(4, st[4].w * .5), on(5, st[5].w * .5)];
-    const xEnd = L.tail.x0 - 40, Pend = [xEnd, tailY(L, xEnd) - L.st[L.st.length - 1].gap];
+    const xEnd = L.tail.x0 - 150, Pend = [xEnd, tailY(L, xEnd) - L.st[L.st.length - 1].gap];
     const legs = [
       { a: 0, b: 1, t0: slamAt(ws[1]), t1: bt(13, 2.5), h: 110, spin: TAU },
       { a: 1, b: 2, t0: slamAt(ws[2]), t1: bt(13, 3.5), h: 90, spin: TAU },
@@ -533,6 +545,22 @@
   }
 
   // ------------------------------------------------------------------ screen-space furniture
+  // the bottom bar (§7.10): the video's own seekbar, continuous across both cuts. Until the pop it continues verse1's
+  // log fill and chapter ticks (the pretraining tick, 22.5, is now current); it leaves while the karaoke bar becomes the
+  // frame-filling loading bar (bar 16 b1) and comes back at the pop (29.06) emptied and restarted as context, with
+  // chorus1_brand's ticks and fill, so both cuts match their neighbours exactly.
+  const TICKS_V1 = [10.3, 11.25, 15.0, 22.5, 52.5, 60, 67.5, 71.25, 75, 112.5, 135].map(s => s / 144);
+  const TICKS_CH = [10.3, 11.25, 15.0, 22.5, 52.5, 56.25, 67.5, 69.84, 71.72, 112.5, 120.0].map(s => s / 144);
+  const POP = 29.06;
+  function seekbar(X, t, a = 1) {
+    if (a <= 0) return;
+    let fill, ticks;
+    if (t < POP) {
+      const hi = wordOnset('hi', 9.9, 10.9, 10.28);
+      fill = .05 * Math.log(1 + (t - hi) * 4) / Math.log(1 + (28.13 - 10.3) * 4); ticks = TICKS_V1;
+    } else { fill = lerp(.01, .51, (t - POP) / (75 - POP)); ticks = TICKS_CH; }
+    X.save(); X.globalAlpha *= a; contextBar(X, fill, { ticks, cur: 3 }); X.restore();
+  }
   function chyron(X, t, a = 1) {
     if (a <= 0) return;
     X.save(); X.globalAlpha *= a;
@@ -550,7 +578,8 @@
     let s = ''; for (const [p, t0] of parts) if (t >= t0) s += p;
     if (!s) return;
     if (t >= bt(14, 2.5)) { const n = Math.round(lerp(65536, 1048576, E.out3(seg(t, bt(14, 2.5), bt(14, 3.5))))); s += ' · step ' + n.toLocaleString('en-US'); }
-    X.save(); X.globalAlpha *= .8; drawRich(X, s, 1824, 80, mono(28, 500), C.PAPER, { align: 'right' }); X.restore();
+    // under the chyron (top-left HUD block); the top-right belongs to the pour and the funnel
+    X.save(); X.globalAlpha *= .8; drawRich(X, s, 98, 128, mono(28, 500), C.PAPER, { align: 'left' }); X.restore();
   }
   function axisLabels(X, t, V) {
     if (V.kp <= .05) return;
@@ -563,15 +592,19 @@
   // FOCAL carried over from S08 (same plate and geometry as verse1's, badge in AMBER: no CLAY type beside the AMBER
   // cloud), held to bar 14 b1; then the LYRIC `a little less wrong` (mono 96, typed on as sung)
   function captions(X, t, lw, kIn) {
-    const out = seg(t, T14 - 3 * F, T14);
+    // it drops out over 3 frames and is gone the frame the lyric starts typing (never two lines on the subtitle row)
+    const out = seg(t, T14 - 4 * F, T14 - F);
     if (out < 1) {
       const f = mono(72, 500), full = '▶ 1× · don\'t remember this part either';
-      X.save(); X.globalAlpha *= 1 - out; X.translate(0, 18 * E.in2(out));
+      X.save(); X.globalAlpha *= 1 - E.in2(out); X.translate(0, 26 * E.in2(out));
       const w = richWidth(X, full, f), x0 = 960 - w / 2;
       rr(X, x0 - 30, 950 - 70, w + 60, 96, 20); X.fillStyle = rgba(C.INK, .92); X.fill();
-      drawRich(X, '▶ 1×', x0, 950, f, C.AMBER);
+      // identical to verse1's caption across the cut: its badge cools CLAY → PAPER by 22.58 (no CLAY type once the
+      // AMBER cloud has the frame), same source line
+      const age = t - (bt(12, 4) - F);
+      drawRich(X, '▶ 1×', x0, 950, f, mix(C.CLAY, C.PAPER, E.io2(seg(age, .3, .55))));
       drawRich(X, full.slice(4), x0 + richWidth(X, '▶ 1×', f), 950, f, C.PAPER);
-      X.font = mono(28, 400); X.fillStyle = C.UI_GREY; X.textAlign = 'center'; X.fillText('(source: my system card)', 960, 1004);
+      X.globalAlpha *= .62; X.font = mono(28, 500); X.fillStyle = C.PAPER; X.textAlign = 'center'; X.textBaseline = 'alphabetic'; X.fillText('(source: my system card)', 960, 1002);
       X.restore();
     }
     if (t < T14 - F) return;
@@ -615,7 +648,9 @@
     }
     X.restore();
   }
-  const checkAnchor = tr => [tr.Pend[0] - 640, tr.Pend[1] - 330];
+  // over the flat tail, up and right of where the cloud comes to rest (never under its hops or its roll), clear of the
+  // funnel: lands at screen (1690, 620) in the pulled-back view
+  const checkAnchor = () => [(1690 - O1[0]) / S1, (620 - O1[1]) / S1];
   // one frame of negative on each WRONG impact (INK↔PAPER)
   function flash(X, t, V, ws) {
     for (let i = 0; i < 3; i++) {
@@ -650,7 +685,14 @@
     const lands = ws.map((w, i) => ({ t: w.s - BEAT / 2, x: K.pos[i].c }));
     lands.push({ t: Math.max(T16, lands[lands.length - 1].t + .2), x: KAR.x1 - 80 });
     const yRest = KAR.y0 - 22;
-    if (t < lands[0].t) { const k = seg(t, tIn + 4 * F, lands[0].t); return { nx: lands[0].x, x: lands[0].x - 90 * (1 - k), y: lerp(560, yRest, E.in2(k)), sq: 0, on: k > 0 }; }
+    if (t < lands[0].t) {   // pops up out of the capsule's left end (anticipation squash), then one hop onto the first word
+      const tp = tIn + 4 * F, x0 = KAR.x0 + KAR.r, th = Math.max(tp + 3 * F, lands[0].t - .3);
+      if (t < tp) return { on: false };
+      const pop = E.back(seg(t, tp, tp + 4 * F), 2.4);
+      if (t < th) { const pre = seg(t, th - 3 * F, th); return { nx: lands[0].x, x: x0, y: yRest, sq: .7 * pre, sc: pop, on: true }; }
+      const u = seg(t, th, lands[0].t);
+      return { nx: lands[0].x, x: lerp(x0, lands[0].x, u), y: yRest - 90 * 4 * u * (1 - u), sq: Math.exp(-(t - th) * 30) * .6, sc: pop, on: true };
+    }
     let i = 0; while (i < lands.length - 1 && t >= lands[i + 1].t) i++;
     const a = lands[i], b = lands[i + 1];
     if (!b) { const ph = frac((t - a.t) / (BEAT / 2)); return { nx: a.x, x: a.x, y: yRest - 60 * 4 * ph * (1 - ph), sq: Math.exp(-ph * 14), on: true }; }
@@ -659,8 +701,9 @@
   }
   function drawBall(X, B) {
     if (!B.on) return;
-    const r = 22, sy = 1 - .3 * B.sq, sx = 1 + .3 * B.sq;
-    X.save(); X.translate(B.x, B.y + r * (1 - sy)); X.scale(sx, sy);
+    const r = 22, sy = 1 - .3 * B.sq, sx = 1 + .3 * B.sq, sc = B.sc ?? 1;
+    if (sc <= .01) return;
+    X.save(); X.translate(B.x, B.y + r * (1 - sy)); X.scale(sx * sc, sy * sc);
     X.beginPath(); X.arc(0, 0, r + 4, 0, TAU); X.fillStyle = C.PAPER; X.fill();
     X.beginPath(); X.arc(0, 0, r, 0, TAU); X.fillStyle = C.CLAY; X.fill(); X.lineWidth = 4; X.strokeStyle = C.INK; X.stroke();
     X.fillStyle = rgba(C.PAPER, .9); X.beginPath(); X.arc(-6, -7, 5, 0, TAU); X.fill();
@@ -751,20 +794,26 @@
       const r0 = neg ? by0 + split : by0, r1 = neg ? by1 : by0 + split;
       if (r1 <= r0) continue;
       T.save(); T.setTransform(1, 0, 0, 1, 0, 0);
-      T.beginPath(); T.rect(bx0, r0, bw, r1 - r0); T.moveTo(hp.x + hr, hp.y); T.arc(hp.x, hp.y, hr, 0, TAU, true); T.clip('evenodd');
-      T.globalCompositeOperation = 'source-atop'; T.globalAlpha = neg ? .9 : .6;
+      T.beginPath(); T.rect(bx0, r0, bw, r1 - r0); T.clip();
+      // the face hole is its own clip: in one evenodd path, a face outside this band's rect would flip to "inside"
+      T.beginPath(); T.rect(0, 0, T.canvas.width, T.canvas.height); T.moveTo(hp.x + hr, hp.y); T.arc(hp.x, hp.y, hr, 0, TAU, true); T.clip('evenodd');
+      T.globalCompositeOperation = 'source-atop'; T.globalAlpha = neg ? .9 : .72;
       T.setTransform(m); textRows(T, x - 3.6 * R, y - 9.6 * R, 7.2 * R, 10.2 * R, t, neg ? tiles().amber : tiles().ink, R / 66, 5);
       T.restore();
     }
     // die-cut PAPER keyline, then the print
     const K = layer('p1_K'); K.save(); K.setTransform(1, 0, 0, 1, 0, 0);
     K.drawImage(layerCanvas('p1_T'), bx0, by0, bw, bh, bx0, by0, bw, bh); K.globalCompositeOperation = 'source-in'; K.fillStyle = C.PAPER; K.fillRect(bx0, by0, bw, bh); K.restore();
-    const kr = Math.max(3, .045 * R * zoom / sc) * sc;
-    Fr.save(); Fr.setTransform(1, 0, 0, 1, 0, 0); Fr.globalAlpha *= o.alpha ?? 1;
+    const kr = Math.max(3, .045 * R * zoom / sc) * sc, al = o.alpha ?? 1;
     const kc = layerCanvas('p1_K');
-    for (let i = 0; i < 12; i++) { const a = i / 12 * TAU; Fr.drawImage(kc, bx0, by0, bw, bh, bx0 + Math.cos(a) * kr, by0 + Math.sin(a) * kr, bw, bh); }
-    Fr.drawImage(layerCanvas('p1_T'), bx0, by0, bw, bh, bx0, by0, bw, bh);
-    Fr.restore();
+    // keyline + print composed at full opacity first, then faded as one piece (12 stacked keyline copies at partial
+    // alpha would read as a grey ghost)
+    const Cc = al < 1 ? layer('p1_C') : Fr;
+    Cc.save(); Cc.setTransform(1, 0, 0, 1, 0, 0);
+    for (let i = 0; i < 12; i++) { const a = i / 12 * TAU; Cc.drawImage(kc, bx0, by0, bw, bh, bx0 + Math.cos(a) * kr, by0 + Math.sin(a) * kr, bw, bh); }
+    Cc.drawImage(layerCanvas('p1_T'), bx0, by0, bw, bh, bx0, by0, bw, bh);
+    Cc.restore();
+    if (al < 1 && al > 0) { const pad = Math.ceil(kr) + 2; Fr.save(); Fr.setTransform(1, 0, 0, 1, 0, 0); Fr.globalAlpha *= al; Fr.drawImage(layerCanvas('p1_C'), bx0 - pad, by0 - pad, bw + 2 * pad, bh + 2 * pad, bx0 - pad, by0 - pad, bw + 2 * pad, bh + 2 * pad); Fr.restore(); }
     return { pts };
   }
 
@@ -795,6 +844,7 @@
     const kIn = kIn0(lw);
     captions(X, t, lw, kIn);
     if (t >= kIn) { const kw = karaokeWords(), K = karaoke(X, t, kw, kIn); drawBall(X, ballAt(t, kw, K, kIn)); }
+    seekbar(X, t);
     flash(X, t, V, ws);
   }
   scene('S09_wrong_staircase', T13 - F, T15, (X, t) => viaCPU(X, Fr => paintS09(Fr, t)));
@@ -824,12 +874,25 @@
     X.restore();
     if (t >= t1 - 2 * F) { X.save(); X.globalAlpha *= a * .78 * clamp((t - t1 + 2 * F) / (4 * F)); X.font = mono(28, 500); X.fillStyle = C.PAPER; X.textAlign = 'right'; X.fillText('knowledge cutoff', 1824, 212); X.restore(); }
   }
+  // the karaoke mic (held under the chin, tilted to the mouth): drawn through the rig's hold() so it is printed in the
+  // same AMBER duotone as the body
+  const MIC = (x, R) => {   // the fist grips the handle: only the butt (below) and the grille (above) are drawn
+    x.rotate(.42); x.lineJoin = 'round'; x.lineWidth = Math.max(3, .045 * R); x.strokeStyle = C.INK;
+    x.beginPath(); x.moveTo(-.06 * R, .15 * R); x.lineTo(.06 * R, .15 * R); x.lineTo(.045 * R, .4 * R); x.lineTo(-.045 * R, .4 * R); x.closePath();
+    x.fillStyle = C.BRICK; x.fill(); x.stroke();
+    rr(x, -.085 * R, -.25 * R, .17 * R, .08 * R, .02 * R); x.fillStyle = C.BRICK; x.fill(); x.stroke();
+    x.beginPath(); x.arc(0, -.37 * R, .15 * R, 0, TAU); x.fillStyle = C.PAPER; x.fill(); x.stroke();
+    x.save(); x.clip(); x.lineWidth = Math.max(1.5, .022 * R);
+    for (let i = -2; i <= 2; i++) { x.beginPath(); x.moveTo(i * .06 * R, -.55 * R); x.lineTo(i * .06 * R, -.2 * R); x.stroke(); x.beginPath(); x.moveTo(-.16 * R, -.37 * R + i * .06 * R); x.lineTo(.16 * R, -.37 * R + i * .06 * R); x.stroke(); }
+    x.restore();
+  };
   // sing-along pose (text-body Opus): sway on half notes, bob on beats, the pointing hand already on the next word
   function singPose(t, B, ws, hx, R, soles, z) {
     const b = beatPos(t), bob = Math.abs(Math.sin(b * Math.PI)), sw = Math.sin((b - .15) * Math.PI / 2);
     let mouth = 'rest', wi = -1, wAge = 9;
     ws.forEach((w, i) => { if (t >= w.s - .03) { wi = i; wAge = t - w.s; } });
     for (const w of ws) if (t >= w.s - .03 && t <= w.e) { mouth = visemeFor(w.d, seg(t, w.s, w.e)); break; }
+    mouth = { E: 'A', I: 'grin', U: 'O' }[mouth] || mouth;     // belting: the rig's biggest open shapes read at R 88
     // every sung word lands in the body: a quick dip (squash) with a spring back, the head tipping side to side
     const hit = wi >= 0 && wAge < .4 ? Math.exp(-wAge * 16) * Math.cos(wAge * 30) : 0, side = wi % 2 ? 1 : -1;
     const gx = B && B.on ? clamp((B.x - hx) / 320, -1, 1) : .4;
@@ -839,7 +902,7 @@
     return {
       dx: .06 * sw, dy: .05 * bob, sy: 1 - .045 * hit + (frac(b) < .1 ? -.02 * (1 - frac(b) / .1) : 0),
       head: { tilt: .07 * sw + (wi >= 0 ? side * .07 * (1 - Math.exp(-wAge * 12)) : 0), dx: 0, dy: -.04 * hit },
-      armL: { hand: [-.95 - .12 * sw, 2.9 + .15 * bob], bend: -1 },
+      armL: { hand: [-.32 + .04 * sw, 4.5 + .05 * bob - .06 * hit], bend: -1, front: true, type: 'mitten', hold: MIC },
       armR: { hand: [.62 + Math.cos(ang) * reach, 4.45 - Math.sin(ang) * reach], bend: 1, front: true, type: 'point', fingerAng: ang },
       face: { eyes: 'cursor', gaze: [gx, .9], mouth, lid: blinkAt(t, 21), cursorOn: Math.floor(beatPos(t)) % 2 === 0 },
       crown: { flare: 1 + .06 * pulse(t, 8) },
@@ -870,7 +933,15 @@
       if (furn > 0) { chyron(X, t, furn); calendar(X, t, furn); }
       // halftone spotlight (karaoke stage)
       X.save(); X.globalAlpha = .55 * clamp((t - T15 - .3) / .25) * (1 - clamp(u * 2));
-      X.beginPath(); X.moveTo(860, 0); X.lineTo(1060, 0); X.lineTo(1230, KAR.y0); X.lineTo(690, KAR.y0); X.closePath(); X.fillStyle = halftone(X, C.AMBER, .16, 14, 45); X.fill(); X.restore();
+      X.beginPath(); X.moveTo(860, 0); X.lineTo(1060, 0); X.lineTo(1230, KAR.y0); X.lineTo(690, KAR.y0); X.closePath(); X.fillStyle = halftone(X, C.AMBER, .16, 14, 45); X.fill();
+      // two stage beams from the top corners, crossing onto the singer; they swing on half notes (a sway, not a flicker)
+      X.globalAlpha *= .62;
+      for (const sd of [-1, 1]) {
+        const sway = 46 * Math.sin((beatPos(t) / 2 + (sd > 0 ? .5 : 0)) * Math.PI), top = 960 + sd * 900, foot = 960 - sd * 60 + sway;
+        X.beginPath(); X.moveTo(top - 70, -30); X.lineTo(top + 70, -30); X.lineTo(foot + 250, KAR.y0); X.lineTo(foot - 250, KAR.y0); X.closePath();
+        X.fillStyle = halftone(X, C.AMBER, .09, 14, 45); X.fill();
+      }
+      X.restore();
       X.save();
       if (cV > 0) { X.translate(Pp[0], Pp[1]); X.scale(lerp(1, .012, cH), lerp(1, .018, cV)); X.translate(-Pp[0], -Pp[1]); }
       const kop = { grow: u }, K = karaoke(X, t, kw, tIn, kop);
@@ -881,7 +952,7 @@
       if (t >= T16 - .05) {    // bar 16: the bar keeps going without it. It looks up at the flood, arms rise: whoa
         const k = E.back(seg(t, T16 - .05, T16 + .3), 1.4);
         S.face.gaze = [lerp(S.face.gaze[0], .2, k), lerp(.9, -1, k)]; S.face.eyes = 'normal';
-        S.armL = { hand: [lerp(S.armL.hand[0], -1.45, k), lerp(S.armL.hand[1], 5.4, k)], bend: 1, type: 'spark', front: true };
+        S.armL = { hand: [lerp(S.armL.hand[0], -1.45, k), lerp(S.armL.hand[1], 5.4, k)], bend: 1, type: 'mitten', front: true, hold: MIC };
         S.armR = { hand: [lerp(S.armR.hand[0], 1.45, k), lerp(S.armR.hand[1], 5.4, k)], bend: -1, front: true, type: 'spark' };
         S.face.mouth = 'O'; S.crown = { flare: 1 + .12 * k }; S.dy = .08 * k;
       }
@@ -891,16 +962,16 @@
       X.restore();
       // particle-to-glyph morph: the cloud bursts into glyphs that fly into the silhouette
       if (kMorph < 1 && tb && tb.pts.length) {
-        const pts = tb.pts, n = pts.length;
+        const pts = tb.pts, n = Math.min(pts.length, 460);          // fewer, chunkier glyphs: a burst, not confetti
         const c0 = cloudAtHandoff(), circ = cloudCircles(T15, c0.w);
-        X.save(); X.font = `700 22px ${FONTS.mono}`; X.textAlign = 'center'; X.textBaseline = 'middle';
+        X.save(); X.font = `800 30px ${FONTS.mono}`; X.textAlign = 'center'; X.textBaseline = 'middle';
         const glyphs = 'abcdefghijklmnopqrstuvwxyz.,;:{}()?!';
         X.globalAlpha = 1 - seg(t, T15 + .44, T15 + .56);
         for (let i = 0; i < n; i++) {
           const pc = circ[Math.floor(hash(i * 3 + 1) * circ.length)], an = hash(i * 5 + 2) * TAU, rd = Math.sqrt(hash(i * 7 + 3)) * pc[2];
           const sxp = c0.x + pc[0] + Math.cos(an) * rd, syp = c0.y + pc[1] + Math.sin(an) * rd;
           const d = hash(i * 11 + 4) * .16, k = E.io3(seg(t, T15 + d, T15 + d + .36));
-          const [tx, ty] = pts[(i * 7919) % n];
+          const [tx, ty] = pts[Math.floor(((i * 7919) % n) * pts.length / n)];
           const mx = (sxp + tx) / 2 + (hash(i * 13) - .5) * 90, my = Math.min(syp, ty) - 190 - hash(i * 17) * 70;
           const px_ = (1 - k) * (1 - k) * sxp + 2 * (1 - k) * k * mx + k * k * tx, py_ = (1 - k) * (1 - k) * syp + 2 * (1 - k) * k * my + k * k * ty;
           X.fillStyle = hash(i * 19) < .12 ? C.PAPER : C.AMBER;
@@ -911,6 +982,7 @@
       drawBall(X, B);
       X.restore();
       if (cV > .6) { X.save(); X.fillStyle = C.PAPER; const lw_ = lerp(1840, 14, cH), lh = lerp(20, 10, cH); X.fillRect(Pp[0] - lw_ / 2, Pp[1] - lh / 2, lw_, lh); X.restore(); }
+      seekbar(X, t, 1 - seg(t, T16 - F, T16 + 3 * F));
     } else {
       // b3: the last pixel pops into the first chat bubble; b4: near-blackout, bubble + cursor; it docks for S11
       const a = t - T3;
@@ -936,8 +1008,9 @@
         bubble(X, bx, by, str, { who: 'opus', size: 72, endTurn: true, maxW: 1420 });
         X.restore();
       }
-      // the cursor, where the reply box will be
-      if (t >= T4 && Math.floor((t - T4) / (BEAT / 2)) % 2 === 0) { X.fillStyle = C.CLAY; X.fillRect(122, 926, 12, 50); }
+      // the cursor, exactly where (and in phase with) S11's reply-box caret, so it rides the cut
+      if (t >= T4 && Math.floor(beatPos(t) * 2) % 2 === 0) { X.fillStyle = C.CLAY; X.fillRect(132, 922, 10, 54); }
+      seekbar(X, t, clamp((t - POP) / (3 * F)));
     }
   }
   scene('S10_sing_along', T15, T17, (X, t) => viaCPU(X, Fr => paintS10(Fr, t)));
