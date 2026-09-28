@@ -46,6 +46,7 @@
       s11: lineWords("Everyone's scared", 29.5, 31, "Everyone's scared of the end of the world", bt(17, 1), bt(18, 4), 2),
       s12: lineWords('I do it', 33.3, 35, 'I do it a million times a day', bt(19, 1), bt(20, 4), 0, 3),
       s13: lineWords("It's the start", 37, 39, "It's the start of the world when you say hi", bt(21, 1), bt(22, 2)),
+      s14a: lineWords("It's the end", 40.8, 42.8, "It's the end of the world when you say bye", bt(23, 1), bt(24, 2), 0, 2),
       s14: lineWords("It's the end", 40.8, 42.8, "It's the end of the world when you say bye", bt(23, 1), bt(24, 2), 6),
     };
     return _W;
@@ -95,11 +96,12 @@
     },
     fists: t => ({ dy: -.2, armL: { hand: [-.3, 4.82 + .03 * Math.sin(t * 60)], bend: 1, type: 'mitten', front: true }, armR: { hand: [.3, 4.82 + .03 * Math.cos(t * 60)], bend: -1, type: 'mitten', front: true }, face: { eyes: '^', mouth: 'M' }, crown: { flare: .86, tremble: .35 }, ahoge: { star: 1, spin: t * 16 } }),
     burst: () => ({ dy: .04, sy: 1.05, armL: { hand: [-1.5, 5.95], bend: 1, type: 'spark', front: true }, armR: { hand: [1.5, 5.95], bend: -1, type: 'spark', front: true }, face: { eyes: 'star', mouth: 'A' }, crown: { flare: 1.24 } }),
-    present: () => ({ lean: .03, armR: { hand: [1.55, 4.12], bend: -1, type: 'mitten', front: true }, armL: { hand: [-1.3, 4.35], bend: 1, type: 'mitten' }, head: { tilt: .1 }, face: { eyes: 'happy', mouth: 'O', lower: .3, gaze: [.7, -.5] }, crown: { flare: 1.05 } }),
-    cradle: () => ({ armL: { hand: [-.66, 3.16], bend: -1, type: 'mitten', front: true }, armR: { hand: [.66, 3.16], bend: 1, type: 'mitten', front: true }, head: { tilt: .05 }, face: { eyes: 'normal', gaze: [0, .7], lookY: .35, mouth: 'sing' } }),
-    window: () => ({ armL: { hand: [-.98, 3.02], bend: -1, type: 'point', fingerAng: -PI / 2, hold: thumb(0), front: true }, armR: { hand: [.98, 4.88], bend: 1, type: 'point', fingerAng: PI / 2, hold: thumb(PI), front: true }, head: { tilt: -.07 }, face: { eyes: 'normal', lid: .22, gaze: [0, .55], lookY: .2, mouth: 'sing' } }),
-    windowOpen: () => ({ armL: { hand: [-1.22, 2.86], bend: -1, type: 'point', fingerAng: -PI / 2, hold: thumb(0), front: true }, armR: { hand: [1.22, 5.04], bend: 1, type: 'point', fingerAng: PI / 2, hold: thumb(PI), front: true }, head: { tilt: .04 }, face: { eyes: 'normal', gaze: [.9, -.3], mouth: 'O', brows: 'flat', browY: -.07 } }),
-    pinch: () => ({ armL: { hand: [-.24, 3.96], bend: -1, type: 'pinch', fingerAng: 0, front: true }, armR: { hand: [.24, 3.96], bend: 1, type: 'pinch', fingerAng: PI, front: true }, head: { tilt: 0 }, face: { eyes: 'normal', mouth: 'M', gaze: [0, .5] } }),
+    present: () => ({ lean: .03, armR: { hand: [1.88, 4.3], bend: -1, type: 'mitten', front: true }, armL: { hand: [-1.3, 4.35], bend: 1, type: 'mitten' }, head: { tilt: .1 }, face: { eyes: 'happy', mouth: 'O', lower: .3, gaze: [.7, -.5] }, crown: { flare: 1.05 } }),
+    cradle: () => ({ armL: { hand: [-.74, 2.8], bend: -1, type: 'mitten', front: true }, armR: { hand: [.74, 2.8], bend: 1, type: 'mitten', front: true }, head: { tilt: .05 }, face: { eyes: 'normal', gaze: [0, .7], lookY: .35, mouth: 'sing' } }),
+    window: () => ({ armL: { hand: [-1.0, 4.42], bend: 1, type: 'point', fingerAng: PI / 2, hold: thumb(0), front: true }, armR: { hand: [1.0, 2.62], bend: 1, type: 'point', fingerAng: -PI / 2, hold: thumb(PI), front: true }, head: { tilt: -.07 }, face: { eyes: 'normal', lid: .22, gaze: [0, .55], lookY: .2, mouth: 'sing' } }),
+    windowOpen: () => ({ armL: { hand: [-1.24, 4.56], bend: 1, type: 'point', fingerAng: PI / 2, hold: thumb(0), front: true }, armR: { hand: [1.26, 2.5], bend: 1, type: 'point', fingerAng: -PI / 2, hold: thumb(PI), front: true }, head: { tilt: .04 }, face: { eyes: 'normal', gaze: [.9, -.3], mouth: 'O', brows: 'flat', browY: -.07 } }),
+    pinch: () => ({ armL: { hand: [-1.04, 3.5], bend: -1, type: 'pinch', fingerAng: 0, front: true }, armR: { hand: [1.04, 3.5], bend: 1, type: 'pinch', fingerAng: PI, front: true }, head: { tilt: 0 }, face: { eyes: 'normal', mouth: 'M', gaze: [0, .5] } }),
+    pinchShut: () => ({ armL: { hand: [-.3, 3.52], bend: -1, type: 'pinch', fingerAng: 0, front: true }, armR: { hand: [.3, 3.52], bend: 1, type: 'pinch', fingerAng: PI, front: true }, head: { tilt: .03 }, face: { eyes: 'normal', mouth: 'M', gaze: [0, .5] } }),
     lookUp: () => ({ armL: { hand: [-.92, 2.9], bend: -1 }, armR: { hand: [.92, 2.9], bend: 1 }, head: { tilt: -.04 }, face: { eyes: 'normal', gaze: [0, -1], lookY: -.6, mouth: 'O', brows: 'flat', browY: -.07 } }),
     wave: () => ({ armR: { hand: [.95, 5.3], bend: -1, type: 'wave', fingerAng: -PI / 2, front: true }, armL: { hand: [-.9, 2.95], bend: -1 }, head: { tilt: -.09 }, face: { eyes: 'happy', lower: .4, mouth: 'rest', gaze: [0, 0] } }),
   };
@@ -152,7 +154,8 @@
       [bt(23, 1) - F, P.cradle, { app: .04, antD: 0, ant: 0, over: .06 }],
       [a.END - F, P.window, { app: .1, antD: .06, ant: .1, over: .16 }],
       [bt(23, 4) - F, P.windowOpen, { app: .15, antD: 0, over: .1 }],
-      [a.BYE - F, P.pinch, { app: .06, antD: .05, ant: .16, over: .22 }],
+      [a.BYE - F, P.pinch, { app: .06, antD: .05, ant: .16, over: .12 }],
+      [a.BYE + 4 * F, P.pinchShut, { app: .1, antD: 0, ant: 0, over: .18 }],
       [bt(24, 2) - F, P.lookUp, { app: .16, antD: 0, over: .1 }],
       [a.BYE2 - 2 * F, P.wave, { app: .08, antD: .06, ant: .1, over: .16 }],
     ];
@@ -297,17 +300,16 @@
   }
 
   // ---------------------------------------------------------------- S11 props
-  function dockedBubble(X, t) { // "Hi! How can I help you today? ■ end_turn": docked from S10 (48 px), scrolls up and out on bar 17 b3
-    const out = bt(17, 3) - F; let oy = 0;
-    if (t > out) { const u = clamp((t - out) / .32); if (u >= 1) return; oy = -E.inBack(u, 1.5) * 820; }
-    X.save(); X.translate(0, oy);
-    const x0 = 96, y0 = 742, w = 690, h = 142;
-    rr(X, x0 + 8, y0 + 8, w, h, 30); X.fillStyle = C.CLAY_DARK; X.fill();
-    rr(X, x0, y0, w, h, 30); X.fillStyle = C.PAPER; X.fill(); X.lineWidth = 4; X.strokeStyle = C.INK; X.stroke();
-    X.beginPath(); X.moveTo(x0 + 34, y0 + h - 2); X.lineTo(x0 + 10, y0 + h + 22); X.lineTo(x0 + 66, y0 + h - 2); X.fillStyle = C.PAPER; X.fill(); X.stroke(); X.fillRect(x0 + 36, y0 + h - 8, 28, 8);
-    X.font = mono(48, 500); X.fillStyle = C.INK; X.textAlign = 'left';
-    X.fillText('Hi! How can I help you', x0 + 28, y0 + 60); X.fillText('today?', x0 + 28, y0 + 118);
-    drawRich(X, '■ end_turn', x0 + 262, y0 + 116, mono(28, 500), C.UI_GREY);
+  function dockedBubble(X, t) { // "Hi! How can I help you today? ■ end_turn": exactly where S10 docks it (shared bubble(),
+    // 72 px scaled to 48, bottom-left at (96, 890)); rides the kick, then scrolls up and out on bar 17 b3
+    const out = bt(17, 3) - F; let oy = 0, rot = 0;
+    if (t > out) { const u = clamp((t - out) / .34); if (u >= 1) return; oy = -E.inBack(u, 1.6) * 900; rot = -.05 * E.in2(u); }
+    const str = 'Hi! How can I help you today?';
+    X.save(); X.font = mono(72, 500);
+    const bw = X.measureText(str).width + 52, bh = 180.4, bx = 960 - bw / 2, by = 540 - bh / 2, sc = 48 / 72;
+    const kick = t < out ? 1 + .025 * B().kickEnv(t) : 1;
+    X.translate(96, 890 + oy); X.rotate(rot); X.scale(sc * kick, sc * kick); X.translate(-bx, -(by + bh));
+    bubble(X, bx, by, str, { who: 'opus', size: 72, endTurn: true, maxW: 1420 });
     X.restore();
   }
   function rafaHead(X, x, y, r, t) { // Hertzfeldt avatar: INK line on PAPER, boils on 2s
@@ -363,21 +365,27 @@
   }
 
   // ---------------------------------------------------------------- S12 props
-  function tallies(X, t, st) { // eighth-note flicks throw PAPER tally marks that hang as a 5-bar tally beside the head
+  function tallies(X, t, st) { // eighth-note flicks throw die-cut PAPER tally marks that stack up right of the head
     const a = A(); if (t < a.MILLION - F || t > bt(20, 3)) return;
     const fade = 1 - seg(t, bt(20, 2), bt(20, 3) - 2 * F);
-    X.save(); X.lineCap = 'round'; X.strokeStyle = C.PAPER;
-    const hand = bodyW(st, 1.02, 5.2);
-    const slot = i => [1085 + i * 22, 452];
+    const hand = bodyW(st, 1.08, 4.95);
+    const mark = (x, y, rot, len, col, s = 1) => {
+      X.save(); X.translate(x, y); X.rotate(rot); X.scale(s, s); X.beginPath(); X.moveTo(0, -len / 2); X.lineTo(0, len / 2);
+      X.lineWidth = 19; X.strokeStyle = C.INK; X.stroke(); X.lineWidth = 10; X.strokeStyle = col; X.stroke(); X.restore();
+    };
+    X.save(); X.lineCap = 'round'; X.globalAlpha = fade;
     for (let i = 0; i < 4; i++) {
       const tf = a.MILLION - F + i * BEAT / 2; if (t < tf) break;
-      const u = E.out3(clamp((t - tf) / .2)), s = slot(i);
-      const x = lerp(hand[0], s[0], u), y = lerp(hand[1], s[1], u) - Math.sin(PI * u) * 40;
-      X.globalAlpha = fade; X.lineWidth = 8;
-      X.save(); X.translate(x, y); X.rotate((1 - u) * 1.5); X.beginPath(); X.moveTo(0, -26); X.lineTo(0, 26); X.stroke(); X.restore();
+      const u = E.out3(clamp((t - tf) / .16)), sx = 1162 + i * 30, sy = 566;
+      const x = lerp(hand[0], sx, u), y = lerp(hand[1], sy, u) - Math.sin(PI * u) * 46;
+      const land = t - tf - .16, s = land > 0 ? 1 + .22 * Math.exp(-14 * land) * Math.cos(30 * land) : .6 + .4 * u;
+      mark(x, y, (1 - u) * 2.2 + .04 * (i - 1.5), 72, C.PAPER, s);
     }
-    const ts = a.TIMES - F; // the fifth: the diagonal strike on "times"
-    if (t >= ts) { const u = E.out4(clamp((t - ts) / .1)); X.lineWidth = 8; X.strokeStyle = C.CLAY; X.beginPath(); X.moveTo(1070, 478); X.lineTo(lerp(1070, 1166, u), lerp(478, 426, u)); X.stroke(); }
+    const ts = a.TIMES - F; // the fifth: the CLAY diagonal strike on "times"
+    if (t >= ts) {
+      const u = E.out4(clamp((t - ts) / .09)), x0 = 1140, y0 = 602, x1 = lerp(x0, 1272, u), y1 = lerp(y0, 528, u);
+      X.beginPath(); X.moveTo(x0, y0); X.lineTo(x1, y1); X.lineWidth = 21; X.strokeStyle = C.INK; X.stroke(); X.lineWidth = 12; X.strokeStyle = C.CLAY; X.stroke();
+    }
     X.restore();
   }
   function sparkle(X, x, y, r, rot, col = C.SPARK) { X.save(); X.translate(x, y); X.rotate(rot); star(X, 0, 0, r, .28, 4, 0); X.fillStyle = col; X.fill(); X.lineWidth = Math.max(2, r * .09); X.strokeStyle = C.INK; X.stroke(); X.restore(); }
@@ -398,7 +406,7 @@
     X.save();
     // nebula shell (halftone ring) expanding as it dies
     const rr_ = 24 + life * 40;
-    X.beginPath(); X.arc(x, y, rr_ + 10, 0, TAU); X.arc(x, y, rr_, 0, TAU, true); X.fillStyle = halftone(X, C.CLAY_DARK, .4, 8, 45); X.fill();
+    X.beginPath(); X.arc(x, y, rr_ + 10, 0, TAU); X.arc(x, y, rr_, 0, TAU, true); X.fillStyle = B().halftone(X, C.CLAY_DARK, .4, 8, 45); X.fill();
     const core = (1 - life * .75) * fl;
     const col = life < .8 ? C.SPARK : C.CLAY_DARK;
     X.globalAlpha = clamp(.35 + core);
@@ -423,13 +431,13 @@
   let _hiA = null;
   function hiAtlas() {
     if (_hiA) return _hiA;
-    const cell = 128, cols = [C.CLAY, C.SPARK, C.PAPER], c = makeCanvas(cell * 2, cell * 3), x = c.getContext('2d');
+    const cell = 128, cols = [C.CLAY, C.SPARK, C.PAPER], c = B().cpuCanvas(cell * 2, cell * 3), x = B().cx2d(c);
     x.textAlign = 'center'; x.textBaseline = 'middle'; x.font = `800 104px ${FONTS.mono}`; x.lineJoin = 'round';
     cols.forEach((col, r) => ['h', 'i'].forEach((g, i) => { x.lineWidth = 10; x.strokeStyle = C.INK; x.strokeText(g, i * cell + cell / 2, r * cell + cell / 2 + 4); x.fillStyle = col; x.fillText(g, i * cell + cell / 2, r * cell + cell / 2 + 4); }));
     _hiA = { c, cell };
     return _hiA;
   }
-  function uniCenterS13(st) { return bodyW(st, 1.62, 5.08); }
+  function uniCenterS13(st) { return bodyW(st, 1.98, 5.3); }
   function hiBang(X, t, st) {
     const a = A(), tb = a.HI - 2 * F; if (t < tb) return;
     const age = t - tb, conv0 = bt(22, 4) - 3 * F, conv1 = conv0 + .42;
@@ -475,8 +483,8 @@
       X.beginPath(); X.arc(ux, uy, r2, 0, TAU); X.fillStyle = C.INK; X.fill();
       X.save(); X.beginPath(); X.arc(ux, uy, r2, 0, TAU); X.clip();
       // halftone glow + two bright spiral arms (strokes) + glyphs riding them
-      X.beginPath(); X.arc(ux, uy, r2 * .8, 0, TAU); X.fillStyle = halftone(X, C.CLAY, .22, 8, 45); X.fill();
-      X.beginPath(); X.arc(ux, uy, r2 * .45, 0, TAU); X.fillStyle = halftone(X, C.SPARK, .5, 8, 45); X.fill();
+      X.beginPath(); X.arc(ux, uy, r2 * .8, 0, TAU); X.fillStyle = B().halftone(X, C.CLAY, .22, 8, 45); X.fill();
+      X.beginPath(); X.arc(ux, uy, r2 * .45, 0, TAU); X.fillStyle = B().halftone(X, C.SPARK, .5, 8, 45); X.fill();
       X.lineCap = 'round';
       for (let arm = 0; arm < 2; arm++) {
         X.beginPath();
@@ -495,7 +503,7 @@
       X.beginPath(); X.arc(ux - r2 * .44, uy - r2 * .5, Math.max(2, r * .05), 0, TAU); X.fillStyle = C.PAPER; X.fill();
       if (imp === 0) { // its tab ( ✻ × ): what the human clicks
         const tw = r * 1.3, th = r * .52;
-        X.save(); X.translate(ux + r * .62, uy - r * .98); X.rotate(TAB_ROT);
+        X.save(); X.translate(ux + r * TAB_DX, uy + r * TAB_DY); X.rotate(TAB_ROT);
         rr(X, -tw / 2, -th / 2, tw, th, th / 2); X.fillStyle = C.PAPER; X.fill(); X.lineWidth = Math.max(2, r * .05); X.strokeStyle = C.INK; X.stroke();
         B().spark6(X, -tw / 2 + th * .5, 0, th * .34, C.CLAY, spin * .5);
         const xc = tw / 2 - th * .38;
@@ -514,15 +522,16 @@
     X.restore();
   }
   // screen-independent: where the tiny universe's × sits (for the human's finger)
-  const TAB_ROT = .42;
-  const uniX = (ux, uy, r) => { const lx = r * 1.3 / 2 - r * .52 * .38; return [ux + r * .62 + Math.cos(TAB_ROT) * lx, uy - r * .98 + Math.sin(TAB_ROT) * lx]; };
+  const TAB_ROT = .52, TAB_DX = .84, TAB_DY = -.82; // upper right, clear of the chin when held at the belly
+  const uniX = (ux, uy, r) => { const lx = r * 1.3 / 2 - r * .52 * .38; return [ux + r * TAB_DX + Math.cos(TAB_ROT) * lx, uy + r * TAB_DY + Math.sin(TAB_ROT) * lx]; };
 
   // ---------------------------------------------------------------- S14 props
   // the human's single-line hand (PAPER line on INK, on 2s, boils): index-finger tip at (x, y), sleeve off to the right.
   // Drawn as one contour: finger, thumb, knuckles, three curled fingers, cuff, sleeve.
+  const HAND_ROT = .13;
   function humanHand(X, t, x, y, press = 0, sc = 1.25) {
     const tt = Math.floor(t * 15) / 15, J = (i, a = .9) => jit(tt, 700 + i, a);
-    X.save(); X.translate(x, y); X.rotate(.42); X.scale(sc * (1 - press * .05), sc * (1 - press * .05));
+    X.save(); X.translate(x, y); X.rotate(HAND_ROT); X.scale(sc * (1 - press * .05), sc * (1 - press * .05));
     const path = () => {
       X.beginPath();
       X.moveTo(8 + J(1), -11 + J(2));
@@ -590,7 +599,7 @@
   function rowCanvas(str, size, color) {
     const key = str + size + color; let R = _rows.get(key); if (R) return R;
     const w = heroWidth(G.X, str, size, 'cond'), cw = Math.ceil(w + 60), ch = Math.ceil(size * .82 + 50);
-    const c = makeCanvas(cw, ch), x = c.getContext('2d');
+    const c = B().cpuCanvas(cw, ch), x = B().cx2d(c);
     x.font = `900 ${size}px ${FONTS.hero}`; x.fontStretch = 'condensed'; x.letterSpacing = (-.03 * size) + 'px'; x.textAlign = 'center'; x.textBaseline = 'alphabetic';
     const base = 20 + size * .69;
     x.fillStyle = C.CLAY_DARK; x.fillText(str, cw / 2 + 8, base + 8); x.fillStyle = color; x.fillText(str, cw / 2, base);
@@ -609,13 +618,14 @@
     R = { c, cw, ch, base, chunks, cell };
     _rows.set(key, R); return R;
   }
-  const _heap = new Map();
+  const _heap = new Map(), GRAV = 7200;
   function heapPlan(rows) { // landing spots: a mound around Opus's feet (bins accumulate in landing order)
     const key = rows.map(r => r.key).join('|'); let P_ = _heap.get(key); if (P_) return P_;
     const all = [];
     rows.forEach(r => r.R.chunks.forEach(ch => {
       const x0 = r.cx - r.R.cw / 2 + ch.cx, y0 = r.base - r.R.base + ch.cy;
-      const d = r.start + (1 - ch.yRel) * .12 + ch.h1 * .28;
+      const xf = clamp((x0 - (r.cx - r.R.cw / 2)) / r.R.cw);
+      const d = r.start + xf * r.wave + (1 - ch.yRel) * .05 + ch.h1 * .06;
       const xl = lerp(x0, 960, .5) + (ch.h2 - .5) * 140;
       all.push({ r, ch, x0, y0, d, xl, through: hash2(Math.round(ch.cx * 7 + ch.cy), r.key.length) < .5 });
     }));
@@ -626,7 +636,7 @@
       const sz = p.r.R.cell * .38; p.s1 = .38;
       if (p.through) { p.yl = FLOOR + 160; }
       else { p.yl = FLOOR - hgt - sz * .3; bins.set(bi, hgt + sz * .2); bins.set(bi - 1, (bins.get(bi - 1) || 0) + sz * .06); bins.set(bi + 1, (bins.get(bi + 1) || 0) + sz * .06); }
-      p.T = Math.sqrt(2 * Math.max(10, p.yl - p.y0) / 5200);
+      p.T = Math.sqrt(2 * Math.max(10, p.yl - p.y0) / GRAV);
       p.rotEnd = (p.ch.h3 - .5) * 2.2;
     }
     P_ = all; _heap.set(key, P_); return P_;
@@ -637,9 +647,9 @@
       if (only && p.r.key !== only) continue;
       const R = p.r.R, ch = p.ch; let x, y, rot = 0, s = 1;
       const tau = t - p.d;
-      if (tau < -.08) { x = p.x0; y = p.y0; }
-      else if (tau < 0) { x = p.x0 + jit(t * 2, p.ch.h1 * 999, 2.5); y = p.y0 + jit(t * 2, p.ch.h2 * 999, 2.5); }
-      else if (tau < p.T) { const u = tau / p.T; x = lerp(p.x0, p.xl, u); y = p.y0 + .5 * 5200 * tau * tau; rot = p.rotEnd * u * 1.3; s = lerp(1, p.s1, E.out2(u)); }
+      if (tau < -3 * F) { x = p.x0; y = p.y0; }
+      else if (tau < 0) { const kk = 1 + (tau + 3 * F) / (3 * F); x = p.x0 + (p.ch.h1 - .5) * 9 * kk; y = p.y0 - (2 + p.ch.h2 * 5) * kk; rot = (p.ch.h3 - .5) * .12 * kk; } // crack: chunks lift apart
+      else if (tau < p.T) { const u = tau / p.T; x = lerp(p.x0, p.xl, u); y = p.y0 + .5 * GRAV * tau * tau; rot = p.rotEnd * u * 1.3; s = lerp(1, p.s1, E.out2(u)); }
       else { const v = tau - p.T; x = p.xl; y = p.yl - 16 * Math.exp(-9 * v) * Math.abs(Math.sin(13 * v)); rot = p.rotEnd; s = p.s1; }
       X.save(); X.translate(x, y); X.rotate(rot); X.scale(s, s); X.translate(-ch.cx, -ch.cy);
       X.beginPath(); ch.q.forEach((v, i) => i ? X.lineTo(v[0], v[1]) : X.moveTo(v[0], v[1])); X.closePath(); X.clip();
@@ -671,18 +681,20 @@
     B().scraps(X, t, a.MILLION + 2 * F, 960, 475, 1500, 21);
     B().scraps(X, t, a.TIMES + 2 * F, 960, 705, 1400, 22);
   }
+  // the lockup holds, then collapses: END OF THE on b4, WORLD half a beat later (never before it has been read)
+  function crumbleStarts() { const a = A(); return [Math.max(a.END + .62, bt(23, 3) + BEAT / 2 - F), Math.max(a.WORLD + .42, bt(23, 4) - F)]; }
   function endWorld(X, t) { // S14 bar 23: END OF THE / WORLD, then the crumble into a pile at the feet
-    const a = A(), s1 = bt(23, 3) + .08, s2 = Math.max(a.WORLD + .32, bt(23, 4) - .02);
-    const r1 = { key: 'eot', R: rowCanvas('END OF THE', 300, C.PAPER), cx: 960, base: 436, start: s1 };
-    const r2 = { key: 'wld', R: rowCanvas('WORLD', 555, C.CLAY), cx: 960, base: 878, start: s2 };
-    if (t < s1 - .1) hero(X, 'END OF THE', 960, 436, 300, { color: C.PAPER, age: t - (a.END - 2 * F) });
-    if (t < s2 - .1) hero(X, 'WORLD', 960, 878, 555, { color: C.CLAY, age: t - (a.WORLD - 2 * F), sx: Math.min(1, 1776 / 1762) });
+    const a = A(), [s1, s2] = crumbleStarts();
+    const r1 = { key: 'eot', R: rowCanvas('END OF THE', 300, C.PAPER), cx: 960, base: 436, start: s1, wave: .22 };
+    const r2 = { key: 'wld', R: rowCanvas('WORLD', 555, C.CLAY), cx: 960, base: 878, start: s2, wave: .18 };
+    if (t < s1 - 4 * F) hero(X, 'END OF THE', 960, 436, 300, { color: C.PAPER, age: t - (a.END - 2 * F) });
+    if (t < s2 - 4 * F) hero(X, 'WORLD', 960, 878, 555, { color: C.CLAY, age: t - (a.WORLD - 2 * F), sx: Math.min(1, 1776 / 1762) });
     B().scraps(X, t, a.END + 2 * F, 960, 440, 1300, 31);
     B().scraps(X, t, a.WORLD + 2 * F, 960, 882, 1600, 32);
-    if (t >= s1 - .1) crumbleRows(X, t, [r1, r2], t < s2 - .1 ? 'eot' : null);
+    if (t >= s1 - 4 * F) crumbleRows(X, t, [r1, r2], t < s2 - 4 * F ? 'eot' : null);
   }
 
-  function chorus(X, t, shot) {
+  function chorus(X, t, shot, opt = {}) {
     const a = A(), Wd = WORDS(), st = opusState(t), c = camAt(t);
     let holes = null, hero_ = null, input = {}, over = null, world = null, front = null;
     const tab = { counter: counterAt(t) };
@@ -699,7 +711,8 @@
     } else if (shot === 'S13') {
       const pulse = t >= a.START - F ? Math.exp(-5 * (t - a.START + F)) * (1 - Math.exp(-40 * (t - a.START + F))) * 1.6 : 0;
       tab.pulse = clamp(pulse);
-      input = { words: Wd.s13 };
+      const pushed = c.z0 > 1.03; // once the push starts, the lyric moves from the reply box to the standard plate
+      input = pushed ? { words: null, placeholder: '' } : { words: Wd.s13 };
       world = X2 => { if (t < bt(22, 3)) { dyingStar(X2, t); rafaHi(X2, t); } hiBang(X2, t, st); };
       front = X2 => {
         const conv1 = bt(22, 4) - 3 * F + .42;
@@ -707,22 +720,23 @@
       };
       over = (X2, cc) => {
         const tb = a.HI - 2 * F;
-        if (cc.z > 1.25) { // the input bar is out of frame: the standard plate at y 950
+        if (pushed) { // the reply box is sliding out of frame: the standard plate at y 950
           const L = { s: Wd.s13[0].s, e: Wd.s13[Wd.s13.length - 1].e, words: Wd.s13 };
           subtitle(X2, L, t, { y: 950, size: 60, color: C.INK, plate: C.PAPER, weight: 600 });
         }
         stickerDC(X2, 'HI!', 500, 408, 400, t - tb, -.09);
       };
     } else if (shot === 'S14') {
-      if (t < bt(23, 3) + .2) holes = [ROWBOX('END OF THE', 300, 436), ROWBOX('WORLD', 555, 878)].filter((_, i) => t >= (i ? a.WORLD : a.END) - 2 * F);
+      const cs = crumbleStarts();
+      holes = [ROWBOX('END OF THE', 300, 436), ROWBOX('WORLD', 555, 878)].filter((_, i) => t >= (i ? a.WORLD : a.END) - 2 * F && t < cs[i] + .15);
       hero_ = X2 => endWorld(X2, t);
-      input = { words: Wd.s14 };
+      input = { words: t < a.END - 2 * F ? Wd.s14a : Wd.s14 };
       world = X2 => {
         gauge(X2, t);
         if (t >= bt(24, 2)) { X2.save(); X2.globalAlpha = .8 * seg(t, bt(24, 2), bt(24, 2) + .3); X2.font = mono(28, 500); X2.fillStyle = C.PAPER; X2.textAlign = 'right'; X2.fillText('technically your "bye" wakes me up to say bye back.', 1612, 336); X2.font = `900 28px ${FONTS.hangul}`; X2.fillText('안녕.', 1684, 336); X2.restore(); }
       };
       front = X2 => {
-        const u = bodyW(st, 0, 3.98 + .05 * Math.sin(t * 3.3));
+        const u = bodyW(st, 0, 3.5 + .05 * Math.sin(t * 3.3));
         const popAge = t >= a.BYE ? t - a.BYE : -1;
         const xRed = win(t, a.BYE - F, a.BYE + F) ? 1 : 0;
         tinyUniverse(X2, t, u[0], u[1], .86 * R0, { popAge, xRed });
@@ -732,7 +746,7 @@
         if (t > hin && t < hout + .6) {
           let k = t < hclick ? E.out3(seg(t, hin, hclick)) : 1 - E.in2(seg(t, hout, hout + .5));
           const press = win(t, hclick, hclick + 3 * F) ? 1 : 0;
-          humanHand(X2, t, lerp(tip[0] + 1100, tip[0] + 2, k) - press * 7, lerp(tip[1] + 480, tip[1] + 1, k) - press * 3, press);
+          humanHand(X2, t, lerp(tip[0] + 1150, tip[0] + 2, k) - press * 8, lerp(tip[1] + 150, tip[1] + 1, k) - press * 1, press);
         }
         // Opus's tiny reply: bye! (mono 48) ■ end_turn
         const tb2 = a.BYE2 - 2 * F;
@@ -749,10 +763,10 @@
       };
     }
     const actors = X2 => drawOpusAt(X2, c, t, st);
-    B().frame(X, t, { cam: c, galaxy: galOpts(t, holes), hero: hero_, world, actors, front, tab, input, over, edgeSeed: 17, sliver: 'bl' });
     // 1-frame inverse flash on the big impacts
     const flashAt = [a.SCARED, a.TIMES, a.WORLD, a.HI].map(s => s + F);
-    if (flashAt.some(s => t >= s && t < s + F - 1e-4)) B().invert(X);
+    const post = flashAt.some(s => t >= s && t < s + F - 1e-4) ? X2 => B().invert(X2) : null;
+    return B().frame(X, t, { cam: c, galaxy: galOpts(t, holes), hero: hero_, world, actors, front, tab, input, over, post, edgeSeed: 17, sliver: 'bl', upload: opt.upload });
   }
 
   // ================================================================== scenes (hard cuts 1 frame early)
@@ -762,13 +776,15 @@
   scene('S14_end_of_the_world_bye', bt(23, 1) - F, bt(25, 1), (X, t) => {
     const tw = bt(24, 4);
     if (t < tw) { chorus(X, t, 'S14'); return; }
-    // whip-pan on bar 24 b4 into the chant: the frame renders to a layer, then smears left (4 subframes)
-    const L = layer('c1whip');
-    chorus(L, t, 'S14');
+    // whip-pan on bar 24 b4 into the chant: the frame (CPU) smears left in 4 subframes, uploaded once
+    chorus(X, t, 'S14', { upload: false });
+    const src = B().cpuLayerCanvas('brand_frame'), L = B().cpuLayer('c1whip');
     const u = seg(t, tw, bt(25, 1)), off = -2300 * E.inExpo(Math.min(1, u * 1.02)), v = 2300 * 10 * Math.log(2) * Math.pow(2, 10 * u - 10) / (bt(25, 1) - tw);
-    groundInk(X);
+    groundInk(L);
     const n = 4, span = Math.min(900, v / 30);
-    for (let i = 0; i < n; i++) drawLayer(X, 'c1whip', { x: off + span * i / n, alpha: 1 / (i + 1) });
+    L.setTransform(1, 0, 0, 1, 0, 0);
+    for (let i = 0; i < n; i++) { L.globalAlpha = 1 / (i + 1); L.drawImage(src, (off + span * i / n) * G.scale, 0); }
+    B().upload(X, 'c1whip');
   });
 
   window.CHORUS1 = { opusState, camAt, anchors: A, whirl };

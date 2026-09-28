@@ -90,8 +90,8 @@ def sing_word(word, notes, fs=SR, voice='af_heart'):
     f0, t = pw.harvest(y, fs, frame_period=fp, f0_floor=70, f0_ceil=800)
     sp = pw.cheaptrick(y, f0, t, fs)
     ap = pw.d4c(y, f0, t, fs)
-    total = sum(d for d, _ in notes)
-    n_out = max(4, int(round(total * 1000 / fp)))
+    ns = [max(1, int(round(d * 1000 / fp))) for d, _ in notes]
+    n_out = max(4, sum(ns))
     src_idx = np.linspace(0, len(f0) - 1, n_out)
     lo = np.floor(src_idx).astype(int)
     hi = np.minimum(lo + 1, len(f0) - 1)
@@ -102,14 +102,13 @@ def sing_word(word, notes, fs=SR, voice='af_heart'):
     # sustain vowels: widen voicing to cover long notes (espeak words are short)
     tgt = np.zeros(n_out)
     k = 0
-    for d, p in notes:
-        n = int(round(d * 1000 / fp))
+    for (d, p), n in zip(notes, ns):
         hz = 440.0 * 2 ** ((p - 69) / 12)
         seg = np.full(n, hz)
         if d > 0.35:  # gentle delayed vibrato on long notes
             tt = np.arange(n) * fp / 1000
             seg *= 2 ** ((0.25 * np.clip((tt - 0.2) / 0.3, 0, 1) * np.sin(2 * np.pi * 5.5 * tt)) / 12)
-        tgt[k:k + n] = seg[: max(0, min(n, n_out - k))]
+        tgt[k:k + n] = seg[:len(tgt[k:k + n])]
         k += n
     tgt[k:] = tgt[k - 1] if k > 0 else 220
     # portamento between notes

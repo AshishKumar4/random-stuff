@@ -51,7 +51,13 @@
   G.frameId = 0;
   if (window.STYLE_INIT) await window.STYLE_INIT();
 
-  window.renderAt = (t, opt = {}) => {
+  // optional real-time -> grid-time warp (piecewise linear [[real, grid], ...]) when the chosen take's
+  // timing differs from the 128 BPM grid the storyboard is authored on
+  const WARP = T.warp || null;
+  const toGrid = tr => { if (!WARP) return tr; if (tr <= WARP[0][0]) return WARP[0][1] + (tr - WARP[0][0]); for (let i = 1; i < WARP.length; i++) if (tr <= WARP[i][0]) { const [a0, b0] = WARP[i - 1], [a1, b1] = WARP[i]; return b0 + (b1 - b0) * (tr - a0) / Math.max(1e-6, a1 - a0); } const [aL, bL] = WARP[WARP.length - 1]; return bL + (tr - aL); };
+  window.toGrid = toGrid;
+  window.renderAt = (tReal, opt = {}) => {
+    const t = toGrid(tReal);
     G.t = t; G.frameId++; G.post = {};
     const X = G.X;
     X.setTransform(G.scale, 0, 0, G.scale, 0, 0);

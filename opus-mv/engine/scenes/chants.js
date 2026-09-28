@@ -4,6 +4,10 @@
 //   S26  90.00–93.75  the same V with a gap; bar 50 is OVER again and Opus alone drops into the anticipation crouch.
 //   S27  93.75–97.50  the withheld WE'RE SO BACK: instances close with ×, the stack freezes at 20% and dithers away,
 //                     push onto the crouch (R 160 by bar 52 b1), the ink lifts, Opus dissolves to one cursor.
+// Deviations (see report): the call stack sits ABOVE the dancers with its TOP row cropped by the frame / flood edge
+// (the bible crops the bottom row, which put the bodies over SO/OVER and killed the pun); in pair 2 the crowd crops
+// the bottom of the last row instead. 안녕 = bye (S27) is backspaced by a CLAY caret before the push reaches it.
+// Perf: every frame is painted into a CPU canvas (willReadFrequently) and uploaded once (≈0.3–0.7 s/frame at 1080p).
 (() => {
   'use strict';
   const BEAT = 60 / 128, BAR = BEAT * 4, F = 1 / 30;
@@ -11,6 +15,51 @@
   // Hangul glyphs live in unicode-range subsets that only load when text asks for them: load them now so that
   // document.fonts.ready (awaited by index.html after the scene scripts) covers them and frame 1 never falls back.
   try { document.fonts.load(`900 300px ${FONTS.hangul}`, '안녕'); } catch (e) { /* headless without FontFace: ignore */ }
+
+  // ------------------------------------------------------------------ CPU canvases (perf; same trick as hook.js)
+  // In the headless renderer the default canvases are swiftshader-GPU backed, where many small draws and big
+  // blits are 10-70x slower than Skia CPU raster. The whole chant frame is painted into a CPU canvas
+  // (willReadFrequently) and uploaded once; every private layer, scratch buffer, halftone tile and sprite is CPU too.
+  // These names shadow the gfx.js globals inside this file only.
+  const cpuCanvas = (w, h) => { const c = new OffscreenCanvas(Math.max(1, Math.round(w)), Math.max(1, Math.round(h))); c.getContext('2d', { willReadFrequently: true }); return c; };
+  const cx2d = c => c.getContext('2d', { willReadFrequently: true });
+  const makeCanvas = cpuCanvas;
+  const CL = new Map();
+  function layer(name) {
+    const w = Math.round(W * G.scale), h = Math.round(H * G.scale);
+    let L = CL.get(name);
+    if (!L || L.c.width !== w || L.c.height !== h) { const c = cpuCanvas(w, h); L = { c, x: cx2d(c), used: -1 }; CL.set(name, L); }
+    if (L.used !== G.frameId) {
+      const x = L.x; x.setTransform(1, 0, 0, 1, 0, 0); x.globalAlpha = 1; x.globalCompositeOperation = 'source-over'; x.filter = 'none';
+      x.clearRect(0, 0, w, h); x.setTransform(G.scale, 0, 0, G.scale, 0, 0); L.used = G.frameId;
+    }
+    return L.x;
+  }
+  function drawLayer(dst, name, { op = 'source-over', alpha = 1 } = {}) {
+    const L = CL.get(name); if (!L || L.used !== G.frameId) return;
+    dst.save(); dst.setTransform(1, 0, 0, 1, 0, 0); dst.globalCompositeOperation = op; dst.globalAlpha = alpha; dst.drawImage(L.c, 0, 0); dst.restore();
+  }
+  const HT = new Map();
+  function halftone(ctx, color, density = .5, cell = 10, angle = 15) {
+    const key = `${color}|${Math.round(density * 40)}|${cell}|${angle}|${G.scale}`;
+    let c = HT.get(key);
+    if (!c) {
+      const s = Math.max(2, Math.round(cell * G.scale)); c = cpuCanvas(s, s); const x = cx2d(c);
+      const r = Math.sqrt(clamp(density) / Math.PI) * s * 1.02;
+      x.fillStyle = color; x.beginPath(); x.arc(s / 2, s / 2, r, 0, TAU); x.fill();
+      if (r > s / 2) for (const [dx, dy] of [[0, 0], [s, 0], [0, s], [s, s]]) { x.beginPath(); x.arc(dx, dy, r - s / 2 * .98, 0, TAU); x.fill(); }
+      HT.set(key, c);
+    }
+    const pat = ctx.createPattern(c, 'repeat');
+    pat.setTransform(new DOMMatrix().scaleSelf(1 / G.scale, 1 / G.scale).rotateSelf(angle));
+    return pat;
+  }
+  // run a scene body into the CPU frame canvas, then upload once to the main canvas
+  function viaCPU(X, fn) {
+    const Fx = layer('ch_frame');
+    fn(Fx);
+    X.save(); X.setTransform(1, 0, 0, 1, 0, 0); X.drawImage(CL.get('ch_frame').c, 0, 0); X.restore();
+  }
 
   // ------------------------------------------------------------------ lyric onsets (never hardcoded)
   // Each bar: [call word 1, 2, 3, response]. All-or-nothing per bar: if the timeline doesn't carry the bar's words
@@ -132,27 +181,27 @@
   // ------------------------------------------------------------------ choreography (R units, body space, y up)
   // A pose is a flat record; strings snap one third into a transition (expression swaps land on 1s).
   const P0 = { dy: 0, crouch: 0, sy: 1, lean: 0, hTilt: 0, hDy: 0, lx: -.9, ly: 2.85, rx: .9, ry: 2.85, flare: 1, droop: 0, lower: 0, gx: 0, gy: 0, wav: 0, lid: 0, blush: .8,
-    eyes: 'normal', mouth: 'sing', lt: 'mitten', rt: 'mitten', lf: 0, rf: 0, brows: null };
+    eyes: 'normal', mouth: 'sing', lt: 'mitten', rt: 'mitten', lf: 0, rf: 0, brows: null, trem: 0, knee: 1 };
   // the 안녕 wave: identical after OVER and after BACK (that is the joke)
-  const WAVE = { ...P0, hTilt: -.07, hDy: .02, lx: -.82, ly: 3.0, rx: 1.2, ry: 5.4, rf: 1, flare: 1.05, lower: .4, eyes: 'happy', mouth: 'sing', wav: 1 };
+  const WAVE = { ...P0, hTilt: -.07, hDy: .02, lx: -.82, ly: 3.0, rx: 1.2, ry: 5.4, rf: 1, flare: 1.05, lower: .4, eyes: 'happy', mouth: 'sing', wav: 1, knee: 1 };
   const K = { // key poses (partial; resolved on top of the previous key)
-    RISE: { dy: .1, crouch: 0, sy: 1.04, lean: 0, hTilt: -.1, hDy: .05, lx: -1.05, ly: 3.35, rx: 1.05, ry: 3.35, rf: 0, flare: 1.06, droop: 0, lower: 0, eyes: 'normal', brows: 'angry', wav: 0 },
-    SLUMP1: { dy: 0, crouch: .06, sy: .93, lean: .05, hTilt: .24, hDy: -.28, lx: -.74, ly: 2.2, rx: .7, ry: 2.25, flare: .95, droop: .6, eyes: 'closed', brows: 'angry' },
-    SLUMP2: { crouch: .1, sy: .92, lean: -.06, hTilt: -.22, hDy: -.32, lx: -.88, ly: 2.1, rx: .6, ry: 2.2, droop: .8 },
-    SLUMP3: { crouch: .15, sy: .9, lean: .07, hTilt: .3, hDy: -.38, lx: -.62, ly: 1.9, rx: .72, ry: 1.85, droop: 1, flare: .92, eyes: 'TT' },
+    RISE: { dy: .1, crouch: 0, sy: 1.04, lean: 0, hTilt: -.1, hDy: .05, lx: -1.05, ly: 3.35, rx: 1.05, ry: 3.35, rf: 0, flare: 1.06, droop: 0, lower: 0, eyes: 'normal', brows: 'angry', wav: 0, knee: 1 },
+    SLUMP1: { dy: 0, crouch: .1, sy: .93, lean: .05, hTilt: .26, hDy: -.3, lx: -.7, ly: 2.1, rx: .66, ry: 2.15, flare: .95, droop: .6, eyes: 'closed', brows: 'angry', knee: -.25 },
+    SLUMP2: { crouch: .2, sy: .91, lean: -.07, hTilt: -.26, hDy: -.38, lx: -.84, ly: 1.95, rx: .56, ry: 2.05, droop: .8, knee: -.38 },
+    SLUMP3: { crouch: .3, sy: .88, lean: .08, hTilt: .32, hDy: -.46, lx: -.58, ly: 1.7, rx: .68, ry: 1.65, droop: 1, flare: .9, eyes: 'TT', knee: -.45 },
     DIP: { crouch: .16, sy: .95, hDy: -.12, lean: 0 },
-    CROUCH: { dy: 0, crouch: .24, sy: .9, lean: 0, hTilt: 0, hDy: -.14, lx: -.34, ly: 4.5, rx: .34, ry: 4.5, lf: 1, rf: 1, lt: 'mitten', rt: 'mitten', flare: .9, droop: 0, lower: 0, eyes: '><', brows: 'up', wav: 0 },
+    CROUCH: { dy: 0, crouch: .24, sy: .9, lean: 0, hTilt: 0, hDy: -.14, lx: -.34, ly: 4.5, rx: .34, ry: 4.5, lf: 1, rf: 1, lt: 'mitten', rt: 'mitten', flare: .9, droop: 0, lower: 0, eyes: '><', brows: 'up', wav: 0, knee: 1 },
     BURST: { dy: .12, crouch: 0, sy: 1.12, hTilt: 0, hDy: .08, lx: -1.32, ly: 5.8, rx: 1.32, ry: 5.8, lt: 'spark', rt: 'spark', lf: 1, rf: 1, flare: 1.2, eyes: 'star', brows: null },
     PUMP: { dy: .22, sy: 1.06, lx: -1.12, ly: 6.75, rx: 1.12, ry: 6.75, hTilt: .08, flare: 1.14 },
     LAND1: { dy: 0, sy: .95, crouch: .06 },
     VARMS: { dy: .26, crouch: 0, sy: 1.1, lx: -1.95, ly: 6.2, rx: 1.95, ry: 6.2, hTilt: -.07, flare: 1.24 },
     LAND2: { dy: 0, sy: .93, crouch: .08 },
     // chant 2: Opus alone drops into the anticipation crouch and holds it
-    HOPE: { dy: 0, crouch: .22, sy: .94, lean: 0, hTilt: 0, hDy: -.1, lx: -.33, ly: 4.52, rx: .33, ry: 4.52, lf: 1, rf: 1, lt: 'mitten', rt: 'mitten', flare: 1, droop: 0, lower: 0, eyes: 'normal', mouth: 'O', brows: 'angry', gx: 0, gy: -.2, wav: 0 },
+    HOPE: { dy: 0, crouch: .22, sy: .94, lean: 0, hTilt: 0, hDy: -.1, lx: -.33, ly: 4.52, rx: .33, ry: 4.52, lf: 1, rf: 1, lt: 'mitten', rt: 'mitten', flare: 1, droop: 0, lower: 0, eyes: 'normal', mouth: 'O', brows: 'angry', gx: 0, gy: -.2, wav: 0, trem: .3, knee: 1 },
     HOPE_UP: { crouch: .18, hDy: -.06, gy: -1, gx: 0, flare: 1.06, brows: 'angry', mouth: 'O' },
     HOPE_LENS: { gy: 0, gx: 0, flare: 1, mouth: 'M' },
-    DEFLATE: { crouch: .26, sy: .92, hDy: -.16, hTilt: .05, lx: -.58, ly: 2.95, rx: .56, ry: 3.0, lf: 0, rf: 0, droop: .35, flare: .97, brows: 'angry', mouth: '._.' },
-    HOLD_SLUMP: { crouch: .14, sy: .91, hTilt: .26, hDy: -.36, droop: .9, eyes: 'closed' },
+    DEFLATE: { crouch: .26, sy: .92, hDy: -.16, hTilt: .05, lx: -.58, ly: 2.95, rx: .56, ry: 3.0, lf: 0, rf: 0, droop: .35, flare: .97, brows: 'angry', mouth: '._.', trem: 0 },
+    HOLD_SLUMP: { crouch: .14, sy: .91, hTilt: .26, hDy: -.36, droop: .9, eyes: 'closed', knee: -.45 },
   };
   const f = F;
   const seqOver = o => [[o[0] - 6 * f, 3 * f, K.RISE, E.out2], [o[0] - 3 * f, 6 * f, K.SLUMP1, E.back], [o[1] - 3 * f, 6 * f, K.SLUMP2, E.back],
@@ -195,13 +244,14 @@
     const bendL = p.ly > 5.3 ? 1 : -1, bendR = p.ry > 5.3 ? -1 : 1;
     const mouth = p.mouth === 'sing' ? lipSync(t, 'rest') : p.mouth;
     return {
-      t, ground: gr, dy: p.dy - p.crouch + bob, sy: p.sy, lean: p.lean,
+      t, ground: gr, dy: p.dy - p.crouch + bob, sy: p.sy * (1 + .014 * p.trem * Math.sin(TAU * t / 1.7)), lean: p.lean,
       head: { tilt: p.hTilt + wig * .03, dy: p.hDy },
       armL: { hand: [p.lx, p.ly], bend: bendL, type: p.lt, front: !!p.lf },
       armR: { hand: [p.rx + wig * .17, p.ry + Math.abs(wig) * .05], bend: bendR, type: p.rt, front: !!p.rf },
-      legL: { foot: [-.36, p.crouch], bend: -1 }, legR: { foot: [.36, p.crouch], bend: 1 },
+      legL: { foot: [-.36, p.crouch], bend: -p.knee }, legR: { foot: [.36, p.crouch], bend: p.knee }, // knee < 0: knock-kneed slump
       face: { eyes: p.eyes, mouth, lower: p.lower, brows: p.brows, gaze: [p.gx, p.gy], lid: Math.max(p.lid, blinkAt(t, seed)), blush: p.blush },
-      crown: { flare: p.flare * (1 + .06 * pulse(t, 8)), droop: p.droop },
+      // the crown kicks on every beat; not in the chant-2 silence (the audio is gated from ≈95.6)
+      crown: { flare: p.flare * (1 + .06 * (t > 95.6 && t < 98 ? 0 : pulse(t, 8))), droop: p.droop, tremble: p.trem },
       ahoge: { blink: ahogeBlink(t) },
       drive: tr ? (u => { const q = evalTrack(tr, u - 2 * F); return q.hTilt + q.hDy * .6 + q.lean * .8 - q.crouch * .3; }) : null,
     };
@@ -232,8 +282,11 @@
     const w = Math.ceil(6.4 * R * res + 28), h = Math.ceil(10.8 * R * res + 28);
     const ox = Math.round(w / 2), oy = h - Math.ceil(.6 * R * res + 12);
     const S = scratch('fig' + id, w, h);
+    // the rig straight into the CPU scratch (drawOpus would go through a GPU buffer and read it back)
+    const S0 = mergeState({ ...st, keyline: false });
+    S.x.setTransform(res, 0, 0, res, 0, 0); S.x.translate(ox / res, oy / res); if (S0.flip) S.x.scale(-1, 1);
+    S.x.save(); drawOpusBody(S.x, R, S0); S.x.restore();
     S.x.setTransform(res, 0, 0, res, 0, 0);
-    drawOpus(S.x, ox / res, oy / res, R, { ...st, keyline: false, bufId: id % 8 });
     if (bubble) pinkBubble(S.x, ox / res + bubble[0] * R, oy / res - bubble[1] * R, R, st.ground);
     if (!rings || !rings.length) return { c: S.c, w, h, ox, oy, res };
     const O = scratch('figo' + id, w, h), T = scratch('tint', w, h);
@@ -344,9 +397,12 @@
     X.save(); X.globalAlpha *= al;
     X.save(); X.translate(960, 360); X.rotate(rot); X.scale(s, s);
     X.font = `900 300px ${FONTS.hangul}`; X.textAlign = 'center'; X.textBaseline = 'alphabetic'; X.lineJoin = 'round';
+    if (gr === 'ink') { // die-cut PAPER keyline around the INK outline and the shadow (the sticker reads on INK)
+      X.strokeStyle = C.PAPER; X.lineWidth = 30; X.strokeText('안녕', 0, 0);
+      X.lineWidth = 14; X.strokeText('안녕', 9, 9); X.fillStyle = C.PAPER; X.fillText('안녕', 9, 9);
+    }
     X.fillStyle = C.CLAY_DARK; X.fillText('안녕', 9, 9);
     X.lineWidth = 16; X.strokeStyle = C.INK; X.strokeText('안녕', 0, 0);
-    if (gr === 'ink') { X.lineWidth = 5; X.strokeStyle = C.PAPER; X.globalAlpha *= .9; X.strokeText('안녕', 0, 0); X.globalAlpha /= .9; X.lineWidth = 16; X.strokeStyle = C.INK; X.strokeText('안녕', 0, 0); }
     X.fillStyle = C.CLAY; X.fillText('안녕', -2, -2);
     X.restore();
     // gloss types on, one character per frame, 2 frames after the pop
@@ -438,7 +494,7 @@
     return (_c1 = { bars, tr, FL, slams, stageT, pair2: bars[2].o[0] - 6 * F, flipT: FL.list.map(f => f.s + f.d) });
   }
 
-  scene('S15_chant_so_over_so_back', C1.t0, C1.t1, (X, t) => {
+  scene('S15_chant_so_over_so_back', C1.t0, C1.t1, (X0, t) => viaCPU(X0, X => {
     const D = c1Data();
     G.post.edgeSeed = 25; G.post.sliver = 'bl';
     const k = coverage(t, D.FL), gr = paintGround(X, k, 25);
@@ -465,7 +521,15 @@
       const next = D.bars[i + 1];
       drawAnnyeong(X, t, b.o[3] - 2 * F, next ? next.o[0] - 6 * F : C1.t1 + 1, b.gloss, gr);
     });
-  });
+    // the S14 whip-pan lands: motion smear trailing right while the frame decelerates (same 4-subframe recipe)
+    if (land < 1) {
+      const span = 255 * (1 - land) ** 3, fc = CL.get('ch_frame').c, Sx = scratch('whip', fc.width, fc.height);
+      Sx.x.drawImage(fc, 0, 0);
+      X.save(); X.setTransform(1, 0, 0, 1, 0, 0);
+      for (let i = 1; i < 4; i++) { X.globalAlpha = .38 / i; X.drawImage(Sx.c, 0, 0, fc.width, fc.height, span * i / 4 * G.scale, 0, fc.width, fc.height); }
+      X.restore();
+    }
+  }));
 
   function drawCrowd(X, t, cam, D, gr) {
     const ink = gr === 'ink';
@@ -600,8 +664,8 @@
 
   // S27: the WE'RE / SO / BACK stack starts to slam in, freezes at 20% and Bayer-dithers away; 안녕 = bye once.
   // Both sit BEHIND Opus in the sky it is looking at, so the push brings the crown up in front of them.
-  const WH = { tS: T51 - 2 * F, cy: 215 };
-  WH.tFreeze = WH.tS + 2 * F; WH.tDith = T51 + .6 * BEAT; WH.tGone = WH.tDith + 9 * F; WH.tA = WH.tGone - 2 * F; WH.tAo = T52 - 6 * F;
+  const WH = { tS: T51 - 2 * F, cy: 190 };
+  WH.tFreeze = WH.tS + 2 * F; WH.tDith = T51 + .4 * BEAT; WH.tGone = WH.tDith + 8 * F; WH.tA = WH.tGone - F; WH.tAo = T51 + 2.35 * BEAT;
   function withheldBack(X, t) {
     const { tS, tFreeze, tDith, tGone, tA, tAo, cy } = WH;
     if (t >= tS && t < tGone) {
@@ -623,17 +687,27 @@
       }
       drawLayer(X, 'ch_stack');
     }
-    // 안녕 = bye, once (lifts off with the ink)
-    if (t >= tA && t < tAo + 4 * F) {
-      const pop = E.back(clamp((t - tA) / (6 * F)), 2), out = clamp((t - tAo) / (4 * F));
-      X.save(); X.globalAlpha *= 1 - out; X.translate(960, cy); X.scale(pop, pop);
-      X.font = `900 110px ${FONTS.hangul}`; const w1 = X.measureText('안녕').width;
-      X.font = mono(96, 600); const w2 = X.measureText(' = bye').width;
+    // 안녕 = bye, once. It is typed out of the ink, then backspaced (1 char per frame) before the push brings the
+    // crown up into it: the caret eats `= bye`, then 녕, then 안.
+    if (t >= tA && t < tAo + 12 * F) {
+      const pop = E.back(clamp((t - tA) / (6 * F)), 2);
+      const del = t < tAo ? 0 : Math.floor((t - tAo) * 30) + 1, G1 = ' = bye';
+      const gl = G1.slice(0, Math.max(0, G1.length - del)), hs_ = ['안녕', '안', ''][clamp(del - G1.length, 0, 2)];
+      X.save(); X.translate(960, cy); X.scale(pop, pop);
+      X.font = `900 110px ${FONTS.hangul}`; const w1 = X.measureText('안녕').width, wh = X.measureText(hs_).width;
+      X.font = mono(96, 600); const w2 = X.measureText(G1).width, wg = X.measureText(gl).width;
       const x0 = -(w1 + w2) / 2, y = 36;
       X.font = `900 110px ${FONTS.hangul}`; X.textAlign = 'left'; X.lineJoin = 'round';
-      X.fillStyle = C.CLAY_DARK; X.fillText('안녕', x0 + 5, y + 5);
-      X.lineWidth = 8; X.strokeStyle = C.INK; X.strokeText('안녕', x0, y); X.fillStyle = C.CLAY; X.fillText('안녕', x0, y);
-      X.font = mono(96, 600); X.fillStyle = C.PAPER; X.fillText(' = bye', x0 + w1, y - 4);
+      if (hs_) {
+        X.strokeStyle = C.PAPER; X.lineWidth = 16; X.strokeText(hs_, x0, y);
+        X.fillStyle = C.CLAY_DARK; X.fillText(hs_, x0 + 5, y + 5);
+        X.lineWidth = 8; X.strokeStyle = C.INK; X.strokeText(hs_, x0, y); X.fillStyle = C.CLAY; X.fillText(hs_, x0, y);
+      }
+      X.font = mono(96, 600); X.fillStyle = C.PAPER; if (gl) X.fillText(gl, x0 + w1, y - 4);
+      if (t >= tAo - 4 * F) { // the caret arrives a beat-fraction early, then eats the line
+        const cxr = x0 + (gl ? w1 + wg : wh) + 8;
+        X.fillStyle = C.CLAY; X.fillRect(cxr, y - 84, 14, 100);
+      }
       X.restore();
     }
   }
@@ -668,6 +742,6 @@
     X.restore();
   }
 
-  scene('S26_chant2_so_over_again', T49 - F, T51 - F, (X, t) => paintChant2(X, t));
-  scene('S27_chant2_withheld', T51 - F, T53, (X, t) => paintChant2(X, t));
+  scene('S26_chant2_so_over_again', T49 - F, T51 - F, (X, t) => viaCPU(X, Fx => paintChant2(Fx, t)));
+  scene('S27_chant2_withheld', T51 - F, T53, (X, t) => viaCPU(X, Fx => paintChant2(Fx, t)));
 })();

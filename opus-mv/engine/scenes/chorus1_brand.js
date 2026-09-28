@@ -12,7 +12,16 @@
 //     input: {words:[{w,s,e}], placeholder, caret, maxW},
 //     over:  (X, c) => {...},  // screen space, over everything (stickers, flashes)
 //     hud:   {fill, cur, label} | false,
+//     post:  (X, c) => {...},  // screen space, after the HUD (e.g. BRAND.invert for a 1-frame flash)
+//     upload: true,            // false: leave the frame in the CPU canvas (BRAND.cpuLayerCanvas(layer)) for a transition
+//     layer: 'brand_frame',    // CPU frame canvas name (use a second name to hold two brand frames at once)
 //     edgeSeed, sliver })
+//
+// PERF: the frame is painted into a CPU canvas (willReadFrequently) and uploaded once; callbacks receive that CPU
+// context. Keep anything they blit on the CPU side too: BRAND.cpuCanvas/cx2d for caches, BRAND.halftone for
+// patterns, BRAND.opus/opusKeyed for Opus (vector rig straight into a cropped CPU canvas + die-cut rings).
+// A GPU canvas (gfx layer()/makeCanvas, gfx halftone()) still works but costs a readback per draw.
+// Full chorus 1 frames at 1920x1080: ≈0.35–0.9 s (was 1–6 s on the GPU path).
 //
 // Geometry (SHOTLIST §A): tab strip PAPER y 0–192, rails PAPER 8 px at x 72 / 1848 with 48 px fillets,
 // input bar PAPER y 900–1000, content y 192–900, Opus R 64 soles (960, 900). z-order:
@@ -21,6 +30,41 @@
   'use strict';
   const BEAT = 60 / 128, BAR = 4 * BEAT, F = 1 / 30, DEG = Math.PI / 180;
   const bt = (bar, beat = 1) => (bar - 1) * BAR + (beat - 1) * BEAT;
+
+  // ------------------------------------------------------------------ CPU raster (perf)
+  // In the headless renderer default canvases are swiftshader-GPU backed, where thousands of small draws and big
+  // transformed blits are 10-70x slower than Skia CPU raster (same finding as the hook). The brand frame paints into
+  // a CPU frame canvas (willReadFrequently) and uploads once; every atlas/cache it reads is a CPU canvas too.
+  const cpuCanvas = (w, h) => { const c = new OffscreenCanvas(Math.max(1, Math.round(w)), Math.max(1, Math.round(h))); c.getContext('2d', { willReadFrequently: true }); return c; };
+  const cx2d = c => c.getContext('2d', { willReadFrequently: true });
+  const CL = new Map();
+  function cpuLayer(name) { // full-frame (1920x1080 logical at G.scale), cleared once per frame
+    const w = Math.round(W * G.scale), h = Math.round(H * G.scale);
+    let L = CL.get(name);
+    if (!L || L.c.width !== w || L.c.height !== h) { const c = cpuCanvas(w, h); L = { c, x: cx2d(c), used: -1 }; CL.set(name, L); }
+    const x = L.x;
+    if (L.used !== G.frameId) { x.setTransform(1, 0, 0, 1, 0, 0); x.globalAlpha = 1; x.globalCompositeOperation = 'source-over'; x.filter = 'none'; x.clearRect(0, 0, w, h); L.used = G.frameId; }
+    x.setTransform(G.scale, 0, 0, G.scale, 0, 0);
+    return x;
+  }
+  const cpuLayerCanvas = name => CL.get(name).c;
+  function upload(X, name) { X.save(); X.setTransform(1, 0, 0, 1, 0, 0); X.globalAlpha = 1; X.globalCompositeOperation = 'source-over'; X.drawImage(CL.get(name).c, 0, 0); X.restore(); }
+  // halftone pattern from CPU tiles (same recipe as gfx.halftone)
+  const HT = new Map();
+  function ht(ctx, color, density = .5, cell = 10, angle = 15) {
+    const key = `${color}|${Math.round(density * 40)}|${cell}|${angle}|${G.scale}`;
+    let c = HT.get(key);
+    if (!c) {
+      const s = Math.max(2, Math.round(cell * G.scale)); c = cpuCanvas(s, s); const x = cx2d(c);
+      const r = Math.sqrt(clamp(density) / Math.PI) * s * 1.02;
+      x.fillStyle = color; x.beginPath(); x.arc(s / 2, s / 2, r, 0, TAU); x.fill();
+      if (r > s / 2) for (const [dx, dy] of [[0, 0], [s, 0], [0, s], [s, s]]) { x.beginPath(); x.arc(dx, dy, r - s / 2 * .98, 0, TAU); x.fill(); }
+      HT.set(key, c);
+    }
+    const pat = ctx.createPattern(c, 'repeat');
+    pat.setTransform(new DOMMatrix().scaleSelf(1 / G.scale, 1 / G.scale).rotateSelf(angle));
+    return pat;
+  }
 
   // ------------------------------------------------------------------ beat envelopes (hits land 1 frame early)
   const kickEnv = t => Math.exp(-7 * frac(beatPos(t + F)));
@@ -55,7 +99,7 @@
     if (GAL) return GAL;
     const glyphs = [...'abcdefghijklmnopqrstuvwxyz0123456789{}<>=+*/#@&?!', 'hi', '안', '녕', '✻'];
     const cols = [C.CLAY, C.SPARK, C.PAPER, C.TEAL], cell = 64;
-    const c = makeCanvas(glyphs.length * cell, cols.length * cell), x = c.getContext('2d');
+    const c = cpuCanvas(glyphs.length * cell, cols.length * cell), x = cx2d(c);
     x.textAlign = 'center'; x.textBaseline = 'middle';
     cols.forEach((col, r) => glyphs.forEach((g, i) => {
       x.fillStyle = col;
@@ -80,7 +124,7 @@
   // halftone of the arm field, built once: dot radius ∝ sqrt(density) on a 45° 13 px screen
   function armsCanvas() {
     if (ARMS) return ARMS;
-    const Rm = ARM_RM, c = makeCanvas(Rm * 2, Rm * 2), x = c.getContext('2d');
+    const Rm = ARM_RM, c = cpuCanvas(Rm * 2, Rm * 2), x = cx2d(c);
     const cell = 13, lnA = Math.log(ARM_A);
     const field = (px, py) => {
       const r = Math.hypot(px, py); if (r < 1 || r > Rm - 10) return 0;
@@ -169,7 +213,7 @@
     const { label = TAB.label, pulse = 0, counter = null, closeRed = 0, plus = true } = o;
     X.save();
     X.fillStyle = C.PAPER; X.fillRect(-500, -500, W + 1000, 692);
-    X.fillStyle = halftone(X, C.INK, .06, 10, 45); X.fillRect(-500, -500, W + 1000, 692); // strip tint: the tab reads lighter
+    X.fillStyle = ht(X, C.INK, .06, 10, 45); X.fillRect(-500, -500, W + 1000, 692); // strip tint: the tab reads lighter
     const f = mono(72, 500), lw = richWidth(X, '✻ ' + label, f);
     const tw = 44 + lw + 38 + 44 + 40, tx = TAB.x, ty = TAB.y, th = TAB.h;
     // tab (rounded top, sits on the strip's bottom rule)
@@ -272,7 +316,7 @@
     const k = kickEnv(t);
     X.save();
     for (const [s, d] of [[1, .2], [.72, .34], [.45, .5]]) {
-      X.beginPath(); X.ellipse(x, y, rx * s, ry * s, 0, 0, TAU); X.fillStyle = halftone(X, C.CLAY, d * (1 + .3 * k), 14, 45); X.globalAlpha = .7; X.fill();
+      X.beginPath(); X.ellipse(x, y, rx * s, ry * s, 0, 0, TAU); X.fillStyle = ht(X, C.CLAY, d * (1 + .3 * k), 14, 45); X.globalAlpha = .7; X.fill();
     }
     X.restore();
   }
@@ -345,41 +389,53 @@
   // silhouette cropped to the character's screen box (half resolution for close-ups): 3–6× cheaper than 24
   // full-buffer copies. Reusable for any Opus on an INK ground.
   const _kc = {};
-  function kcan(name, w, h) { let c = _kc[name]; if (!c || c.width < w || c.height < h) { c = makeCanvas(Math.max(w, c ? c.width : 0, 8), Math.max(h, c ? c.height : 0, 8)); _kc[name] = c; } return c; }
+  function kcan(name, w, h) { let c = _kc[name]; if (!c || c.width < w || c.height < h) { c = cpuCanvas(Math.max(w, c ? c.width : 0, 8), Math.max(h, c ? c.height : 0, 8)); _kc[name] = c; } return c; }
+  // The rig is drawn as vectors straight into a CPU canvas cropped to the character's screen box (sharp at any
+  // zoom, no GPU buffer round-trips), then the die-cut rings are dilated from that crop (half res for close-ups).
   function opusKeyed(X, sx, sy, R, st, id = 0) {
-    const S = G.scale, lname = 'c1opusA' + id;
-    const Al = layer(lname);
-    drawOpus(Al, sx, sy, R, { ...st, keyline: false });
-    const Ac = layerCanvas(lname);
-    const x0 = clamp(Math.floor(sx - 2.9 * R - 24), 0, W), x1 = clamp(Math.ceil(sx + 2.9 * R + 24), 0, W);
-    const y0 = clamp(Math.floor(sy - 9.6 * R - 24), 0, H), y1 = clamp(Math.ceil(sy + .7 * R + 24), 0, H);
+    const S = G.scale;
+    const Sm = mergeState(st);
+    if (Sm.alpha === 0) return;
+    const ext = 2.9 + Math.abs(Sm.dx || 0), up = 9.6 + Math.max(0, Sm.dy || 0) * (Sm.sy || 1);
+    const x0 = clamp(Math.floor(sx - ext * R - 24), 0, W), x1 = clamp(Math.ceil(sx + ext * R + 24), 0, W);
+    const y0 = clamp(Math.floor(sy - up * R - 24), 0, H), y1 = clamp(Math.ceil(sy + .7 * R + 24), 0, H);
     if (x1 <= x0 || y1 <= y0) return;
+    const pw = Math.ceil((x1 - x0) * S), ph = Math.ceil((y1 - y0) * S);
+    const A = kcan('a' + id, pw, ph), ax = cx2d(A);
+    ax.setTransform(1, 0, 0, 1, 0, 0); ax.globalAlpha = 1; ax.globalCompositeOperation = 'source-over'; ax.clearRect(0, 0, pw + 2, ph + 2);
+    ax.setTransform(S, 0, 0, S, (sx - x0) * S, (sy - y0) * S);
+    if (Sm.flip) ax.scale(-1, 1);
+    ax.lineJoin = 'round'; ax.lineCap = 'round';
+    drawOpusBody(ax, R, Sm);
+    if (st.after) st.after(ax, R, Sm);
+    ax.setTransform(1, 0, 0, 1, 0, 0);
     const onInk = st.ground !== 'paper' && st.keyline !== false && st.skin !== 'ghost';
     X.save();
     if (st.alpha !== undefined) X.globalAlpha *= st.alpha;
     if (onInk) {
       const rings = st.heroLine ? [[C.PAPER, 6 + .035 * R], [C.INK, 6]] : [[C.PAPER, Math.max(3, .035 * R + 1.5)]];
-      const ds = R >= 110 ? .5 : 1, k = S * ds;
-      const pad = Math.ceil(rings[0][1] * k) + 2, pw = Math.ceil((x1 - x0) * k), ph = Math.ceil((y1 - y0) * k), cw = pw + 2 * pad, ch = ph + 2 * pad;
-      const M = kcan('m', cw, ch), K = kcan('k', cw, ch), mx = M.getContext('2d'), kx = K.getContext('2d');
+      const ds = R * S >= 110 ? .5 : 1, k = S * ds;
+      const pad = Math.ceil(rings[0][1] * k) + 2, qw = Math.ceil((x1 - x0) * k), qh = Math.ceil((y1 - y0) * k), cw = qw + 2 * pad, ch = qh + 2 * pad;
+      const M = kcan('m', cw, ch), K = kcan('k', cw, ch), mx = cx2d(M), kx = cx2d(K);
       kx.setTransform(1, 0, 0, 1, 0, 0); kx.globalCompositeOperation = 'source-over'; kx.globalAlpha = 1; kx.clearRect(0, 0, cw, ch);
       for (const [col, rad] of rings) {
         mx.setTransform(1, 0, 0, 1, 0, 0); mx.globalCompositeOperation = 'source-over'; mx.clearRect(0, 0, cw, ch);
-        mx.drawImage(Ac, x0 * S, y0 * S, (x1 - x0) * S, (y1 - y0) * S, pad, pad, pw, ph);
+        mx.drawImage(A, 0, 0, pw, ph, pad, pad, qw, qh);
         mx.globalCompositeOperation = 'source-in'; mx.fillStyle = col; mx.fillRect(0, 0, cw, ch);
-        const r = rad * k;
-        for (let i = 0; i < 12; i++) { const a = i / 12 * TAU; kx.drawImage(M, 0, 0, cw, ch, Math.cos(a) * r, Math.sin(a) * r, cw, ch); }
+        const r = rad * k, n = r > 7 ? 16 : 12;
+        for (let i = 0; i < n; i++) { const a = i / n * TAU; kx.drawImage(M, 0, 0, cw, ch, Math.cos(a) * r, Math.sin(a) * r, cw, ch); }
       }
       X.drawImage(K, 0, 0, cw, ch, x0 - pad / k, y0 - pad / k, cw / k, ch / k);
     }
-    X.drawImage(Ac, x0 * S, y0 * S, (x1 - x0) * S, (y1 - y0) * S, x0, y0, x1 - x0, y1 - y0);
+    X.drawImage(A, 0, 0, pw, ph, x0, y0, pw / S, ph / S);
     X.restore();
   }
   function opus(X, c, wx, wy, R, st) { const p = w2s(c, wx, wy); opusKeyed(X, p[0], p[1], R * c.z, st, st.bufId || 0); return p; }
 
   // ------------------------------------------------------------------ the template
-  function frame(X, t, o = {}) {
+  function frame(Xout, t, o = {}) {
     const c = o.cam || camera(t);
+    const X = cpuLayer(o.layer || 'brand_frame');
     const PR = window.__c1prof || (() => {}); // optional profiler hook (debug only)
     groundInk(X); G.post.edgeSeed = o.edgeSeed ?? 17; G.post.sliver = o.sliver || 'bl';
     PR('ground', X);
@@ -398,10 +454,12 @@
     X.restore(); PR('chrome', X);
     if (o.over) { X.save(); o.over(X, c); X.restore(); } PR('over', X);
     if (o.hud !== false) hud(X, t, o.hud || {}); PR('hud', X);
+    if (o.post) { X.save(); o.post(X, c); X.restore(); }
+    if (o.upload !== false) upload(Xout, o.layer || 'brand_frame');
     return c;
   }
 
-  window.BRAND = { BEAT, BAR, F, bt, kickEnv, snareRoll, camera, lerpCam, w2s, rollT, worldT, heroT, galaxy, galAtlas, tabStrip, rails, inputBar, typedWords, spot,
+  window.BRAND = { BEAT, BAR, F, bt, cpuCanvas, cx2d, cpuLayer, cpuLayerCanvas, upload, halftone: ht, kickEnv, snareRoll, camera, lerpCam, w2s, rollT, worldT, heroT, galaxy, galAtlas, tabStrip, rails, inputBar, typedWords, spot,
     hud, contextFill, CHAPTERS, spark6, armsCanvas, heroLayout, heroLetters, scraps, invert, opus, opusKeyed, frame, odometer, TAB,
     ROWS: { top: { base: 436, size: 320 }, bottom: { base: 878, size: 490 }, million: { base: 471, size: 385 }, times: { base: 700, size: 290 } } };
 })();

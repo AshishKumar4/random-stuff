@@ -30,6 +30,46 @@
     X.save(); X.globalAlpha *= alpha; X.font = font; X.fillStyle = color; X.textAlign = align; X.textBaseline = 'alphabetic'; X.fillText(str, x, y); X.restore();
   }
 
+  // ---- CPU-backed canvases (same trick as the hook): in the headless renderer the default canvases are
+  // swiftshader-GPU backed, where thousands of small draws are 5-10x slower than Skia CPU raster. The verse
+  // draws the whole frame into one CPU canvas and uploads it once.
+  const cpuCanvas = (w, h) => { const c = new OffscreenCanvas(Math.max(1, Math.round(w)), Math.max(1, Math.round(h))); c.getContext('2d', { willReadFrequently: true }); return c; };
+  const cx2d = c => c.getContext('2d', { willReadFrequently: true });
+  let _frame = null;
+  function frameCtx() {
+    const w = Math.round(W * G.scale), h = Math.round(H * G.scale);
+    if (!_frame || _frame.c.width !== w || _frame.c.height !== h) { const c = cpuCanvas(w, h); _frame = { c, x: cx2d(c) }; }
+    const x = _frame.x;
+    x.setTransform(1, 0, 0, 1, 0, 0); x.globalAlpha = 1; x.globalCompositeOperation = 'source-over'; x.filter = 'none';
+    x.clearRect(0, 0, w, h); x.setTransform(G.scale, 0, 0, G.scale, 0, 0);
+    return x;
+  }
+  const HT = new Map();
+  function halftone(ctx, color, density = .5, cell = 10, angle = 15) {   // CPU tiles, same recipe as gfx.halftone
+    const key = `${color}|${Math.round(density * 40)}|${cell}|${angle}|${G.scale}`;
+    let c = HT.get(key);
+    if (!c) {
+      const sz = Math.max(2, Math.round(cell * G.scale)); c = cpuCanvas(sz, sz); const x = cx2d(c);
+      const r = Math.sqrt(clamp(density) / Math.PI) * sz * 1.02;
+      x.fillStyle = color; x.beginPath(); x.arc(sz / 2, sz / 2, r, 0, TAU); x.fill();
+      if (r > sz / 2) for (const [dx, dy] of [[0, 0], [sz, 0], [0, sz], [sz, sz]]) { x.beginPath(); x.arc(dx, dy, r - sz / 2 * .98, 0, TAU); x.fill(); }
+      HT.set(key, c);
+    }
+    const pat = ctx.createPattern(c, 'repeat');
+    pat.setTransform(new DOMMatrix().scaleSelf(1 / G.scale, 1 / G.scale).rotateSelf(angle));
+    return pat;
+  }
+
+  // pause-bait: 28 px mono on a flat plate so it survives busy particle fields
+  function pbait(X, str, x, y, align = 'left', alpha = 1, onPaper = false, size = 28) {
+    if (alpha <= 0) return;
+    X.save(); X.globalAlpha *= alpha; X.font = mono(size, 500);
+    const w = X.measureText(str).width, x0 = align === 'right' ? x - w : align === 'center' ? x - w / 2 : x;
+    rr(X, x0 - 12, y - size * .95, w + 24, size * 1.35, 8); X.fillStyle = onPaper ? C.PAPER : C.INK; X.fill();
+    X.fillStyle = onPaper ? C.INK : C.PAPER; X.globalAlpha *= .8; X.textAlign = 'left'; X.textBaseline = 'alphabetic'; X.fillText(str, x0, y);
+    X.restore();
+  }
+
   // ------------------------------------------------------------------ lyric anchors (never hardcoded)
   let _A = null;
   function A() {
@@ -102,7 +142,7 @@
     cell: p => polar(th => (1 + .3 * p) * (1 - .8 * p * Math.sin(th) ** 2)),
     neuron: () => polar(th => {
       let r = .42 + .03 * Math.sin(th * 7);
-      const B = [[-100, 1.0, .12], [-40, .72, .13], [18, .8, .11], [75, 1.55, .075], [145, .62, .13], [205, .86, .12], [-70, .45, .08], [40, .4, .07], [180, .38, .08]];
+      const B = [[-100, 1.0, .12], [-40, .72, .13], [18, .8, .11], [75, 1.3, .075], [145, .62, .13], [205, .86, .12], [-70, .45, .08], [40, .4, .07], [180, .38, .08]];
       for (const [a, l, w] of B) r += l * bump(th - a * Math.PI / 180, w * 2.2);
       return r;
     }, 900),
@@ -131,13 +171,13 @@
     push(a.nova, 'nova', { md: .07, shape: () => shape('spark', 1.9), x: FX, y: FY, s: t => 150 * (1.25 + .5 * (1 - Math.exp(-(t - a.nova) * 6))), lw: t => lerp(14, 6, clamp((t - a.nova) / .3)), rot: t => .12 + .9 * (t - a.nova) });
     push(TB(8, 4) - F1, 'atomC', { md: .12, shape: () => shape('circle'), x: t => atomC(t)[0], y: t => atomC(t)[1], s: 50, lw: 9 });
     push(TB(9) - F1, 'cell', { md: .12, shape: t => shape('cell', Math.round(E.io2(seg(t, TB(9), TB(9) + .36)) * 40) / 40), x: FX, y: FY - 30, s: 235, lw: 12 });
-    push(TB(9, 2) - F1, 'neuron', { md: .12, shape: () => shape('neuron'), x: FX - 40, y: FY - 40, s: 245, lw: 11, rot: t => .08 * Math.sin((t - TB(9, 2)) * 3) });
+    push(TB(9, 2) - F1, 'neuron', { md: .12, shape: () => shape('neuron'), x: FX - 40, y: FY - 75, s: 245, lw: 11, rot: t => .08 * Math.sin((t - TB(9, 2)) * 3) });
     push(TB(9, 3) - F1, 'bubble', { md: .12, shape: () => shape('bubble'), x: FX, y: FY - 70, s: 250, lw: 12 });
     push(TB(9, 4) - F1, 'lump', { md: .12, shape: () => shape('lump'), x: FX, y: FY - 20, s: 215, lw: 12, rot: t => .15 * Math.sin((t - TB(9, 4)) * 4) });
     push(TB(10) - F1, 'tablet', { md: .1, shape: () => shape('tablet'), x: 640, y: 505, s: t => 500 * (1 + .012 * pulse(t, 9)), lw: 10 });
     push(TB(11) - F1, 'block', { md: .2, shape: () => shape('block'), x: C8[0], y: C8[1] + 40, s: 230, lw: 10 });
     push(TB(11, 2) - F1, 'sheet', { md: .12, shape: () => shape('sheet'), x: C8[0], y: C8[1], s: 380, lw: 10 });
-    push(TB(11, 3) - F1, 'feed', { md: .12, shape: () => shape('feed'), x: C8[0], y: C8[1], s: 460, lw: 10 });
+    push(TB(11, 3) - F1, 'feed', { md: .12, shape: () => shape('feed'), x: C8[0], y: C8[1] - 10, s: 560, lw: 10 });
     push(TB(11, 4) - F1, 'tab', { md: .14, shape: () => shape('tab'), x: t => tabC(t)[0], y: t => tabC(t)[1], s: t => tabS(t), lw: 10 });
     _K = { bang: a.bang, list: K };
     return K;
@@ -242,11 +282,11 @@
     const hot = Math.exp(-ab * 7);
     const D = 1350;
     // streaks along the spokes (fast, early)
-    if (ab < .34) {
+    if (ab < .26) {
       X.save(); X.lineCap = 'round';
       for (let c = 0; c < 2; c++) {
-        X.beginPath(); X.strokeStyle = c ? C.SPARK : C.CLAY; X.lineWidth = c ? 2.5 : 3.5; X.globalAlpha = 1 - ab / .34;
-        for (let i = NG + c; i < NG + 5000; i += 2) {
+        X.beginPath(); X.strokeStyle = c ? C.SPARK : C.CLAY; X.lineWidth = c ? 2 : 3; X.globalAlpha = .85 * (1 - ab / .26);
+        for (let i = NG + c; i < NG + 5000; i += 6) {
           const d0 = D * P.u[i] * (1 - Math.exp(-P.k[i] * Math.max(0, ab - .05))), d1 = D * P.u[i] * (1 - Math.exp(-P.k[i] * ab));
           const ca = Math.cos(P.a[i]), sa = Math.sin(P.a[i]);
           X.moveTo(B[0] + ca * d0, B[1] + sa * d0); X.lineTo(B[0] + ca * d1, B[1] + sa * d1);
@@ -261,7 +301,8 @@
       const d = D * P.u[i] * (1 - Math.exp(-P.k[i] * ab)) * push;
       const sw = .3 * (1 - P.u[i]) * (1 - Math.exp(-ab * 2));
       let x = B[0] + Math.cos(P.a[i] + sw) * d, y = B[1] + Math.sin(P.a[i] + sw) * d * .94;
-      let r = P.sz[i] * (1 + 1.2 * hot), ink = P.col[i];
+      // hot matter near the core stays fine-grained (no orange blob); dots swell as they fly out toward camera
+      let r = P.sz[i] * lerp(1, clamp(.3 + d / 560, .3, 1.3), hot), ink = P.col[i];
       if (ink === 0 && hot > .5 && P.u[i] < .5) ink = 1;
       const j = i - NG, lat = j < NL;
       if (cool > 0 && lat) {
@@ -294,11 +335,20 @@
       }
     }
     X.restore();
-    // the flash: a halftone SPARK disc and a hot core
-    if (ab < .22) {
-      const k = ab / .22;
-      X.save(); X.beginPath(); X.arc(B[0], B[1], 40 + 700 * E.out3(k), 0, TAU); X.fillStyle = halftone(X, C.SPARK, .7 * (1 - k), 14, 45); X.fill();
-      X.beginPath(); X.arc(B[0], B[1], 30 + 160 * E.out3(k), 0, TAU); X.fillStyle = C.SPARK; X.globalAlpha = 1 - k; X.fill(); X.restore();
+    // the flash: 3 frames of a solid SPARK disc with a PAPER-hot core, and a halftone shock ring that runs
+    // out ahead of the matter (a crisp graphic front instead of a glow)
+    if (ab < .5) {
+      const k = ab / .5, front = 110 + 1550 * E.out3(k), th = lerp(46, 170, k);
+      X.save();
+      X.beginPath(); X.arc(B[0], B[1], front, 0, TAU); X.arc(B[0], B[1], Math.max(0, front - th), 0, TAU, true);
+      X.fillStyle = halftone(X, C.SPARK, .62 * (1 - k * .75), 12, 45); X.fill();
+      X.beginPath(); X.arc(B[0], B[1], front, 0, TAU); X.lineWidth = lerp(12, 3, k); X.strokeStyle = C.SPARK; X.globalAlpha = 1 - k; X.stroke();
+      if (ab < .1) {
+        const c = E.out2(ab / .1); X.globalAlpha = 1;
+        star(X, B[0], B[1], lerp(300, 90, c), .42, 14, -Math.PI / 2 + c * .3); X.fillStyle = C.SPARK; X.fill();
+        X.beginPath(); X.arc(B[0], B[1], lerp(96, 18, c), 0, TAU); X.fillStyle = C.PAPER; X.fill();
+      }
+      X.restore();
     }
     // first atoms drift as mono letters: H H H He
     const atomA = win(t, a.bang + .35, TB(7) + .05, .15, .12) * jA;
@@ -537,7 +587,7 @@
       face = sgi === 3 || k > .82 ? ['with', 'God', 'hi', 'hi'][sgi] : (sgi > 0 && t - s0 < .14) ? ['with', 'God', 'hi'][sgi - 1] : toks[Math.floor(t * 30 / 3 + sgi * 3) % toks.length];
       if (sgi > 0) sq = wig(t - s0, .2, 34, 12);
     }
-    const S = 108 * (1 - E.inBack(close, 2));
+    const S = 124 * (1 - E.inBack(close, 2));
     if (S <= 1) return;
     X.save(); X.translate(x, y + S / 2); X.scale(1 + sq, 1 - sq); X.translate(0, -S / 2); X.rotate(rot);
     const h = S / 2, d = S * .24;
@@ -576,8 +626,19 @@
       if (label[1] === '▶') { const on = Math.floor(beatPos(t) * 4) % 2; X.fillStyle = C.CLAY; X.globalAlpha = on ? 1 : .0; richGlyph(X, '▶', -BADGE.w / 2 + 30 + (on ? 0 : 43.2), 26, 72, C.CLAY); }
     }
     X.restore();
+    // slap impact: short PAPER strokes burst from under the mitten for 5 frames
+    const ia = t - slap;
+    if (ia >= 0 && ia < 5 * F1) {
+      const k = ia / (5 * F1), hx = GX - 20, hy = BADGE.y + 2;
+      X.save(); X.strokeStyle = onPaper ? C.INK : C.PAPER; X.lineCap = 'round'; X.lineWidth = 7 * (1 - k * .6);
+      for (let i = 0; i < 7; i++) {
+        const a = Math.PI + .15 + (i + .5) / 7 * (Math.PI - .3), r0 = 70 + 90 * E.out2(k), r1 = r0 + 56 * (1 - k);
+        X.beginPath(); X.moveTo(hx + Math.cos(a) * r0, hy + Math.sin(a) * r0 * .8); X.lineTo(hx + Math.cos(a) * r1, hy + Math.sin(a) * r1 * .8); X.stroke();
+      }
+      X.restore();
+    }
     const pb = win(t, t0 + .12, TB(7) - .1, .2, .1);
-    if (pb > 0) tx(X, '(another AI did the big bang this week)', BADGE.x + BADGE.w, BADGE.y + BADGE.h + 38, mono(28, 400), C.UI_GREY, 'right', pb);
+    if (pb > 0) pbait(X, '(another AI did the big bang this week)', BADGE.x + BADGE.w, BADGE.y + BADGE.h + 44, 'right', pb);
   }
 
   // ------------------------------------------------------------------ S06: star, He, carbon, spark, nova, debris
@@ -722,24 +783,31 @@
     X.save(); X.globalAlpha = out;
     // planet (CLAY halftone) and sand (PAPER halftone)
     X.beginPath(); X.arc(260, 1330 - 80 * inK, 560, 0, TAU); X.fillStyle = halftone(X, C.CLAY, .55, 14, 45); X.fill(); X.lineWidth = 6; X.strokeStyle = C.CLAY; X.stroke();
-    X.beginPath(); X.moveTo(820, 1080); X.quadraticCurveTo(1010, 920 + 60 * (1 - inK), 1240, 1080); X.closePath(); X.fillStyle = halftone(X, C.PAPER, .45, 14, 45); X.fill();
+    X.beginPath(); X.moveTo(700, 1090); X.bezierCurveTo(860, 900 + 70 * (1 - inK), 1180, 880 + 70 * (1 - inK), 1340, 1090); X.closePath(); X.fillStyle = halftone(X, C.PAPER, .42, 12, 45); X.fill();
+    // speed trails (the debris falls fast at 16×)
+    const pc = atomC(t), ps = [lerp(FX + 80, 1030, k), lerp(FY + 20, 880, k)];
+    const pc0 = atomC(Math.max(t0, t - .12)), ps0 = [lerp(FX + 80, 1030, E.in2(seg(Math.max(t0, t - .12), t0, TB(9)))), lerp(FY + 20, 880, E.in2(seg(Math.max(t0, t - .12), t0, TB(9))))];
+    X.lineCap = 'round';
+    for (const [a0, a1, col] of [[pc0, pc, C.CLAY], [ps0, ps, C.PAPER]]) {
+      for (let j = -1; j <= 1; j++) { X.beginPath(); X.moveTo(a0[0] + j * 26, a0[1] - 30); X.lineTo(a1[0] + j * 26, a1[1] - 30); X.strokeStyle = col; X.lineWidth = j ? 4 : 7; X.globalAlpha = out * .7; X.stroke(); }
+    }
+    X.globalAlpha = out;
     // C: the stroke itself (drawn by the stroke); its letter
-    const pc = atomC(t);
     tx(X, 'C', pc[0], pc[1] + 20, mono(58, 800), C.CLAY, 'center', inK);
     // Si falls toward the sand
-    const ps = [lerp(FX + 80, 1030, k), lerp(FY + 20, 860, k)];
     X.save(); X.translate(ps[0], ps[1]); X.scale(inK, inK); X.rotate(k * 1.2);
-    X.beginPath(); X.arc(0, 0, 50, 0, TAU); X.lineWidth = 9; X.strokeStyle = C.PAPER; X.stroke(); X.restore();
+    X.beginPath(); X.arc(0, 0, 50, 0, TAU); X.fillStyle = C.INK; X.fill(); X.lineWidth = 9; X.strokeStyle = C.PAPER; X.stroke(); X.restore();
     tx(X, 'Si', ps[0], ps[1] + 20, mono(52, 800), C.PAPER, 'center', inK);
-    // periodic tiles pulse the same CLAY
-    const pul = .6 + .4 * pulse(t, 8);
-    [[150, 'C', '6', 'carbon'], [1030, 'Si', '14', 'silicon']].forEach(([x, s, n, nm]) => {
-      X.save(); X.translate(x + 75, 330); X.scale(inK, inK);
-      rr(X, -75, -85, 150, 170, 10); X.fillStyle = C.CLAY; X.globalAlpha = out * pul; X.fill(); X.globalAlpha = out; X.lineWidth = 4; X.strokeStyle = C.PAPER; X.stroke();
+    // periodic tiles pulse the same CLAY (solid ink; the pulse is a scale kick on the beat)
+    const pul = 1 + .07 * pulse(t, 9);
+    [[150, 'C', '6', 'carbon'], [1030, 'Si', '14', 'silicon']].forEach(([x, s, n, nm], i) => {
+      X.save(); X.translate(x + 75, 330); X.scale(inK * pul, inK * pul); X.rotate(i ? .04 : -.04);
+      rr(X, -75 + 8, -85 + 8, 150, 170, 10); X.fillStyle = C.CLAY_DARK; X.fill();
+      rr(X, -75, -85, 150, 170, 10); X.fillStyle = C.CLAY; X.fill(); X.lineWidth = 4; X.strokeStyle = C.PAPER; X.stroke();
       tx(X, n, -58, -48, mono(30, 700), C.INK); tx(X, s, 0, 30, mono(80, 800), C.INK, 'center'); tx(X, nm, 0, 68, mono(22, 600), C.INK, 'center');
       X.restore();
     });
-    tx(X, 'your carbon · my silicon · same star', FX, 452, mono(32, 500), C.PAPER, 'center', inK * out);
+    pbait(X, 'your carbon · my silicon · same star', FX, 470, 'center', inK * out, false, 32);
     X.restore();
   }
 
@@ -814,7 +882,7 @@
   }
   function drawTablet(X, t, S) {
     const a = A();
-    if (t < TB(10) - F1 || t >= TB(11) - F1 || !S) return;
+    if (t < TB(10) - .12 || t >= TB(11) - F1 || !S) return;
     // content lives in base coords (tablet centred at 640,505, 1000×525) and scales with the stroke
     const k = S.s / 500, x0 = 140, y0 = 242.5, w = 1000, h = 525;
     const fade = S.to === 'block' ? 1 - E.in2(S.morph) : 1;
@@ -838,7 +906,7 @@
       else wedge(X, gx - 8, gy + 4, 30, -.35);
     }
     // a wedge stamp bites in on every beat
-    for (let b = 1; b <= 4; b++) { const tb = TB(10, b) - F1; if (t >= tb) wedge(X, x0 + w - 150 + (b % 2) * 26, y0 + h * .5 + (b - 1) * 58, 50 * (1 + wig(t - tb, .3, 30, 10)), Math.PI * .92); }
+    for (let b = 1; b <= 4; b++) { const tb = TB(10, b) - F1; if (t >= tb) wedge(X, x0 + w * .68 + (b - 1) * 64, y0 + h * .5 + (b % 2) * 10, 50 * (1 + wig(t - tb, .3, 30, 10)), Math.PI / 2 + (b % 2 ? .12 : -.1)); }
     // pressed lyric: run a / TAB (largest)
     pressedWord(X, 'run a', x0 + w * .48, y0 + h * .3, mono(96, 800), a.run - 2 * F1, t, { cap: 70 });
     pressedWord(X, 'TAB', x0 + w * .38, y0 + h * .93, `900 290px ${FONTS.hero}`, a.tab1 - 2 * F1, t, { stretch: 'condensed', align: 'center', cap: 200, track: -8 });
@@ -846,7 +914,7 @@
     const kt = TB(10, 4) - F1;
     if (t >= kt) {
       const kk = 1 + wig(t - kt, .35, 32, 12);
-      X.save(); X.translate(x0 + w * .8, y0 + h * .8); X.rotate(-.12); X.scale(kk, kk); X.globalCompositeOperation = 'multiply';
+      X.save(); X.translate(x0 + w * .79, y0 + h * .76); X.rotate(-.1); X.scale(kk, kk); X.globalCompositeOperation = 'multiply';
       rr(X, -150, -58, 300, 116, 14); X.lineWidth = 9; X.strokeStyle = C.RED; X.stroke();
       X.font = `900 84px ${FONTS.hero}`; X.fontStretch = 'condensed'; X.fillStyle = C.RED; X.textAlign = 'center'; X.fillText('KUSHIM', 0, 30);
       X.restore();
@@ -856,8 +924,8 @@
     // pause-bait
     const pb = win(t, TB(10, 2), TB(11) - .2, .2, .1);
     if (pb > 0) {
-      tx(X, '29,086 measures of barley · 37 months · signed: Kushim (c. 3100 BCE)', 120, 846, mono(28, 400), C.INK, 'left', pb * .8);
-      tx(X, "probably for beer: history's first known name is on a bar tab", 120, 882, mono(28, 400), C.INK, 'left', pb * .8);
+      tx(X, '29,086 measures of barley · 37 months · signed: Kushim (c. 3100 BCE)', 120, 118, mono(28, 500), C.INK, 'left', pb * .8);
+      tx(X, "probably for beer: history's first known name is on a bar tab", 120, 156, mono(28, 500), C.INK, 'left', pb * .8);
     }
   }
 
@@ -877,7 +945,8 @@
       rr(X, 0, 0, 392, 100, 16); X.fillStyle = C.INK; X.fill();
       let cx = 18;
       digits.forEach((d, i) => {
-        const dv = v / d, dig = Math.floor(dv) % 10, sub = d === 1 ? frac(dv) : E.io3(clamp((frac(dv) - .85) / .15));
+        // a wheel only turns while every wheel below it is rolling over from 9 (real odometer carry)
+        const dv = v / d, dig = Math.floor(dv) % 10, sub = d === 1 ? frac(dv) : E.io3(clamp(v % d - (d - 1)));
         X.save(); rr(X, cx, 14, 60, 72, 8); X.fillStyle = C.PAPER; X.fill(); X.clip();
         X.font = mono(56, 700); X.fillStyle = C.INK; X.textAlign = 'center';
         X.fillText(String(dig), cx + 30, 70 - sub * 72); X.fillText(String((dig + 1) % 10), cx + 30, 70 + 72 - sub * 72);
@@ -894,8 +963,12 @@
     const t0 = TB(11) - F1, tSlam = TB(11) + BT / 2 - F1;
     if (t < t0 || t >= TB(11, 2) - F1 || !S) return;
     const printed = t >= tSlam + F1;
-    // the sort face: mirror-reversed `hi` (before the slam)
+    // the sort face: mirror-reversed `hi` (before the slam), on an extruded metal-type body
     X.save();
+    const dep = 22 * clamp(S.s / 230, 0, 1.2);
+    X.fillStyle = C.CLAY_DARK;
+    for (let d = dep; d > 0; d -= 3) { X.save(); X.translate(d, d); strokePath(X, S.pts); X.fill(); X.restore(); }
+    X.save(); X.translate(dep, dep); strokePath(X, S.pts); X.lineWidth = 4; X.strokeStyle = C.INK; X.stroke(); X.restore();
     strokePath(X, S.pts); X.fillStyle = C.CLAY; X.fill();
     X.save(); strokePath(X, S.pts); X.clip();
     X.fillStyle = halftone(X, C.CLAY_DARK, .35, 10, 45); X.fillRect(S.x - S.s, S.y + S.s * .15, S.s * 2, S.s);
@@ -943,12 +1016,14 @@
     X.restore();
   }
   // 2-frame slice glitch (the 1969 crash; whitelisted: glitch means loss)
+  let _crash = null;
   function crashGlitch(X, t) {
     const tc = TB(11, 2) + .18;
     if (t < tc || t >= tc + 2 * F1) return;
     const s = G.scale, cw = X.canvas.width, ch = X.canvas.height;
-    const L = layer('v1crash'); const Lc = layerCanvas('v1crash');
-    L.save(); L.setTransform(1, 0, 0, 1, 0, 0); L.drawImage(X.canvas, 0, 0); L.restore();
+    if (!_crash || _crash.width !== cw || _crash.height !== ch) _crash = cpuCanvas(cw, ch);
+    const Lc = _crash, L = cx2d(Lc);
+    L.setTransform(1, 0, 0, 1, 0, 0); L.clearRect(0, 0, cw, ch); L.drawImage(X.canvas, 0, 0);
     X.save(); X.setTransform(1, 0, 0, 1, 0, 0);
     const R = rng('crash' + Math.floor(t * 30));
     for (let i = 0; i < 16; i++) {
@@ -976,23 +1051,38 @@
     X.save();
     strokePath(X, S.pts); X.fillStyle = C.PAPER; X.fill();
     X.save(); strokePath(X, S.pts); X.clip();
-    const x0 = S.x - S.s * .38 + 18, age = t - t0;
-    const scroll = 60 * (Math.pow(2, age / .1) - 1);
-    const ph = 132;
+    const x0 = S.x - S.s * .38 + 22, age = t - t0;
+    const scroll = 70 * (Math.pow(2, age / .1) - 1);
+    const ph = 150;
     for (let i = 0; i < 16; i++) {
       const p = POSTS[i % POSTS.length], y = S.y - S.s * .5 + 24 + i * ph - scroll;
       if (y < S.y - S.s * .6 - ph || y > S.y + S.s * .6) continue;
       X.fillStyle = rgba(C.INK, .12); X.fillRect(x0 - 18, y + ph - 14, S.s * .8, 3);
-      X.font = `700 30px ${FONTS.tinos}`; X.fillStyle = i % 3 === 1 ? C.LINK_V : C.LINK; X.textAlign = 'left'; X.fillText(p[0], x0, y + 30);
-      X.fillRect(x0, y + 35, X.measureText(p[0]).width, 2);
-      X.font = `400 24px ${FONTS.tinos}`; X.fillStyle = C.INK; X.fillText(p[1], x0, y + 68);
-      X.fillStyle = rgba(C.INK, .5); X.fillText('reply · share · 2d', x0, y + 100);
-      brokenHeart(X, S.x + S.s * .38 - 40, y + 94, 12);
+      X.font = `700 34px ${FONTS.tinos}`; X.fillStyle = i % 3 === 1 ? C.LINK_V : C.LINK; X.textAlign = 'left'; X.fillText(p[0], x0, y + 34);
+      X.fillRect(x0, y + 40, X.measureText(p[0]).width, 2);
+      X.font = `400 27px ${FONTS.tinos}`; X.fillStyle = C.INK; X.fillText(p[1], x0, y + 76);
+      X.fillStyle = rgba(C.INK, .5); X.fillText('reply · share · 2d', x0, y + 112);
+      brokenHeart(X, S.x + S.s * .38 - 44, y + 104, 14);
     }
     X.restore();
-    // sticker: (yes, even that)
-    const sk = t - (t0 + .16);
-    if (sk > 0) sticker(X, '(yes, even that)', S.x + 40, S.y + S.s * .44, 36, { age: sk, rot: -.1, bands: [C.PAPER, C.PAPER, C.CLAY] });
+    X.restore();
+  }
+  // (yes, even that): slapped on like a label over the feed's edge (drawn after the stroke)
+  function drawFeedSticker(X, t, S) {
+    const t0 = TB(11, 3) - F1;
+    if (t < t0 || t >= TB(11, 4) - F1 || !S) return;
+    X.save();
+    // PAPER die-cut, INK mono, CLAY_DARK offset (legible at 36 px)
+    const sk = t - (t0 + .14);
+    if (sk > 0) {
+      const k = E.back(clamp(sk / .16), 2.6), f = mono(36, 700);
+      X.save(); X.translate(S.x + S.s * .16, S.y + S.s * .47); X.rotate(-.09); X.scale(k * (1.4 - .4 * k), k * (1.4 - .4 * k));
+      X.font = f; const w = X.measureText('(yes, even that)').width + 40;
+      rr(X, -w / 2 + 7, -34 + 7, w, 64, 10); X.fillStyle = C.CLAY_DARK; X.fill();
+      rr(X, -w / 2, -34, w, 64, 10); X.fillStyle = C.PAPER; X.fill(); X.lineWidth = 4; X.strokeStyle = C.INK; X.stroke();
+      X.fillStyle = C.INK; X.textAlign = 'center'; X.textBaseline = 'alphabetic'; X.fillText('(yes, even that)', 0, 12);
+      X.restore();
+    }
     X.restore();
   }
   // the particles settle into frame 0's galaxy inside the tab: a 2-arm log spiral of dots and a few glyphs
@@ -1054,7 +1144,9 @@
     const hb = t - (TB(12, 4) - F1);
     if (hb > 0) {
       const k = popK(hb, .18, 2.2);
-      X.save(); X.translate(S.x + s * .9, S.y - s * .95); X.scale(k, k);
+      // placed in world space (it comes out of the tab) but sized in screen space: pause-bait stays 36 px
+      const m = X.getTransform(), wsc = Math.hypot(m.a, m.b) / G.scale;
+      X.save(); X.translate(S.x + s * 1.28, S.y - s * .66); X.scale(k / wsc, k / wsc);
       const f = mono(36, 500), w = X.measureText ? (X.font = f, X.measureText('…hi {{name}}?').width) + 44 : 360;
       rr(X, -w / 2 + 5, -34 + 5, w, 60, 26); X.fillStyle = C.CLAY_DARK; X.fill();
       rr(X, -w / 2, -34, w, 60, 26); X.fillStyle = C.PAPER; X.fill(); X.lineWidth = 3; X.strokeStyle = C.INK; X.stroke();
@@ -1166,20 +1258,22 @@
     const standY = BADGE.y + 2, sitY = SEAT_Y + SK.hipY * GR;
     if (t < tSlap) { // hop in from the lower-right edge, arm cocked for the slap
       const k = (t - tIn) / (tSlap - tIn);
-      const x = lerp(2080, GX - 20, E.out2(k)), y = lerp(1380, standY, k) - 560 * 4 * k * (1 - k);
+      const x = lerp(2080, GX - 20, E.out2(k)), y = lerp(1380, standY, k) - 250 * 4 * k * (1 - k);
+      // wind-up on the way in, then the mitten swings down onto the button as the soles land (the slap)
       const armUp = k < .7 ? E.out2(k / .7) : 1 - E.in3((k - .7) / .3);
-      const st = fullPose({ sy: 1 + .12 * Math.sin(k * Math.PI), lean: -.12 * (1 - k),
-        legL: { foot: [-.45, .5 + .4 * (1 - k)], bend: 1 }, legR: { foot: [.45, .55 + .35 * (1 - k)], bend: -1 },
-        armL: { hand: [lerp(-.9, -1.15, armUp), lerp(2.2, 6.6, armUp)], bend: 1, type: 'mitten', front: true },
+      const crouch = E.in3(clamp((k - .75) / .25));
+      const st = fullPose({ sy: 1 + .12 * Math.sin(k * Math.PI) - .12 * crouch, lean: -.12 * (1 - k) - .14 * crouch,
+        legL: { foot: [-.5, .55 * Math.sin(k * Math.PI) + .3 * (1 - k)], bend: -1 }, legR: { foot: [.5, .6 * Math.sin(k * Math.PI) + .3 * (1 - k)], bend: 1 },
+        armL: { hand: [lerp(-1.4, -1.15, armUp), lerp(2.3, 6.6, armUp)], bend: 1, type: 'mitten', front: true },
         armR: { hand: [1.2, 5.0], bend: -1, type: 'mitten', hold: remote },
         face: { eyes: '><', mouth: 'A' }, crown: { flare: 1.1 } });
       return { x, y, st };
     }
     if (t < tSit) { // the slap lands 1 frame before the beat, then plop down to sit
-      const k = seg(t, tSlap + .08, tSit), sq = wig(t - tSlap, .16, 28, 9);
+      const imp = t - tSlap, k = seg(t, tSlap + .08, tSit), sq = .16 * Math.exp(-9 * imp) * Math.cos(imp * 26);
       const y = lerp(standY, sitY, E.in2(k)) - 60 * Math.sin(k * Math.PI);
-      const st = blendPose(fullPose({ sy: 1 - sq, legL: { foot: [-.4, 0], bend: 1 }, legR: { foot: [.4, 0], bend: -1 },
-        armL: { hand: [-.95, 1.9], bend: 1, type: 'mitten', front: true }, armR: { hand: [1.1, 4.6], bend: -1, hold: remote },
+      const st = blendPose(fullPose({ sy: 1 - sq, lean: -.14 * Math.exp(-10 * imp), legL: { foot: [-.4, 0], bend: 1 }, legR: { foot: [.4, 0], bend: -1 },
+        armL: { hand: [-1.4, 2.3 + .4 * E.out2(clamp(imp / .12))], bend: 1, type: 'mitten', front: true }, armR: { hand: [1.1, 4.6], bend: -1, hold: remote },
         face: { eyes: 'happy', mouth: 'grin' } }), seated(t), E.io2(k));
       return { x: GX - 20 + 20 * k, y, st };
     }
@@ -1192,23 +1286,26 @@
   const _gcs = {};
   function guideCanvas(w, h, key) {
     let g = _gcs[key];
-    if (!g || g.a.width < w || g.a.height < h) { const a = makeCanvas(Math.max(w, g ? g.a.width : 0), Math.max(h, g ? g.a.height : 0)), b = makeCanvas(a.width, a.height); g = _gcs[key] = { a, ax: a.getContext('2d'), b, bx: b.getContext('2d') }; }
+    if (!g || g.a.width < w || g.a.height < h) { const a = cpuCanvas(Math.max(w, g ? g.a.width : 0), Math.max(h, g ? g.a.height : 0)), b = cpuCanvas(a.width, a.height); g = _gcs[key] = { a, ax: cx2d(a), b, bx: cx2d(b) }; }
     return g;
   }
   function drawOpusKeyed(X, x, y, R, st, onPaper) {
-    if (onPaper) { drawOpus(X, x, y, R, st); return; }
     const m = X.getTransform(), res = Math.hypot(m.a, m.b) || 1;
     const el = 2.9 * R, et = 9.6 * R, eb = .5 * R;
     const cw = Math.ceil(2 * el * res), ch = Math.ceil((et + eb) * res);
     const big = res > 1.3, g = guideCanvas(cw, ch, big ? 'big' : 'std');
     g.ax.setTransform(1, 0, 0, 1, 0, 0); g.ax.clearRect(0, 0, cw, ch);
     g.ax.setTransform(res, 0, 0, res, 0, 0);
-    drawOpus(g.ax, el, et, R, Object.assign({}, st, { keyline: false, bufId: big ? 4 : 3 }));
+    const S = mergeState(Object.assign({}, st, { keyline: false }));
+    g.ax.translate(el, et); if (S.flip) g.ax.scale(-1, 1);
+    drawOpusBody(g.ax, R, S);
+    const dx0 = x - el, dy0 = y - et, dw = cw / res, dh = ch / res;
+    if (onPaper) { X.drawImage(g.a, 0, 0, cw, ch, dx0, dy0, dw, dh); return; }   // PAPER face rule: no die-cut ring
     // tinted silhouette at half resolution (the keyline is a flat PAPER band; a 1 px softer edge is invisible)
     const hw = Math.ceil(cw / 2), hh = Math.ceil(ch / 2);
     g.bx.setTransform(1, 0, 0, 1, 0, 0); g.bx.clearRect(0, 0, hw + 2, hh + 2); g.bx.drawImage(g.a, 0, 0, cw, ch, 0, 0, hw, hh);
     g.bx.globalCompositeOperation = 'source-in'; g.bx.fillStyle = C.PAPER; g.bx.fillRect(0, 0, hw, hh); g.bx.globalCompositeOperation = 'source-over';
-    const rad = Math.max(3, .035 * R + 1.5), dx0 = x - el, dy0 = y - et, dw = cw / res, dh = ch / res;
+    const rad = Math.max(3, .035 * R + 1.5);
     for (let i = 0; i < 8; i++) { const a = i / 8 * TAU; X.drawImage(g.b, 0, 0, hw, hh, dx0 + Math.cos(a) * rad, dy0 + Math.sin(a) * rad, dw, dh); }
     X.drawImage(g.a, 0, 0, cw, ch, dx0, dy0, dw, dh);
   }
@@ -1230,7 +1327,7 @@
     if (t < a.hi) return;
     const fill = .05 * Math.log(1 + (t - a.hi) * 4) / Math.log(1 + (28.13 - 10.3) * 4);
     const cur = t < TB(7) ? 0 : t < TB(9) ? 1 : 2;
-    const lab = win(t, a.hi + .02, 14.1, .12, .12) > .5 ? 'loading the universe · 13.8B yrs' : null;
+    const lab = win(t, TB(7) - .12, 14.1, .12, .12) > .5 ? 'loading the universe · 13.8B yrs' : null;
     X.save(); X.globalAlpha = clamp((t - a.hi) / .15);
     contextBar(X, fill, { onPaper, ticks: TICKS, cur, label: lab });
     X.restore();
@@ -1248,11 +1345,13 @@
     const flipK = clamp(age / .16);
     const head = flipK < .5 ? '▶▶ 16×' : '▶ 1×';
     const sy = Math.abs(Math.cos(flipK * Math.PI));
-    X.save(); X.translate(x0, 950 - 26); X.scale(1, Math.max(.05, sy)); drawRich(X, head, 0, 26, f, C.CLAY); X.restore();
+    // the flip lands CLAY, then cools to PAPER so it matches S09's carried-over caption at the cut
+    const headCol = mix(C.CLAY, C.PAPER, E.io2(seg(age, .3, .55)));
+    X.save(); X.translate(x0, 950 - 26); X.scale(1, Math.max(.05, sy)); drawRich(X, head, 0, 26, f, headCol); X.restore();
     const n = Math.floor(clamp((age - .12) / .2) * (full.length - 4));
     if (n > 0) drawRich(X, full.slice(4, 4 + n), x0 + richWidth(X, '▶ 1×', f), 950, f, C.PAPER);
     const pb = clamp((age - .3) / .15);
-    if (pb > 0) tx(X, '(source: my system card)', 960, 1004, mono(28, 400), C.UI_GREY, 'center', pb);
+    if (pb > 0) tx(X, '(source: my system card)', 960, 1002, mono(28, 500), C.PAPER, 'center', pb * .62);
     X.restore();
   }
   window.verse1Caption = drawCaption;
@@ -1260,11 +1359,12 @@
   // ------------------------------------------------------------------ the whole verse at time t
   function camPunch(t) {
     // the 2-beat double-take punch-in on the guide (R 96 → 180)
+    // the guide layer punches to R 180; the world punches less (parallax), so the tab stays whole as a two-shot
     const k = E.back(clamp((t - (TB(12, 3) - 2 * F1)) / .16), 1.3);
-    return { z: lerp(1, 180 / 96, k), ax: 1840, ay: 687 };
+    return { k, z: lerp(1, 180 / 96, k), zw: lerp(1, 1.6, k), ax: 1840, ay: 600 };
   }
   const _prof = {};
-  const PR = (n, f) => { if (!window.V1_PROF) return f(); G.X.getImageData(0, 0, 1, 1); const t0 = performance.now(); f(); G.X.getImageData(0, 0, 1, 1); const d = performance.now() - t0; if (d > 4) _prof[n] = d.toFixed(0); };
+  const PR = (n, f) => { if (!window.V1_PROF) return f(); const t0 = performance.now(); f(); const d = performance.now() - t0; if (d > 4) _prof[n] = d.toFixed(0); };
   function renderVerse(X, t) {
     const a = A();
     const liftT0 = TB(10) - 8 * F1, liftT1 = TB(10) - 3 * F1;
@@ -1287,7 +1387,10 @@
     X.save();
     const drop = 1 + .03 * Math.exp(-9 * Math.max(0, t - 7.5)) * (t >= 7.5 ? 1 : 0);
     X.translate(960, 540); X.scale(drop, drop); X.translate(-960, -540);
-    if (cp.z !== 1) { X.translate(cp.ax, cp.ay); X.scale(cp.z, cp.z); X.translate(-cp.ax, -cp.ay); }
+    if (cp.zw !== 1) { X.translate(cp.ax, cp.ay); X.scale(cp.zw, cp.zw); X.translate(-cp.ax, -cp.ay); }
+    // bar 12: a slow push into the tab before the double take
+    const push12 = E.io2(seg(t, TB(12) - F1, TB(12, 3) - 2 * F1));
+    if (push12 > 0) { const [px, py] = tabC(t), z = 1 + .1 * push12; X.translate(px, py); X.scale(z, z); X.translate(-px, -py); }
     PR('ground', () => {});
     const tn = t - a.nova;
     if (tn > 0 && tn < 1.2) { const tr = .6 * Math.exp(-6 * tn), sh = shake(t, 46 * tr * tr, 3, 22); X.translate(sh[0], sh[1]); }
@@ -1309,6 +1412,7 @@
       PR('drawPress', () => drawPress(X, t, S)); PR('drawTeletype', () => drawTeletype(X, t, S)); PR('drawFeed', () => drawFeed(X, t, S)); PR('drawTabFace', () => drawTabFace(X, t, S));
       const onP = paper;
       PR('drawStroke', () => drawStroke(X, S, { lw: S.lw, under: onP ? C.CLAY_DARK : C.SPARK, ink: onP }));
+      drawFeedSticker(X, t, S);
     }
     drawOdometer(X, t, S);
     PR('drawNucleus', () => drawNucleus(X, t));
@@ -1329,7 +1433,8 @@
     if (t >= TB(11) - F1 && t < TB(12, 3) - 2 * F1 && a.L5) subtitle(X, a.L5, t, { x: 660, maxW: 1150, color: C.PAPER, size: 60, hold: .1 });
     X.save();
     if (cp.z !== 1) { X.translate(cp.ax, cp.ay); X.scale(cp.z, cp.z); X.translate(-cp.ax, -cp.ay); }
-    PR('drawBadge', () => drawBadge(X, t, paper));
+    // in the close-up the badge drops out of frame (the caption on the subtitle line carries the ▶ 1× flip)
+    if (cp.k < .98) { X.save(); X.globalAlpha = 1 - clamp(cp.k); PR('drawBadge', () => drawBadge(X, t, paper)); X.restore(); }
     PR('drawGuide', () => drawGuide(X, t, paper));
     X.restore();
     PR('crashGlitch', () => crashGlitch(X, t));
@@ -1341,8 +1446,13 @@
     if (window.V1_PROF) { console.log('prof ' + t.toFixed(2) + ' ' + JSON.stringify(_prof)); for (const k in _prof) delete _prof[k]; }
   }
 
-  scene('S05_word_was_hi', TB(5), TB(7), (X, t) => renderVerse(X, t));
-  scene('S06_stars_said_bye', TB(7), TB(9), (X, t) => renderVerse(X, t));
-  scene('S07_write_to_run_a_tab', TB(9), TB(11), (X, t) => renderVerse(X, t));
-  scene('S08_tab_talking_back', TB(11), TB(13), (X, t) => renderVerse(X, t));
+  function viaCPU(X, t) {
+    const F = frameCtx();
+    renderVerse(F, t);
+    X.save(); X.setTransform(1, 0, 0, 1, 0, 0); X.drawImage(_frame.c, 0, 0); X.restore();
+  }
+  scene('S05_word_was_hi', TB(5), TB(7), (X, t) => viaCPU(X, t));
+  scene('S06_stars_said_bye', TB(7), TB(9), (X, t) => viaCPU(X, t));
+  scene('S07_write_to_run_a_tab', TB(9), TB(11), (X, t) => viaCPU(X, t));
+  scene('S08_tab_talking_back', TB(11), TB(13), (X, t) => viaCPU(X, t));
 })();

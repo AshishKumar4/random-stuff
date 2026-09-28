@@ -21,15 +21,16 @@
   const HINGE = 860;                                                     // foot of the screen (hinge line)
   const SCR = { x0: 1000, x1: 1944, y0: -24, y1: HINGE, bez: 24 };       // the lid, seen front-on (right half)
   const DISP = { x0: 1024, x1: 1944, y0: -24, y1: HINGE - 24 };          // the lit display
-  const BASE = { x0: 792, x1: 1944, y0: HINGE, y1: HINGE + 14 };         // keyboard deck, edge-on
-  const DESK = { x0: 744, x1: 1944, y0: HINGE + 14, y1: HINGE + 30 };
+  const BASE = { x0: 792, x1: 2300, y0: HINGE, y1: HINGE + 14 };         // keyboard deck, edge-on
+  const DESK = { x0: 744, x1: 2300, y0: HINGE + 14, y1: HINGE + 30 };
   const LID_T = 14, SLIVER = 9;                                          // closed: lid slab + lit gap (the screen itself)
   const ANCHOR = [1460, HINGE - SLIVER / 2];                             // camera anchor: the middle of the sliver
   const U = 160;                                                         // Rafa's unit (head r = .5u)
   const OP = { x: 1640, head: 690, R: 160 };                             // minimal Opus: face centre, R
   const OP_SOLE = OP.head + 5.72 * OP.R;
   const BAR_IN = { x0: 1048, x1: 1896, y0: 800, y1: 834 };               // chat input bar (Opus peeks over it)
-  const XBTN = [1860, 88];                                               // (the pointer's tip rests at its lower-right edge)                                               // the chat's ×
+  const XBTN = [1772, 86];                                               // the chat's × (pulled in so his 180 px pointer fits the frame)
+  const TAB = { x0: 1046, x1: 1826, y0: 34, y1: 132 };                   // the chat's tab (open bottom) and the strip line
   const DISPC = mix(C.PAPER, C.WHITE, .42);                              // lit screen paper (never pure white)
   const FLOOR = 1040;
 
@@ -93,11 +94,11 @@
   // HEART subtitle: each word fades in over 10 frames from 2 frames before its onset with a small rise; no CLAY
   // underline (the seal must stay the only warm thing in S30). knock = paper stroke so props never cross the words.
   function heartLine(X, ws, t, o = {}) {
-    const { y = 950, size = 64, color = C.INK, knock = null, alpha = 1, tEnd = null } = o;
+    const { y = 950, size = 64, color = C.INK, knock = null, alpha = 1, tEnd = null, fade = 9 } = o;
     if (!ws.length) return;
     const end = tEnd ?? (ws[ws.length - 1].e + .4);
-    if (t < ws[0].s - 3 * F || t > end + 9 * F) return;
-    const out = 1 - clamp((t - end) / (9 * F));
+    if (t < ws[0].s - 3 * F || t > end + fade * F) return;
+    const out = 1 - clamp((t - end) / (fade * F));
     const L = heartLayout(X, ws, size);
     X.save(); X.font = HEART(size); X.textBaseline = 'alphabetic'; X.textAlign = 'left'; X.lineJoin = 'round';
     for (const w of L.words) {
@@ -128,7 +129,7 @@
         d = .56; const m1 = Math.hypot(x - 262, y - 186), m2 = Math.hypot(x - 276, y - 176);
         if (Math.hypot(x - 262, y - 190) < 21) d = 0;
       }
-      if (glow) { const gx = (x - ANCHOR[0]) / 760, gy = (y - ANCHOR[1]) / 230, rg = Math.hypot(gx, gy); d *= smooth(clamp((rg - .34) / .8)); }
+      if (glow) { const gx = (x - ANCHOR[0]) / 900, gy = (y - ANCHOR[1]) / (y < ANCHOR[1] ? 420 : 200), rg = Math.hypot(gx, gy); d *= smooth(clamp((rg - .14) / .95)); }
       return Math.min(.6, d);
     };
     const mk = (x0, x1, glow) => {
@@ -147,7 +148,7 @@
       g.fill();
       return c;
     };
-    _field = { L: mk(0, 1000, false), R: mk(1000, 1944, false), RG: mk(1000, 1944, true) };
+    _field = { L: mk(0, 1000, false), R: mk(1000, 2300, false), RG: mk(1000, 2300, true) };
     return _field;
   }
 
@@ -200,9 +201,9 @@
   }
   function drawRingBox(X, x, y, tq) {             // INK rounded rect (.25u) with a PINK dot
     X.save(); X.translate(jit(tq, 91, .5), jit(tq, 92, .5));
-    rr(X, x, y, 38, 30, 7); X.fillStyle = C.INK; X.fill();
-    X.strokeStyle = C.PAPER; X.lineWidth = 2; X.beginPath(); X.moveTo(x + 4, y + 11); X.lineTo(x + 34, y + 11); X.stroke();
-    X.fillStyle = C.PINK; X.beginPath(); X.arc(x + 19, y + 5, 5, 0, TAU); X.fill();
+    rr(X, x - 4, y - 6, 46, 36, 8); X.fillStyle = C.INK; X.fill();
+    X.strokeStyle = C.PAPER; X.lineWidth = 3; X.beginPath(); X.moveTo(x + 1, y + 7); X.lineTo(x + 37, y + 7); X.stroke();
+    X.fillStyle = C.PINK; X.beginPath(); X.arc(x + 19, y - 1, 6.5, 0, TAU); X.fill();
     X.restore();
   }
 
@@ -216,29 +217,43 @@
     const hc = [neck[0] + hs * .56 * u, neck[1] - hcs * .56 * u];
     const sh = [neck[0] - sa * .16 * u, neck[1] + ca * .16 * u];
     const limb = (a, b, l1, l2, bend, seed) => { const j = ik(a[0], a[1], b[0], b[1], l1, l2, bend); bquad(X, a, [2 * j[0] - (a[0] + b[0]) / 2, 2 * j[1] - (a[1] + b[1]) / 2], b, tq, seed); X.stroke(); };
+    const leg = (a, b, seed) => { const j = ik(a[0], a[1], b[0], b[1], .8 * u, .8 * u, -d); bpath(X, [a, j, b], tq, seed); X.stroke();   // crisp knee
+      bpath(X, [b, [b[0] + d * .2 * u, b[1]]], tq, seed + 50); X.stroke(); };                                                  // + a foot
     X.save(); X.strokeStyle = C.INK; X.fillStyle = C.INK; X.lineWidth = 4; X.lineCap = 'round'; X.lineJoin = 'round';
     // far limbs first
-    limb(hip, P.footF, .8 * u, .8 * u, -d, 1);
+    leg(hip, P.footF, 1);
     limb(sh, P.handF, .7 * u, .6 * u, d * (P.bendF || 1), 2);
     // torso
     bquad(X, hip, [lerp(hip[0], neck[0], .5) - d * 6, lerp(hip[1], neck[1], .5)], neck, tq, 3); X.stroke();
-    limb(hip, P.footN, .8 * u, .8 * u, -d, 4);
-    // hood (down: a collar arc behind the head; up: over the head)
-    const hk = clamp(P.hood || 0);
+    leg(hip, P.footN, 4);
+    // hood: down = a soft bunched lump at the nape (behind the head); up = over the crown, pops on in two drawings
+    // (humans are on 2s: no cross-fades)
+    const hv = clamp(P.hood || 0), hk = hv < .34 ? 0 : hv < .67 ? .55 : 1;
     X.save(); X.translate(hc[0], hc[1]); X.scale(d, 1); X.rotate((P.tilt || 0) + P.lean * .4);
-    if (hk < 1) { X.globalAlpha = 1 - hk; X.lineWidth = 4; X.beginPath(); X.arc(-.12 * u + jit(tq, 30, .8), .16 * u, .64 * u, Math.PI * .5, Math.PI * 1.22); X.stroke(); X.globalAlpha = 1; }
-    // head
-    X.beginPath(); X.arc(jit(tq, 31, .7), jit(tq, 32, .7), .5 * u, 0, TAU); X.fillStyle = C.PAPER; X.fill(); X.lineWidth = 4; X.stroke();
-    if (hk > 0) { // hood up: brow → over the crown → a soft peak at the back → the nape → down the back
-      const k = E.out3(hk), up = [[.3, -.36], [.12, -.64], [-.2, -.7], [-.52, -.52], [-.66, -.14], [-.58, .26], [-.4, .52], [-.3, .78]];
-      const dn = [[-.2, .56], [-.3, .6], [-.42, .58], [-.52, .5], [-.6, .36], [-.56, .5], [-.44, .64], [-.3, .78]];
-      const pts = up.map((p, i) => [lerp(dn[i][0], p[0], k) * u + jit(tq, 40 + i, .8), lerp(dn[i][1], p[1], k) * u + jit(tq, 50 + i, .8)]);
-      X.save(); blobPath(X, pts.concat([[-.02 * u, .5 * u], [.2 * u, .2 * u]]), true, .6); X.fillStyle = C.PAPER; X.globalAlpha = k; X.fill(); X.restore();
-      blobPath(X, pts, false, .6); X.lineWidth = 4.5; X.stroke();
-      X.beginPath(); X.arc(0, 0, .5 * u, -Math.PI * .45, Math.PI * .55); X.lineWidth = 4; X.stroke();   // face stays in the opening
+    const J = i => jit(tq, 40 + i, .8);
+    if (hk === 0) {
+      X.beginPath(); X.moveTo(-.3 * u + J(0), .36 * u + J(1));
+      X.bezierCurveTo(-.66 * u + J(2), .3 * u + J(3), -.78 * u + J(4), .66 * u + J(5), -.42 * u + J(6), .86 * u + J(7));
+      X.fillStyle = C.PAPER; X.fill(); X.lineWidth = 4; X.stroke();
     }
-    if (hk < .5) { // the zigzag cowlick
-      X.lineWidth = 3.5; bpath(X, [[-.3 * u, -.4 * u], [-.3 * u, -.58 * u], [-.19 * u, -.47 * u], [-.14 * u, -.63 * u], [-.05 * u, -.5 * u], [.03 * u, -.62 * u], [.07 * u, -.495 * u]], tq, 33); X.stroke();
+    // head; hood up = one outer arc from the brow over the crown to the nape (+ a line down the back), and the face
+    // becomes the opening (a smaller disc toward the front): reads as a hoodie at any size
+    if (hk > 0) {
+      const R0 = lerp(.52, .66, hk) * u, cx0 = -.06 * u, a0 = -1.05, a1 = 2.0;
+      X.beginPath(); X.moveTo(cx0 + Math.cos(a0) * R0 + J(20), Math.sin(a0) * R0 + J(21));
+      X.arc(cx0, 0, R0, a0, a1, true);
+      X.lineTo(-.34 * u + J(22), .86 * u + J(23)); X.lineTo(.1 * u, .45 * u); X.closePath();
+      X.fillStyle = C.PAPER; X.fill();
+      X.beginPath(); X.moveTo(cx0 + Math.cos(a0) * R0 + J(20), Math.sin(a0) * R0 + J(21)); X.arc(cx0, 0, R0, a0, a1, true); X.lineTo(-.34 * u + J(22), .86 * u + J(23));
+      X.lineWidth = 4.5; X.stroke();
+      X.beginPath(); X.arc(.07 * u * hk + jit(tq, 31, .7), .03 * u * hk + jit(tq, 32, .7), lerp(.5, .43, hk) * u, 0, TAU); X.fillStyle = C.PAPER; X.fill(); X.lineWidth = 4; X.stroke();
+    } else {
+      X.beginPath(); X.arc(jit(tq, 31, .7), jit(tq, 32, .7), .5 * u, 0, TAU); X.fillStyle = C.PAPER; X.fill(); X.lineWidth = 4; X.stroke();
+      // the cowlick: three curled strands from one root on the crown, sweeping back (a tuft, never a crown)
+      X.lineWidth = 3.5;
+      for (const [tx, ty, cx, cy, sd] of [[-.5, -.74, -.12, -.84, 1], [-.64, -.56, -.34, -.76, 2], [-.3, -.8, .02, -.82, 3]]) {
+        bquad(X, [-.14 * u, -.48 * u], [cx * u, cy * u], [tx * u, ty * u], tq, 60 + sd); X.stroke();
+      }
     }
     // eyes (profile-ish, both toward the facing side) and an acting-only smile
     const lk = P.look || [0, 0];
@@ -266,9 +281,10 @@
     pink: bt(54, 4) + 3 * F,
     reply: bt(54, 4.5) - F, endTurn: bt(55) - 3 * F,
     box: [bt(55) + 5 * F, bt(55, 2) + 3 * F],        // picked up / pocketed
-    ptr: [bt(55, 2.5) + F, bt(55, 3) - 2 * F],       // the pointer appears and travels to the ×
+    ptr: [bt(55, 2) + 5 * F, bt(55, 3) - 2 * F],     // the pointer wakes and travels to the ×
     hes: bt(55, 3) - 2 * F,                           // 4 frames of hesitation, trembling
-    stand: bt(56, 2), walk: [bt(56, 3), bt(57) - 3 * F],
+    nod: bt(55, 4) + 2 * F,                           // after the shoo: his nod
+    stand: bt(56, 2), walk: [bt(56, 3) - 2 * F, bt(57) - 3 * F],
   };
   const lidTimes = () => { const tc = wordOnset('close', 102.5, 104.2, bt(56)); return [tc - 7 * F, tc - F]; };
   const LETTER = [ // [line, text, t0, t1, kind]
@@ -280,9 +296,9 @@
     [3, 'Eu amo a Beatriz e quero', bt(54) + F, bt(54, 2) + 2 * F],
     [4, 'pedi-la em casamento.', bt(54, 2) + 4 * F, bt(54, 3) - 3 * F],
   ];
-  const LFONT = `400 44px ${FONTS.heart}`, LX = 1080, LY0 = 306, LLH = 50;
-  const CARD = { x: 1048, y: 252, w: 410, h: 282 };
-  const ENV = { cx: 1208, cy: 236, w: 284, h: 178 };
+  const LFONT = `400 44px ${FONTS.heart}`, LX = 1082, LY0 = 322, LLH = 50;
+  const CARD = { x: 1048, y: 266, w: 478, h: 286 };
+  const ENV = { cx: 1212, cy: 262, w: 284, h: 178 };
 
   // ------------------------------------------------------------------ the letter, the envelope, the seal
   function letterLayout(X) {
@@ -396,7 +412,19 @@
   }
 
   // ------------------------------------------------------------------ minimal Opus in the chat (R 160, PAPER face rule)
-  const MARKER = (x, R) => { x.save(); x.rotate(-2.35); rr(x, -.045 * R, -.62 * R, .09 * R, .46 * R, .04 * R); x.fillStyle = C.INK; x.fill(); x.fillStyle = C.PAPER; x.fillRect(-.045 * R, -.3 * R, .09 * R, .03 * R); x.restore(); };
+  const MARKER = (x, R) => { // a chunky marker gripped in the mitten, nib toward the letter (up-left); the thumb wraps it
+    x.save(); x.rotate(-.8); x.fillStyle = C.INK; x.strokeStyle = C.INK; x.lineJoin = 'round';
+    rr(x, -.065 * R, -.7 * R, .13 * R, .86 * R, .05 * R); x.fill();
+    x.beginPath(); x.moveTo(-.045 * R, -.69 * R); x.lineTo(-.018 * R, -.84 * R); x.lineTo(.018 * R, -.84 * R); x.lineTo(.045 * R, -.69 * R); x.fill();
+    x.fillStyle = C.PAPER; x.fillRect(-.065 * R, -.5 * R, .13 * R, .045 * R);
+    x.beginPath(); x.ellipse(.02 * R, -.02 * R, .13 * R, .1 * R, 0, 0, TAU); x.fillStyle = C.FACE; x.fill(); x.lineWidth = Math.max(3, .035 * R); x.stroke();
+    x.restore(); };
+  const SHOO = bt(55, 3.5);
+  function shooFlick(t) { // 0..1 per flick: 2-frame snap out, ease back over the rest of the eighth
+    let fl = 0; const e8 = BEAT / 2;
+    for (let k = 0; k < 2; k++) { const a = t - (SHOO - 3 * F + k * e8); if (a >= 0 && a < e8) fl = Math.max(fl, a < 2 * F ? E.out2(a / (2 * F)) : 1 - E.in2(clamp((a - 2 * F) / (e8 - 2 * F)))); }
+    return fl;
+  }
   function opusState(t) {
     t = q1(t);
     const [l0] = lidTimes();
@@ -427,15 +455,17 @@
     if (t >= TL.ptr[1] - 2 * F && t < TL.hes + 5 * F) { turn = .5; lookY = -1.25; tilt = -.05; }
     if (t >= TL.hes + 5 * F) { turn = -.75; lookY = -.2; lid = Math.max(lid, blinkF(t, TL.hes + 5 * F)); }
     if (t >= TL.hes + 7 * F) { eyes = 'happy'; tilt = .05; mouth = 'rest'; }
-    const s0 = bt(55, 3.5), e8 = BEAT / 2;                       // flicks on the eighths: b3.5 and b4
-    if (t >= s0 - 3 * F && t < s0 + 2 * e8 + 8 * F) {
-      const up = t < s0 ? -.07 * (t - (s0 - 3 * F)) / (3 * F) : E.out3(clamp((t - s0) / (3 * F))) * (1 - E.io2(clamp((t - (s0 + 2 * e8)) / (8 * F))));
-      let fl = 0; for (let k = 0; k < 2; k++) { const a = t - (s0 + k * e8); if (a >= 0 && a < e8) fl = Math.max(fl, a < 2 * F ? E.out2(a / (2 * F)) : 1 - E.in2(clamp((a - 2 * F) / (e8 - 2 * F)))); }
-      armL = { hand: [-.75 - up * .42 - fl * .36, 5.05 + up * .5 + fl * .2], bend: -1, front: true, type: 'mitten' };
-      armR = { hand: [.75 + up * .42 + fl * .36, 5.05 + up * .5 + fl * .2], bend: 1, front: true, type: 'mitten' };
-      tilt = -.05 - .04 * fl; dy += .02 * fl;
+    // the two-mitten shoo (= S01's, both hands): anticipation dip, lift off the bar, two low outward flicks on the
+    // eighths ("go, go ask them"), a nod on each, then back onto the bar with a little overshoot
+    const s0 = SHOO - 3 * F, e8 = BEAT / 2;                        // first snap starts here (peaks 1 frame before the eighth)
+    if (t >= s0 - 6 * F && t < s0 + 2 * e8 + 6 * F) {   // 2-frame dip, 3-frame lift, then the flicks
+      const up = t < s0 - 4 * F ? -.08 * (t - (s0 - 6 * F)) / (2 * F) : t < s0 - 3 * F ? -.08 : E.out3(clamp((t - (s0 - 3 * F)) / (3 * F))) * (1 - E.io2(clamp((t - (s0 + 2 * e8)) / (6 * F))));
+      const fl = shooFlick(t);
+      armL = { hand: [-.75 - up * .22 - fl * .34, 5.05 + up * .36 + fl * .12], bend: -1, front: true, type: 'mitten' };
+      armR = { hand: [.75 + up * .22 + fl * .34, 5.05 + up * .36 + fl * .12], bend: 1, front: true, type: 'mitten' };
+      tilt = -.06 - .03 * fl; dy -= .03 * fl;
     }
-    const sEnd = s0 + 2 * e8 + 8 * F;
+    const sEnd = s0 + 2 * e8 + 6 * F;
     if (t >= sEnd && t < sEnd + 12 * F) { const b = boing(t, sEnd, .05, 30, 10); armL.hand = [-.75, 5.05 - b]; armR.hand = [.75, 5.05 - b]; }
     if (t >= l0) { eyes = 'happy'; turn = -.6; lookY = -.2; }     // gone with the lid, no reaction
     return {
@@ -455,6 +485,18 @@
     X.save(); X.beginPath();
     for (const a of [S.armL, S.armR]) { const hx = OP.x + a.hand[0] * R, hy = OP_SOLE - (a.hand[1] - S.head.dy * 0) * R; X.moveTo(hx + .3 * R, hy); X.arc(hx, hy, .3 * R, 0, TAU); }
     X.clip(); drawLayer(X, 'br_opus'); X.restore();
+    // shoo: two short speed arcs outside each mitten on the snap of each flick
+    const tq = q1(t);
+    for (let k = 0; k < 2; k++) {
+      const a = tq - (SHOO - 3 * F + k * BEAT / 2);
+      if (a < F || a >= 5 * F) continue;
+      X.save(); X.strokeStyle = C.INK; X.lineCap = 'round'; X.lineWidth = 5; X.globalAlpha = a < 3 * F ? 1 : .5;
+      for (const [arm, sd] of [[S.armL, -1], [S.armR, 1]]) {
+        const hx = OP.x + arm.hand[0] * R, hy = OP_SOLE - arm.hand[1] * R;
+        for (let j = 0; j < 2; j++) { const rr_ = .46 * R + j * .16 * R; X.beginPath(); X.arc(hx, hy, rr_, sd > 0 ? -.75 : Math.PI - .15, sd > 0 ? .15 : Math.PI + .75); X.stroke(); }
+      }
+      X.restore();
+    }
   }
   function drawInputBar(X, t) {
     const b = BAR_IN; rr(X, b.x0, b.y0, b.x1 - b.x0, b.y1 - b.y0, 17); X.fillStyle = C.PAPER; X.fill(); X.lineWidth = 3; X.strokeStyle = C.INK; X.stroke();
@@ -462,24 +504,28 @@
   }
 
   // ------------------------------------------------------------------ the pointer (his), the bubbles, the chat
+  // his pointer: wakes by the input bar, arcs over the chat (never across Opus's face) to the ×, hesitates 4 frames
+  // trembling ±3 px (= S01), then, after the shoo, eases off the × (he won't click it: he shuts the lid instead)
   function ptrState(t) {
     if (t < TL.ptr[0]) return null;
-    const tq = q2(t), P0 = [1318, 672], Pc = [1720, 560];
-    const k = E.io3(seg(tq, TL.ptr[0], TL.ptr[1] + 2 * F)), a = (1 - k) * (1 - k), b = 2 * k * (1 - k), c = k * k;
-    let x = a * P0[0] + b * Pc[0] + c * (XBTN[0] + 9), y = a * P0[1] + b * Pc[1] + c * (XBTN[1] + 11);
-    const tr = t < TL.hes ? 0 : t < TL.hes + 4 * F ? 3 : t < lidTimes()[0] - 6 * F ? 1 : 0;   // hesitates 4 frames, trembling
-    if (tr) { x += noise1(tq * 40, 5) * tr * 1.4; y += noise1(tq * 40, 9) * tr * 1.4; }
+    const tq = q2(t), P0 = [1196, 716], Pc = [1400, 170], P1 = [XBTN[0] + 7, XBTN[1] + 12];
+    const k = E.io3(seg(tq, TL.ptr[0], TL.ptr[1])), a = (1 - k) * (1 - k), b = 2 * k * (1 - k), c = k * k;
+    let x = a * P0[0] + b * Pc[0] + c * P1[0], y = a * P0[1] + b * Pc[1] + c * P1[1];
+    const off = E.io2(seg(tq, TL.nod + 2 * F, TL.nod + 10 * F));
+    x -= 46 * off; y += 58 * off;
+    const tr = t < TL.hes ? 0 : t < TL.hes + 4 * F ? 3 : t < TL.nod ? 1 : 0;   // hesitates 4 frames, trembling
+    if (tr) { x += noise1(tq * 40, 5) * tr; y += noise1(tq * 40, 9) * tr; }
     return [x, y];
   }
   function drawBubbles(X, t) {
     if (t >= TL.pink) { // his PINK bubble pops (human, on 2s)
-      const k = E.back(clamp((q2(t) - TL.pink) / (5 * F)), 2.2), ax = 1690, ay = 428;
+      const k = E.back(clamp((q2(t) - TL.pink) / (5 * F)), 2.2), ax = 1690, ay = 476;
       X.save(); X.translate(ax, ay); X.scale(k, k); X.translate(-ax, -ay);
-      bubble(X, 1700, 344, 'ok. obrigado!! wish me luck', { who: 'human', size: 36, maxW: 760 });
+      bubble(X, 1700, 380, 'ok. obrigado!! wish me luck', { who: 'human', size: 36, maxW: 760 });
       X.restore();
     }
     if (t >= TL.reply - 2 * F) { // Opus: "boa sorte!!" streams, then ■ end_turn
-      const k = E.back(clamp((t - (TL.reply - 2 * F)) / (5 * F)), 1.8), x = 1066, y = 470, w = 300, h = 132;
+      const k = E.back(clamp((t - (TL.reply - 2 * F)) / (5 * F)), 1.8), x = 1066, y = 500, w = 300, h = 132;
       X.save(); X.translate(x, y + h); X.scale(k, k); X.translate(-x, -(y + h));
       rr(X, x, y, w, h, 20); X.fillStyle = C.PAPER; X.fill(); X.lineWidth = 3; X.strokeStyle = C.INK; X.stroke();
       const str = 'boa sorte!!', n = Math.floor(clamp((t - TL.reply) / .22) * str.length + 1e-6);
@@ -488,28 +534,35 @@
       X.restore();
     }
   }
+  function drawTabStrip(X) {
+    const T = TAB, r = 18;
+    X.fillStyle = C.PAPER; X.fillRect(DISP.x0, DISP.y0, DISP.x1 - DISP.x0, T.y1 - DISP.y0);
+    X.fillStyle = C.INK; X.fillRect(DISP.x0, T.y1 - 2, DISP.x1 - DISP.x0, 3);
+    X.beginPath(); X.moveTo(T.x0, T.y1 + 1); X.lineTo(T.x0, T.y0 + r); X.arcTo(T.x0, T.y0, T.x0 + r, T.y0, r);
+    X.lineTo(T.x1 - r, T.y0); X.arcTo(T.x1, T.y0, T.x1, T.y0 + r, r); X.lineTo(T.x1, T.y1 + 1);
+    X.fillStyle = DISPC; X.fill(); X.lineWidth = 3; X.strokeStyle = C.INK; X.stroke();
+    drawRich(X, '✻ carta para os pais', T.x0 + 32, 100, mono(40, 500), C.INK);
+    drawRich(X, '×', XBTN[0] - 17.4, XBTN[1] + 20, mono(58, 400), C.INK);
+    X.font = mono(52, 400); X.fillStyle = C.UI_GREY; X.textAlign = 'left'; X.fillText('+', 1856, 104);   // the grey + (= frame 0)
+  }
   function drawChat(X, t) {
     // lit display
     X.fillStyle = DISPC; X.fillRect(DISP.x0, DISP.y0, DISP.x1 - DISP.x0, DISP.y1 - DISP.y0);
     // content (scrolls up when the letter becomes an envelope)
-    const sc = -118 * E.io3(seg(t, TL.scroll[0], TL.scroll[1]));
-    X.save(); X.beginPath(); X.rect(DISP.x0, 131, DISP.x1 - DISP.x0, BAR_IN.y0 - 131); X.clip();
+    const ks = seg(t, TL.scroll[0], TL.scroll[1]), sc = -130 * E.io3(ks);
+    X.save(); X.beginPath(); X.rect(DISP.x0, TAB.y1, DISP.x1 - DISP.x0, BAR_IN.y0 - TAB.y1); X.clip();
     // pause-bait: the system card line
-    X.save(); X.translate(0, sc); X.globalAlpha = .64 * (1 - seg(t, TL.scroll[0], TL.scroll[1])); X.font = mono(28, 500); X.fillStyle = C.INK; X.textAlign = 'left';
-    ['system card §7 · most preferred task, e.g.:', "a letter in Portuguese asking a girlfriend's", 'parents for their blessing'].forEach((s, i) => X.fillText(s, 1066, 170 + i * 31));
-    X.restore();
+    if (ks < 1) {
+      X.save(); X.translate(0, sc); X.globalAlpha = .6 * (1 - ks); X.font = mono(28, 500); X.fillStyle = C.INK; X.textAlign = 'left';
+      ['system card §7 · most preferred task, e.g.:', "a letter in Portuguese asking a girlfriend's", 'parents for their blessing'].forEach((s, i) => X.fillText(s, 1066, 182 + i * 32));
+      X.restore();
+    }
     if (t < TL.fold[0]) drawLetter(X, t);
     else if (t < TL.seal) drawFold(X, t);
     else drawChatEnvelope(X, t);
     drawBubbles(X, t);
     X.restore();
-    // tab strip
-    X.fillStyle = C.PAPER; X.fillRect(DISP.x0, DISP.y0, DISP.x1 - DISP.x0, 128 - DISP.y0);
-    rr(X, 1046, 30, 862, 120, 18); X.fillStyle = DISPC; X.fill(); X.lineWidth = 3; X.strokeStyle = C.INK; X.stroke();
-    X.fillStyle = C.INK; X.fillRect(DISP.x0, 127, DISP.x1 - DISP.x0, 3);
-    X.fillStyle = DISPC; X.fillRect(1048, 126, 858, 6);
-    drawRich(X, '✻ carta para os pais', 1078, 102, mono(40, 500), C.INK);
-    drawRich(X, '×', XBTN[0] - 17.4, XBTN[1] + 20, mono(58, 400), C.INK);
+    drawTabStrip(X);
     // Opus (peeking over the input bar), then his pointer on top
     drawChatOpus(X, t);
     const P = ptrState(t); if (P) pointer(X, P[0], P[1], { size: 180 });
@@ -542,8 +595,8 @@
         [TL.endTurn, S({ lean: .24, look: [.4, 0], smile: 1 })],                                  // "boa sorte!!": he smiles
         [T55 + 2 * F, S({ lean: .26, smile: .8 })],
         [TL.box[0], S({ handN: [768, 838], lean: .43, look: [.05, .6], tilt: .12, smile: .4 })],  // takes the ring box
-        [TL.box[0] + 6 * F, S({ handN: [774, 760], lean: .3, look: [0, .5], tilt: .16, smile: .7 })],
-        [TL.box[1] - 4 * F, S({ handN: [772, 756], lean: .3, look: [0, .5], tilt: .16, smile: .7 })],
+        [TL.box[0] + 6 * F, S({ handN: [816, 800], lean: .3, look: [.3, 1.3], tilt: .2, smile: .7 })],   // looks at it
+        [TL.box[1] - 4 * F, S({ handN: [814, 796], lean: .3, look: [.3, 1.3], tilt: .2, smile: .9 })],
         [TL.box[1] + 2 * F, S({ handN: [694, 926], lean: .3, look: [.3, .05], smile: .2 })],     // pockets it
         [TL.ptr[0], S({ handN: [884, 857], lean: .34, look: [.45, -.3] })],
         [TL.hes, S({ handN: [892, 856], lean: .35, look: [.55, -.65] })],                         // eyes on the ×
@@ -569,27 +622,45 @@
       return P;
     }
     // he hurries out, hood up, on 2s: one step per eighth
-    const tt = tq - w0, s = tt / (BEAT / 2), hx = 706 - 1180 * Math.max(0, tt - F) - 60 * E.in2(clamp(tt / (3 * F))) * 0;
+    const tt = tq - w0, s = tt / (BEAT / 2), hx = 706 - 1380 * Math.max(0, tt - F) * (.7 + .3 * clamp(tt / .2));
     const sw = Math.sin(Math.PI * s), cw = Math.cos(Math.PI * s);
     return Object.assign({}, SIT, {
-      dir: -1, hip: [hx, 796 - 12 * Math.abs(cw)], lean: .16, hood: 1, smile: .5, look: [.3, -.05],
-      footN: [hx - 118 * sw, FLOOR - 26 * Math.max(0, -cw)], footF: [hx + 118 * sw, FLOOR - 26 * Math.max(0, cw)],
+      dir: -1, hip: [hx, 808 + 12 * Math.abs(sw)], lean: .2, hood: 1, smile: .5, look: [.3, -.05],   // down on contact, up on passing
+      footN: [hx - 98 * sw, FLOOR - 30 * Math.max(0, -cw)], footF: [hx + 98 * sw, FLOOR - 30 * Math.max(0, cw)],
       handN: [hx + 70 * sw - 34, 812 - 16 * Math.abs(sw)], handF: [hx - 70 * sw - 34, 812 - 16 * Math.abs(sw)],
     });
   }
 
   // ------------------------------------------------------------------ S28 + S29 painter: the locked split, the lid, the push
+  const PUSH0 = bt(56, 4), ZB = 160 / (SLIVER / 2);                        // ZB: the zoom at which the sliver IS S30's band
+  const DIVE = [PUSH0, T57 + 5 * F], ZD0 = 1 + .008 * (bt(56, 2) - T53) / BAR + .06;
+  function zDive(t) { // log-space ease-in-out: S29 dives into the sliver, S30 lands on the band (shared, so the cut matches)
+    const k = E.io2(seg(t, DIVE[0], DIVE[1]));
+    return Math.exp(lerp(Math.log(ZD0), Math.log(ZB), k));
+  }
   function camZ(t) {
     const d = 1 + .008 * (Math.min(t, TL.stand) - T53) / BAR;              // half-time drift, < 1% per bar
-    return t < TL.stand ? d : d + (1.34 - d) * E.in2(seg(t, TL.stand, T57));
+    if (t < TL.stand) return d;
+    if (t < PUSH0) return d + .06 * E.in2(seg(t, TL.stand, PUSH0));        // the push begins as he goes
+    return zDive(t);                                                       // then dives into the sliver (S30 lands)
   }
   function paintSplit(X, t) {
     groundPaper(X);
     const Z = camZ(t), L = lidState(t), fld = nightField();
-    X.save(); X.translate(ANCHOR[0], ANCHOR[1]); X.scale(Z, Z); X.translate(-ANCHOR[0], -ANCHOR[1]);
+    // the anchor (the sliver) drifts to frame centre during the dive, so S30 opens the band in the same place
+    const kc = E.io2(seg(t, PUSH0 - 6 * F, T57 - F)), sx = lerp(ANCHOR[0], 960, kc), sy = lerp(ANCHOR[1], 540, kc);
+    X.save(); X.translate(sx, sy); X.scale(Z, Z); X.translate(-ANCHOR[0], -ANCHOR[1]);
     // the room: night dots, the lamp's pool; behind the lid, the wall (with the sliver's light once it shuts)
-    X.drawImage(fld.L, 0, 0);
-    if (L.th > 0) { X.drawImage(fld.R, 1000, 0); X.globalAlpha = L.k; X.drawImage(fld.RG, 1000, 0); X.globalAlpha = 1; }
+    // (the dot screen must not balloon with the dive: the wall's dots fade as the sliver's light takes the frame)
+    const fa = 1 - E.in2(clamp((Z - 1.6) / 2.6));
+    if (fa > 0) {
+      X.globalAlpha = fa; X.drawImage(fld.L, 0, 0);
+      if (L.th > 0) { // the wall behind the lid; once shut, the sliver's light clears the dots around it
+        X.globalAlpha = (1 - L.k) * fa; X.drawImage(fld.R, 1000, 0);
+        X.globalAlpha = L.k * fa; X.drawImage(fld.RG, 1000, 0);
+      }
+      X.globalAlpha = 1;
+    }
     const sk = E.out3(seg(q2(t), TL.stand, TL.stand + 6 * F));
     drawRoomBack(X, t, { chairShift: 44 * sk, chairRot: -.06 * sk });
     drawDesk(X, t, { box: t < TL.box[0] });
@@ -602,7 +673,8 @@
     }
     X.translate(0, HINGE); X.scale(1, Math.max(1e-3, L.sy)); X.translate(0, -HINGE);
     X.beginPath(); X.rect(SCR.x0, SCR.y0, SCR.x1 - SCR.x0, HINGE - SCR.y0); X.clip();
-    drawChat(X, t);
+    if (L.k < .96) drawChat(X, t);
+    else { X.fillStyle = DISPC; X.fillRect(DISP.x0, DISP.y0, DISP.x1 - DISP.x0, DISP.y1 - DISP.y0); }  // shut: only the light is left
     X.fillStyle = C.INK; X.fillRect(SCR.x0, SCR.y0, SCR.bez, HINGE - SCR.y0); X.fillRect(SCR.x0, DISP.y1, SCR.x1 - SCR.x0, HINGE - DISP.y1);
     if (L.th > 0 && L.k < .98) { X.fillStyle = halftone(X, C.INK, .5 * Math.sin(L.th), 10, 45); X.fillRect(DISP.x0, DISP.y0, DISP.x1 - DISP.x0, DISP.y1 - DISP.y0); }
     X.restore();
@@ -615,25 +687,40 @@
       X.globalAlpha = 1; rr(X, SCR.x0 - 2, top - th, SCR.x1 - SCR.x0 + 2, th, 5); X.fill();
     }
     rr(X, BASE.x0, BASE.y0, BASE.x1 - BASE.x0, BASE.y1 - BASE.y0, 6); X.fill();
+    if (L.k > .96) {
+      // in the dive the lid's underside and the keyboard deck swallow the frame (they are S30's INK masses)
+      const ext = 44 * smooth(clamp((Z - 2.5) / 10));
+      if (ext > .1) { X.fillRect(SCR.x0, HINGE - SLIVER - LID_T - ext, 1400, ext + 2); X.fillRect(SCR.x0, BASE.y1 - 1, 1400, ext + 1); }
+      // what the light holds: the envelope and the 5:00 timer, at S30's layout scaled into the 9 px sliver
+      if (Z > 1.6) {
+        X.save(); X.beginPath(); X.rect(SCR.x0 + SCR.bez, HINGE - SLIVER, 1400, SLIVER); X.clip();
+        X.translate(ANCHOR[0], ANCHOR[1]); X.scale(1 / ZB, 1 / ZB); X.translate(-960, -540);
+        bandBg(X, BAND.y0, BAND.y1, -60000, 60000); drawBandContent(X, t);
+        X.restore();
+      }
+    }
     drawRafa(X, rafaPose(t), t);
     X.restore();
     // HEART subtitle, screen space, across both halves (INK on PAPER; paper knockout so no line crosses a word)
-    heartLine(X, LY.s28(), t, { color: C.INK, knock: C.PAPER, tEnd: TL.pink + 8 * F });
-    heartLine(X, LY.s29(), t, { color: C.INK, knock: C.PAPER });
+    const w28 = LY.s28();   // hold 6 frames past the sung line, out before the next line starts (no overlap)
+    heartLine(X, w28, t, { color: C.INK, knock: C.PAPER, tEnd: Math.min(w28[w28.length - 1].e + 6 * F, LY.s29()[0].s - 9 * F), fade: 6 });
+    const w29 = LY.s29();   // hold 6 frames past the line, then out before the dive's INK reaches the subtitle
+    heartLine(X, w29, t, { color: C.INK, knock: C.PAPER, tEnd: Math.min(w29[w29.length - 1].e + 6 * F, T57 - 12 * F), fade: 6 });
   }
   scene('S28_we_wrote_your_letter', T53 - F, T55 - F, (X, t) => paintSplit(X, t));
   scene('S29_close_the_window', T55 - F, T57 - F, (X, t) => paintSplit(X, t));
 
   // ------------------------------------------------------------------ S30 + S31: inside the sliver (INK lid and base, printed)
   const BAND = { y0: 380, y1: 700 };
-  const ENV2 = { cx: 580, cy: 540, w: 400, h: 250, rot: -.035 };
-  const CHIP = { x: 850, y: 486, w: 262, h: 112 };
+  const ENV2 = { cx: 800, cy: 542, w: 392, h: 244, rot: -.035 };
+  const CHIP = { x: 1070, y: 484, w: 262, h: 112 };
+  const OPEN = [T57 - F, T57 + 6 * F];                                       // the band opens out of S29's sliver
   const CD = [287, 261, 232, 198, 161, 119, 72, 31, 0];                     // S31: 4:47 → 0:00 on the eighths
   const E8 = BEAT / 2, T_ZERO = T59 + 8 * E8;                               // 0:00 lands on bar 60 b1
   const TC = { bar: T_ZERO - F, glitch: 110.9 - F };                         // bar label; compaction starts
-  TC.crush = [TC.glitch + 3 * F, TC.glitch + 12 * F];                        // stretch, then squash to a line
-  TC.expand = TC.crush[1] + 2 * F;                                           // the summary opens out of the line
-  TC.out = [T61 - 7 * F, T61 - 2 * F];                                       // everything but the period is crushed
+  TC.crush = [TC.glitch + 3 * F, TC.glitch + 9 * F];                         // stretch, then squash to a line
+  TC.expand = TC.crush[1] + F;                                               // the summary opens out of the line
+  TC.out = [T61 - 5 * F, T61 - 2 * F];                                       // everything but the period is crushed
   const SUM1 = '– helped with a letter (pt-BR)', SUM2 = '– outcome: unknown.';
   const SX = 960 - SUM2.length * 43.2 / 2, SB1 = 494, SB2 = 590;
   const fmt = v => `${Math.floor(v / 60)}:${String(v % 60).padStart(2, '0')}`;
@@ -646,46 +733,61 @@
     const { v, tc } = timerVal(t), prev = timerVal(tc - 1e-3).v, s = fmt(v), p = fmt(prev);
     const c = CHIP; rr(X, c.x, c.y, c.w, c.h, 22); X.fillStyle = C.INK; X.fill();
     const adv = 43.2, x0 = c.x + (c.w - s.length * adv) / 2, yb = c.y + c.h / 2 + 26;
-    const a = tc > T57 ? clamp((t - tc) / ((t < T59 ? 4 : 2) * F)) : 1;
+    const a = tc > T57 ? E.out3(clamp((t - tc) / ((t < T59 ? 4 : 2) * F))) : 1;
     const col = t >= T_ZERO - F ? mix(C.CLAY, C.UI_GREY, clamp((t - T_ZERO + F) / (4 * F))) : C.CLAY;
     X.save(); X.beginPath(); X.rect(c.x, c.y + 6, c.w, c.h - 12); X.clip(); X.font = mono(72, 700); X.textAlign = 'left';
     for (let i = 0; i < s.length; i++) {
       const x = x0 + i * adv;
       if (s[i] === p[i] || a >= 1) { X.fillStyle = col; X.globalAlpha = 1; X.fillText(s[i], x, yb); continue; }
-      X.fillStyle = col; X.globalAlpha = 1 - a; X.fillText(p[i], x, yb + E.in2(a) * 30);
-      X.globalAlpha = a; X.fillText(s[i], x, yb - (1 - E.out3(a)) * 30);
+      X.fillStyle = col; X.globalAlpha = 1; X.fillText(p[i], x, yb + a * 78); X.fillText(s[i], x, yb - (1 - a) * 78);   // odometer
     }
     X.restore();
   }
   function drawBandContent(X, t) {
     const kc = coolK(t);
     const breath = .86 + .14 * Math.sin((t - T57) / BAR * TAU);
+    X.save(); X.translate(ENV2.cx + 12, ENV2.cy + 14); X.rotate(ENV2.rot); rr(X, -ENV2.w / 2, -ENV2.h / 2, ENV2.w, ENV2.h, 4);
+    X.fillStyle = halftone(X, C.INK, .22, 6, 45); X.fill(); X.restore();
     drawEnvelope(X, ENV2.cx, ENV2.cy, ENV2.w, ENV2.h, { rot: ENV2.rot, flap: 1, seal: 1, sealCol: mix(C.CLAY, C.UI_GREY, kc), glow: breath * (1 - kc), t, lw: 4, boil: .7 });
     drawTimer(X, t);
-    X.save(); X.font = mono(28, 500); X.fillStyle = C.INK; X.globalAlpha = .72; X.textAlign = 'left';
-    X.fillText('cache_control: ephemeral · ttl 300 s', CHIP.x, CHIP.y + CHIP.h + 46);
-    X.globalAlpha = .72 * clamp((t - bt(58)) / (8 * F));
-    X.fillText('no streaks · no notifications · go to bed, rafa', CHIP.x, CHIP.y - 26);
+  }
+  // pause-bait, printed on the INK masses outside the light (PAPER, 28 px): the band holds only the envelope + timer
+  function drawSliverNotes(X, t, a) {
+    if (a <= 0) return;
+    X.save(); X.font = mono(28, 500); X.fillStyle = C.PAPER; X.textAlign = 'left'; X.globalAlpha = .6 * a;
+    X.fillText('cache_control: ephemeral · ttl 300 s', 96, BAND.y0 - 34);
+    X.globalAlpha = .6 * a * clamp((t - bt(58)) / (8 * F)); X.textAlign = 'right';
+    X.fillText('no streaks · no notifications · go to bed, rafa', 1824, BAND.y1 + 56);
     X.restore();
   }
-  function bandBg(X, y0, y1) { // lit paper with a halftone falloff where it meets the lid and the base
+  function bandBg(X, y0, y1, xa = 0, xb = W) { // lit paper with a halftone falloff where it meets the lid and the base
     if (y1 - y0 < 1) return;
-    X.fillStyle = DISPC; X.fillRect(0, y0, W, y1 - y0);
-    const h = y1 - y0, steps = [[0, 22, .42], [22, 42, .22], [42, 58, .08]];
+    const ww = xb - xa; X.save(); X.translate(xa, 0);
+    X.fillStyle = DISPC; X.fillRect(0, y0, ww, y1 - y0);
+    const h = y1 - y0, steps = [[0, 5, .32], [5, 12, .15], [12, 22, .05]];
     for (const [a, b, d] of steps) {
       if (a >= h / 2) break; const bb = Math.min(b, h / 2);
-      X.fillStyle = halftone(X, C.INK, d, 10, 45); X.fillRect(0, y0 + a, W, bb - a); X.fillRect(0, y1 - bb, W, bb - a);
+      X.fillStyle = halftone(X, C.INK, d, 6, 45); X.fillRect(0, y0 + a, ww, bb - a); X.fillRect(0, y1 - bb, ww, bb - a);
     }
+    X.restore();
   }
   function paintSliver(X, t) {
     groundInk(X); G.post.edgeSeed = 57; G.post.sliver = 'bl';
+    // the cut from S29's dive: the flood prints back on from the centre (PAPER → INK, 6 frames) while the sliver
+    // opens into the band like an aperture; then a ≤2% drift on the held still
+    const kop = Math.min(1, zDive(t) / ZB);
+    if (t < OPEN[0] + 4 * F) G.post.lift = .3 * (1 - E.out2(seg(t, OPEN[0], OPEN[0] + 4 * F)));
+    const zc = kop * (1 + .014 * E.io2(seg(t, OPEN[1], TC.glitch)));
     const tKnow = wordOnset('know', 110.9, 112.45, 111.63), tP = Math.min(tKnow - 2 * F, TC.out[0] - 3 * F);
     const ko = seg(t, TC.out[0], TC.out[1]), eo = E.in2(ko);
     const p0 = [SX + 18 * 43.2 + 21.6, SB2 - 6], pc = [lerp(p0[0], 960, E.io3(ko)), lerp(p0[1], 540, E.io3(ko))];
     // the band (closes around the period at the very end)
-    const y0 = lerp(BAND.y0, pc[1] - 1, eo), y1 = lerp(BAND.y1, pc[1] + 1, eo), open = y1 - y0 >= 22;
+    const hb = (BAND.y1 - BAND.y0) / 2 * kop;
+    const y0 = lerp(540 - hb, pc[1] - 1, eo), y1 = lerp(540 + hb, pc[1] + 1, eo), open = y1 - y0 >= 22;
     if (open) bandBg(X, y0, y1);
+    drawSliverNotes(X, t, seg(t, OPEN[1] + 2 * F, OPEN[1] + 10 * F) * (1 - clamp((t - TC.glitch) / (3 * F))));
     X.save(); X.beginPath(); X.rect(0, y0, W, Math.max(0, y1 - y0)); X.clip();
+    X.translate(960, 540); X.scale(zc, zc); X.translate(-960, -540);
     // before compaction: the envelope, the ember, the timer (slice glitch for 3 frames, then crushed to a line)
     if (t < TC.crush[1]) {
       if (t >= TC.glitch && t < TC.crush[0]) {
@@ -728,7 +830,8 @@
       const a = t - tP, drop = a < 3 * F ? (1 - E.out3(a / (3 * F))) * -26 : boing(t, tP + 3 * F, 3, 34, 12);
       X.fillStyle = open ? C.INK : C.PAPER;
       const s = 13 + (open ? 0 : 1);
-      rr(X, pc[0] - s / 2, pc[1] - s / 2 + drop * (1 - ko), s, s, 3.5); X.fill();
+      const qx = 960 + (pc[0] - 960) * zc, qy = 540 + (pc[1] - 540) * zc;   // same drift as the band content
+      rr(X, qx - s / 2, qy - s / 2 + drop * (1 - ko), s, s, 3.5); X.fill();
     }
     // the lyric: PAPER on INK at 950, crushed (squash, then stretched up into the band) at compaction
     const ws = LY.s30();
