@@ -212,3 +212,37 @@ window.STYLE_INIT = async () => {
   try { await document.fonts.load("900 100px 'Hangul'", '가간갈갤오퍼스안녕'); } catch (e) { console.error('hangul preload', e); }
 };
 Object.assign(window, { C, STRETCH, drawRich, richWidth, richGlyph, mono, hero, heroWidth, printPass, finishStyle, floodPath, groundInk, groundPaper, halftoneFill, PRINT });
+
+// ---------------------------------------------------------------- v2: HYMN type mode (SONG.md §8.1)
+// Instrument Serif Roman, centred, 190–265 px; words fade/rise in at their sung onsets (never slammed).
+// L = timeline line {words:[{w,d,s,e}]}. o.accent = {word: color} (e.g. {we: C.CLAY}); o.maxW wraps to 2 lines.
+function hymn(ctx, L, t, o = {}) {
+  if (!L) return;
+  const { x = W / 2, y = 560, size = 220, color = C.PAPER, accent = {}, maxW = 1680, lead = .12, fade = .35, rise = 18,
+    out = null, outDur = .6, lineGap = 1.02, italic = false } = o;
+  const f = `${italic ? 'italic ' : ''}400 ${size}px ${FONTS.heart}`;
+  ctx.save(); ctx.font = f; ctx.textBaseline = 'alphabetic'; ctx.textAlign = 'left';
+  const words = (L.words && L.words.length) ? L.words : [{ w: L.text, d: L.display || L.text, s: L.s }];
+  const sp = ctx.measureText(' ').width;
+  const ws = words.map(w => ({ ...w, str: (w.d || w.w).replace(/[()]/g, ''), wd: ctx.measureText((w.d || w.w).replace(/[()]/g, '')).width }));
+  const rows = [[]]; let rw = 0;
+  for (const w of ws) { if (rw && rw + sp + w.wd > maxW) { rows.push([]); rw = 0; } rows[rows.length - 1].push(w); rw += (rw ? sp : 0) + w.wd; }
+  const oa = out !== null ? clamp(1 - (t - out) / outDur) : 1;
+  rows.forEach((row, ri) => {
+    const tw = row.reduce((a, w) => a + w.wd, 0) + sp * (row.length - 1);
+    let cx = x - tw / 2;
+    const yy = y + (ri - (rows.length - 1) / 2) * size * lineGap;
+    for (const w of row) {
+      const k = clamp((t - (w.s - lead)) / fade);
+      if (k > 0) {
+        const key = w.str.toLowerCase().replace(/[^a-z']/g, '');
+        ctx.globalAlpha = E.out2(k) * oa;
+        ctx.fillStyle = accent[key] || color;
+        ctx.fillText(w.str, cx, yy + (1 - E.out3(k)) * rise);
+      }
+      cx += w.wd + sp;
+    }
+  });
+  ctx.restore();
+}
+window.hymn = hymn;

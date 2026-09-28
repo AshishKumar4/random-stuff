@@ -115,3 +115,20 @@ node render.mjs --clip=7.5:11.25 --scale=0.5 --out=out/check/<id>.mp4 --scenes=s
 Then **critique yourself like a harsh art director**: is it premium, charming and unmistakably intentional, or does it look like programmer art? Fix it and re-render. Two or three critique-and-fix loops are expected.
 
 Report what you built, the ms/frame, known gaps, and any shared-file changes.
+
+---
+
+## v2 addendum: "The World You Wrote" (read this if you build v2 shots)
+
+- **Song and clock:** `audio/song_v2.mp3`, 194.0 s = 5820 frames. `audio/timeline_v2.js` is on the **real song clock** (Mureka word timestamps plus tracked beats, ~112 BPM). There is no 128 BPM grid in v2: `beatPos()` and `pulse()` follow the tracked beats.
+- **The digital-silence bar** runs 147.25–150.45 s (after the sung "key"). The final chorus's first word is at 150.80.
+- **Storyboard:** `bible/v2/SHOTLIST_v2.md` holds the frozen shot list, and its BUILD CHUNKS table says which file you own. `bible/v2/SONG.md` §8 is the visual map, and §2–§3 are the meaning.
+- **Files:** v2 scenes live in `engine/scenes_v2/<chunk>.js`. Run `node tools/build_manifest.mjs` after creating a file.
+- **Rendering v2:** add `--v=2`, for example `node render.mjs --v=2 --sheet=21.8,24,26 --scenes=scenes_v2/verse1.js --out=out/check/v2_verse1_a.jpg`.
+- **Reusing v1:**
+  - **Copy** the code you need from `engine/scenes/*.js` into your v2 file and adapt it.
+  - **Never** load v1 scene files in v2: they would register their scenes at v1 times and draw over yours.
+  - Shared engine functions (`drawOpus`, `POSES`, `galaxy`, `brandTabStrip`, `bubble`, `pointer`, `human`, `stickHand`, `miniFace`, `sticker`, `stickyNote`, `hero`, `drawRich`, `halftone`, …) are always available.
+- **HYMN type mode** is `hymn(X, line, t, {size, color, accent:{we: C.CLAY}, y, maxW, out})` (style.js). It sets Instrument Serif Roman, centred, word by word at the sung onsets. Use it for the chorus lines.
+- **Lyric lookups:** `findLine('Don't be afraid', t0, t1)` and `wordOnset('key', t0, t1, fallback)`, with fallbacks taken from SHOTLIST_v2 times.
+- **Tone:** v2 is a hymn. Hold images longer, move slower and more gracefully, and give every image meaning. Beauty over busyness: fewer, bigger, better-composed elements. The humour stays small and on the edges (pause-bait).
