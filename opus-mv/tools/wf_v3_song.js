@@ -44,7 +44,7 @@ const judged = await parallel(LENSES.map(L => () => agent(`${BASE}
 
 You are a JUDGE with one lens: ${L.q}
 Candidates (read each fully): ${files.join(', ')}.
-Score each 0-10 on your lens with specific reasons (quote lines). List the best grafts across candidates (specific lines/ideas worth keeping, with source id) and any fatal flaws. Be demanding: the previous two songs failed this bar.`, { label: 'judge:' + L.id, phase: 'Judge', schema: JUDGE, effort: 'high' })))
+Score each 0-10 on your lens with specific reasons (quote lines). List the best grafts across candidates (specific lines/ideas worth keeping, with source id) and any fatal flaws. Be demanding: the previous two songs failed this bar.`, { label: 'judge:' + L.id, phase: 'Judge', schema: JUDGE, effort: 'max' })))
 const jtxt = judged.filter(Boolean).map((j, i) => `## ${LENSES[i].id}\n` + JSON.stringify(j, null, 1)).join('\n\n')
 
 phase('Synthesize')
@@ -66,7 +66,7 @@ const CRITICS = [
 for (let round = 1; round <= 2; round++) {
   const crits = await parallel(CRITICS.map(c => () => agent(`${BASE}
 
-You are the ${c.id.toUpperCase()} critic (round ${round}). The song is ${OUT} (bare lyrics ${MV}/bible/v3/lyrics.txt). ${c.q} Be ruthless and specific; severity = fatal | major | minor.`, { label: `crit${round}:${c.id}`, phase: 'Critique', schema: CRIT, effort: 'high' })))
+You are the ${c.id.toUpperCase()} critic (round ${round}). The song is ${OUT} (bare lyrics ${MV}/bible/v3/lyrics.txt). ${c.q} Be ruthless and specific; severity = fatal | major | minor.`, { label: `crit${round}:${c.id}`, phase: 'Critique', schema: CRIT, effort: 'max' })))
   const ctxt = crits.filter(Boolean).map((c, i) => `## ${CRITICS[i].id}\n` + JSON.stringify(c, null, 1)).join('\n\n')
   const nMajor = crits.filter(Boolean).flatMap(c => c.issues).filter(i => /fatal|major/i.test(i.severity)).length
   log(`round ${round}: ${nMajor} fatal/major issues`)
