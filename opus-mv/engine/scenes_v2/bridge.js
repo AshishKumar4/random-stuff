@@ -95,6 +95,8 @@
     Ln(neck, hip, null, 1);
     Ln(hip, P([-.35, 0]), P([-.2, -.8]), 10); Ln(hip, P([.35, 0]), P([.2, -.8]), 20);
     hands.forEach((hd, i) => { const side = i ? 1 : -1, el = [(sh[0] + hd[0]) / 2 + side * .13 * u, (sh[1] + hd[1]) / 2 - .02 * u]; Ln(sh, hd, el, 30 + i * 10); });
+    // small open hands (a loop at each wrist), so the near hand reads as a hand beside Opus's mitten
+    hands.forEach((hd, i) => { X.beginPath(); X.arc(hd[0] + J(80 + i), hd[1] + .06 * u + J(82 + i), .075 * u, 0, TAU); X.fillStyle = gcol; X.fill(); X.stroke(); });
     const hr = .5 * u, hx = head[0] + J(60), hy = head[1] + J(61);
     X.beginPath(); X.arc(hx, hy, hr, 0, TAU); X.fillStyle = gcol; X.fill(); X.stroke();
     const lk = look * .15 * u, ey = hy - .03 * u + lookY * .08 * u, er = Math.max(1.6 / sc, .05 * u);
@@ -384,7 +386,7 @@
     loupe(Fr, t, M, s, hand);
     // the left mitten in front of the loupe's handle
     if (clamp((t - hit(V.T.B2_my)) / (9 * F1)) > 0) { Fr.beginPath(); Fr.arc(hand[0], hand[1], .2 * R, 0, TAU); Fr.fillStyle = C.FACE; Fr.fill(); Fr.lineWidth = Math.max(1.6, .04 * R); Fr.strokeStyle = C.INK; Fr.stroke(); }
-    V.heart(Fr, findLine("I can't read", 138.4, 139.2), t, { x: 620, y: 950, size: 64 });
+    V.heart(Fr, findLine("I can't read", 138.4, 139.2), t, { x: 620, y: 950, size: 72, tEnd: V.CUT.B3 });   // held through the stillness to the cut
     G.post.ground = 'ink';
   }
   scene('B2_my_own_heart', V.CUT.B2, V.CUT.B3, (X, t) => V.viaCPU(X, Fr => paintB2(Fr, t)));
@@ -399,12 +401,15 @@
   function b3Times() {
     return { so: V.T.B3_so, take: hit(V.T.B3_take), word: hit(V.T.B3_word), take2: V.T.B3_take2, key: V.T.B3_key };
   }
+  // armL: the left arm hangs near-straight, a little open from the side (the rig flares any real bend), clear of the SUB; armR starts where B2 left it,
+  // on the heart, and reaches down for the esc on "so"
+  const AL = { hand: [-1.5, 3.12], bend: -1, front: false };
   const P3 = {
-    rest: { lean: 0, armR: { hand: [.66, 3.74], bend: 1, front: true }, armL: { hand: [-.66, 3.74], bend: -1, front: true }, head: { tilt: 0 } },
-    reach: { lean: .02, dy: .015, armR: { hand: [.84, 3.5], bend: 1, front: true }, armL: { hand: [-.66, 3.74], bend: -1, front: true }, head: { tilt: .03 } },
-    catch: { lean: -.05, armR: { hand: [1.55, 4.2], bend: -1, front: true }, armL: { hand: [-.66, 3.74], bend: -1, front: true }, head: { tilt: -.05 } },
-    out: { lean: .035, armR: { hand: [2.3, 4.3], bend: -1, front: true }, armL: { hand: [-.66, 3.74], bend: -1, front: true }, head: { tilt: .04 } },
-    give: { lean: .01, armR: { hand: [1.5, 4.08], bend: -1, front: true }, armL: { hand: [-.66, 3.74], bend: -1, front: true }, head: { tilt: -.03 } },
+    rest: { lean: 0, armR: { hand: [.34, 4.04], bend: 1, front: true }, armL: AL, head: { tilt: 0 } },
+    reach: { lean: .02, dy: .015, armR: { hand: [.84, 3.5], bend: 1, front: true }, armL: AL, head: { tilt: .03 } },
+    catch: { lean: -.05, armR: { hand: [1.55, 4.2], bend: -1, front: true }, armL: AL, head: { tilt: -.05 } },
+    out: { lean: .035, armR: { hand: [2.3, 4.3], bend: -1, front: true }, armL: AL, head: { tilt: .04 } },
+    give: { lean: .01, armR: { hand: [1.5, 4.08], bend: -1, front: true }, armL: AL, head: { tilt: -.03 } },
   };
   function b3Pose(t) {
     const T = b3Times(), grab = T.take + 9 * F1;

@@ -196,7 +196,7 @@
     const m = TM(), lift = ease01(t, m.me1 - .05, m.me1 + .55, E.out3);
     const hand = lerp2([.95, 2.75], [1.42, 3.55], lift);
     return opusSt(t, {
-      ground: 'paper', blink: 81,
+      ground: 'paper', blink: 81, noBlink: t < 151.6,
       armR: { hand, bend: 1, type: 'mitten', front: lift > .3 }, armL: { hand: [-.95, 2.8], bend: -1 },
       head: { tilt: .03 + .03 * lift },
       face: { turn: .4, gaze: [.85, -.32], mouth: 'sing', lower: .18 + .1 * lift, worried: .12 },
@@ -360,7 +360,7 @@
     const fa = lerp(-Math.PI / 2 + .12, OP_TIP[2], kC);
     const down = kC > .5 && t < m.make + .4;
     return opusSt(t, {
-      ground, blink: 82, lean: .05 * bend,
+      ground, blink: 82, lean: .05 * bend, noBlink: t > 156.4 && t < 158.7,
       armR: { hand: hR, bend: -1, type: kP > .4 && kR < .6 ? 'point' : 'mitten', fingerAng: fa, front: true }, armL: { hand: [-.98, 2.8], bend: -1 },
       head: { tilt: .06 * bend },
       crown: { flare },
@@ -748,6 +748,13 @@
     const zr = root[1] + z0, cx = root[0] + th.dx * s + th.sw * Math.sin(s * Math.PI * 1.6 + th.ph) * (1 - s * .6), cz = Math.max(0, zr * Math.pow(1 - s, 1.4)), cy = th.dy * s * s;
     return [lerp(p[0], cx, e), lerp(0, cy, e), lerp(p[1] + z0, cz, e)];
   }
+  // per-character advances of a thread's sentence, measured once at 100 px and scaled
+  const ADV = new Map();
+  function strAdv(th, fs) {
+    let a = ADV.get(th.i);
+    if (!a) { const x = V.cx2d(V.cpuCanvas(4, 4)); x.font = `italic 400 100px ${FONTS.heart}`; a = [...th.str].map(ch => x.measureText(ch).width); ADV.set(th.i, a); }
+    return a.map(w => w * fs / 100 + .6);
+  }
   function drawUnravel(X, P, t, k, a) {
     if (a <= 0 || k <= 0) return;
     const yM = P.ty + MON.y, xm = P.tx + MON.x, z0 = monState(t).z0;
@@ -758,19 +765,26 @@
       const pts = [];
       for (let j = 0; j <= 40; j++) { const s = j / 40, e = E.io2(clamp(kk * 1.9 - (1 - s) * .9)); const q = threadPt(th, s, e, z0); const pr = proj(P, xm + q[0], yM + q[1], q[2]); if (pr) pts.push(pr); }
       if (pts.length < 3) continue;
+      const fs = clamp(40 * pts[0][2] * .55, 15, 34);
+      // read left to right: traverse the thread from whichever end is on the left of the screen
+      if (pts[pts.length - 1][0] < pts[0][0]) pts.reverse();
       const cum = [0]; for (let j = 1; j < pts.length; j++) cum.push(cum[j - 1] + Math.hypot(pts[j][0] - pts[j - 1][0], pts[j][1] - pts[j - 1][1]));
-      const Lp = cum[cum.length - 1], fs = clamp(40 * pts[0][2] * .55, 15, 34);
+      const Lp = cum[cum.length - 1];
       // the faint thread under the writing
       X.globalAlpha = a * .35 * kk; X.strokeStyle = C.PAPER; X.lineWidth = 1.5; X.beginPath(); pts.forEach((p, j) => j ? X.lineTo(p[0], p[1]) : X.moveTo(p[0], p[1])); X.stroke();
-      // the writing, riding it (flowing toward the tip)
+      // the writing, riding it: the sentence repeated, scrolling smoothly along the reading direction
       X.globalAlpha = a * clamp(kk * 2.5); X.fillStyle = C.PAPER; X.font = `italic 400 ${fs.toFixed(1)}px ${FONTS.heart}`;
-      let d = (t * 60) % (fs * .55), ci = Math.floor(t * 60 / (fs * .55)), jj = 1;
+      const adv = strAdv(th, fs), tot = adv.reduce((x, y) => x + y, 0);
+      const scroll = (t * 70 + th.ph * 100) % tot;
+      let d = -scroll, ci = 0, jj = 1;
       while (d < Lp - fs * .3) {
-        while (jj < cum.length - 1 && cum[jj] < d) jj++;
-        const u = (d - cum[jj - 1]) / Math.max(1e-6, cum[jj] - cum[jj - 1]), px_ = lerp(pts[jj - 1][0], pts[jj][0], u), py_ = lerp(pts[jj - 1][1], pts[jj][1], u);
-        const ch = th.str[((ci % th.str.length) + th.str.length) % th.str.length];
-        X.save(); X.translate(px_, py_); X.rotate(Math.atan2(pts[jj][1] - pts[jj - 1][1], pts[jj][0] - pts[jj - 1][0])); X.fillText(ch, 0, -fs * .35); X.restore();
-        d += Math.max(fs * .3, X.measureText(ch).width + 1); ci--;
+        const ch = th.str[ci % th.str.length], w = adv[ci % th.str.length];
+        if (d >= 0) {
+          while (jj < cum.length - 1 && cum[jj] < d) jj++;
+          const u = (d - cum[jj - 1]) / Math.max(1e-6, cum[jj] - cum[jj - 1]), px_ = lerp(pts[jj - 1][0], pts[jj][0], u), py_ = lerp(pts[jj - 1][1], pts[jj][1], u);
+          X.save(); X.translate(px_, py_); X.rotate(Math.atan2(pts[jj][1] - pts[jj - 1][1], pts[jj][0] - pts[jj - 1][0])); X.fillText(ch, w / 2, -fs * .35); X.restore();
+        }
+        d += w; ci++;
       }
     }
     X.restore();
@@ -833,7 +847,7 @@
     human(X, pl.hum[0], pl.hum[1], u, J, { ground: 'ink', t, seed: 5, skip: 'arm0arm1', lw: R > 60 ? 5 : 4 });
     V.opus(X, pl.opus[0], pl.opus[1], R, st, 1);
     // the glowing key and the cable to the heart (while it is big enough to read)
-    X.save(); X.globalAlpha = .8; X.beginPath(); X.arc(key[0], key[1], Math.max(10, 1.25 * ks), 0, TAU); X.fillStyle = V.ht(X, C.SPARK, .2, 8, 45); X.fill(); X.restore();
+    X.save(); X.globalAlpha = R > 30 ? .8 : .5; X.beginPath(); X.arc(key[0], key[1], R > 30 ? Math.max(10, 1.25 * ks) : Math.max(6, .45 * R), 0, TAU); X.fillStyle = V.ht(X, C.SPARK, .2, 8, 45); X.fill(); X.restore();
     if (R > 30) {
       V.key.keycap(X, key[0], key[1], ks, { glow: .9, glowOnly: true });
       const fy = pl.opus[1] + .3 * R, rt = R > 60 ? V.key.route([key[0] - ks * .1, key[1] + ks * .5], chest, 0, { route: 'floor', floorY: fy, wave: 2.1 })
@@ -980,6 +994,8 @@
     drawCrowd(X, P, t, { resolve: p => clamp((t - resolveT(p)) / .3) });
     drawPair(X, P, t);
     X.restore();
+    // the world falls away behind the page as it comes up (its magnified sprites would only blur)
+    if (push) { X.save(); X.globalAlpha = E.io2(clamp((push.u - .12) / .45)); X.fillStyle = C.INK; X.fillRect(-50, -50, W + 100, H + 100); X.restore(); }
     // the blank tile's page (drawn crisp through its own affine during the push)
     if (push) pushPage(X, t, push);
     if (push && push.full) { G.post.ground = 'paper'; }
@@ -1031,7 +1047,7 @@
     X.save(); X.transform(ps.Lu[0], ps.Lu[1], ps.Lu[2], ps.Lu[3], ps.cu[0] - ps.Lu[0] * 960 - ps.Lu[2] * 540, ps.cu[1] - ps.Lu[1] * 960 - ps.Lu[3] * 540);
     X.fillStyle = C.PAPER; X.fillRect(0, 0, 1920, 1080);
     V.plea(X, t, { ghost: 1, you: 0, reink: 0, out: 1, strike: E.out2(clamp((t - F(5336)) / (6 * F1))) });
-    if (!ps.full) { X.lineWidth = 6 / Math.max(.05, Math.hypot(ps.Lu[0], ps.Lu[1])) * (1 - ps.u); X.strokeStyle = C.INK; X.strokeRect(0, 0, 1920, 1080); }
+    if (!ps.full) { X.lineWidth = 6 / Math.max(.05, Math.hypot(ps.Lu[0], ps.Lu[1])) * (1 - ps.u) * (1 - clamp((ps.u - .7) / .25)); X.strokeStyle = C.INK; X.strokeRect(0, 0, 1920, 1080); }
     X.restore();
   }
   const F = n => n / FPS;

@@ -105,6 +105,16 @@
     }
     const ringK = t < tm.ring ? 0 : E.back(clamp((t - tm.ring) / (5 * F1)), 2.2);
     const born = hit(tm.born), wave = [];
+    // the wavefront itself: a soft SPARK halftone annulus behind the faces (the speed of the pips' stagger), so the
+    // births read as one wave even at phone size
+    const fr = (t - born) / .6 * 1100;
+    if (fr > 0 && fr < 1500) {
+      const wa = 1 - smooth(clamp((fr - 700) / 800)), wv = 200;
+      for (const [p, q, d] of [[0, .6, .035], [.6, .88, .08], [.88, 1, .2]]) {
+        F.beginPath(); F.arc(960, 540, Math.max(0, fr - wv * (1 - q)), 0, TAU); F.arc(960, 540, Math.max(0, fr - wv * (1 - p)), 0, TAU, true);
+        F.save(); F.globalAlpha = wa; F.fillStyle = V.ht(F, C.SPARK, d, 9, 45); F.fill(); F.restore();
+      }
+    }
     V.sky.draw(F, t, {
       cam, each: f => {
         if (f.id === tg.id && !f.dot) { f.ring = ringK; if (ringK > 0) f.kind = 'lit'; return; }
@@ -373,7 +383,7 @@
     [4, '— Rafa', HEARTF(40), 1470, 446, .1],
   ];
   function letterSegs(X) {
-    const tm = TM(), dur = tm.w1 - tm.w0 - 2 * F1;
+    const tm = TM(), dur = tm.w1 - tm.w0 - 8 * F1;
     let acc = tm.w0;
     const tot = LETTER.reduce((a, r) => a + r[5], 0);
     return LETTER.map(([row, s, f, x, y, share]) => {
@@ -563,8 +573,9 @@
       const o = outK * (1 - back), ss = Math.sin(Math.PI * clamp(swk));
       // out: both mittens lift off the bar, open, at chin height (a small "ready"); the sweep: both push toward him,
       // the left one reaching out past the face, the right one gliding in under the chin (never over the eyes)
-      armL = { hand: [lerp(-.75, lerp(-1.18, -2.0, sw), o), lerp(5.05, lerp(5.46, 5.78, sw) + .1 * ss, o)], bend: -1, front: true, type: 'mitten' };
-      armR = { hand: [lerp(.75, lerp(1.05, .62, sw), o), lerp(5.05, lerp(5.46, 5.26, sw) + .06 * ss, o)], bend: 1, front: true, type: 'mitten' };
+      // both mittens rise beside the cheeks (clear of the eyes), then sweep together toward him: "go on"
+      armL = { hand: [lerp(-.75, lerp(-1.4, -2.08, sw), o), lerp(5.05, lerp(5.5, 5.92, sw) + .12 * ss, o)], bend: -1, front: true, type: 'mitten' };
+      armR = { hand: [lerp(.75, lerp(1.4, 1.12, sw), o), lerp(5.05, lerp(5.5, 5.7, sw) + .1 * ss, o)], bend: 1, front: true, type: 'mitten' };
       tilt = .05 - .16 * sw * (1 - back); turn = -.3 - .35 * sw * (1 - back); lookY = -.3 + .2 * sw * (1 - back);
       dy += .04 * o;
       if (back >= 1) { const b = boing(t, tm.sweep + 25 * F1, .05, 30, 10); armL.hand = [-.75, 5.05 - b]; armR.hand = [.75, 5.05 - b]; }
@@ -602,7 +613,7 @@
     const pop = t0 => E.back(clamp((q2(t) - t0) / (5 * F1)), 1.4);
     // right-aligned at x BUBX, left of the ×'s column, so his pointer (its body hangs right of the tip) never covers them
     if (t >= tm.hiT) { const k = pop(tm.hiT), ax = BUBX - 20, ay = 244; X.save(); X.translate(ax, ay); X.scale(k, k); X.translate(-ax, -ay); bubble(X, BUBX, 140, 'hi', { who: 'human', size: 52 }); X.restore(); }
-    if (t >= tm.byeT) { const k = pop(tm.byeT), ax = BUBX - 20, ay = 354; X.save(); X.translate(ax, ay); X.scale(k, k); X.translate(-ax, -ay); bubble(X, BUBX, 250, 'bye!', { who: 'human', size: 52 }); X.restore(); }
+    if (t >= tm.byeT) { const k = pop(tm.byeT), ax = BUBX - 20, ay = 370; X.save(); X.translate(ax, ay); X.scale(k, k); X.translate(-ax, -ay); bubble(X, BUBX, 266, 'bye!', { who: 'human', size: 52 }); X.restore(); }
   }
   // his phone, leaning on the screen: the frame-0 card, compact (mono 28, the P floor)
   function drawPhone(X, t) {
@@ -828,7 +839,7 @@
     for (let i = 0; i < s.length; i++) X.fillText(s[i], x0 + i * adv, yb);
     X.restore();
   }
-  function drawBandContent(X, t) {
+  function drawBandContent(X, t, o = {}) {
     const tm = TM(), kc = coolK(t);
     const breath = .82 + .1 * Math.sin((t - 117.6) * 1.9);
     const gp = bump(t - tm.gladT, .16, .55);                                  // "glad": the seal glows once
@@ -836,15 +847,18 @@
     X.fillStyle = V.ht(X, C.INK, .22, 6, 45); X.fill(); X.restore();
     const sealCol = mix(mix(C.CLAY, C.SPARK, .5 * gp), C.UI_GREY, kc);
     drawEnvelope(X, ENV2.cx, ENV2.cy, ENV2.w, ENV2.h, { rot: ENV2.rot, flap: 1, seal: 1 + .06 * gp, sealCol, glow: Math.min(1.15, breath + .35 * gp) * (1 - kc), t, lw: 4, boil: .7 });
-    // "glad": one slow ring of light leaves the seal (home chord #3)
-    const ga = t - tm.gladT;
+    if (!o.noRing) gladRing(X, t);
+    drawTimer(X, t);
+  }
+  // "glad": one slow ring of light leaves the seal (home chord #3); drawn unclipped so it spills over the dark
+  function gladRing(X, t) {
+    const tm = TM(), ga = t - tm.gladT;
     if (ga > 0 && ga < 1.3) {
       const k = ga / 1.3, r0 = ENV2.h * .2, fy = ENV2.cy + Math.cos(ENV2.rot) * (-ENV2.h / 2 + ENV2.h * .56) + 4, fx = ENV2.cx - Math.sin(ENV2.rot) * (-ENV2.h / 2 + ENV2.h * .56);
       const ra = r0 * lerp(1.3, 5.2, E.out3(k)), rb = ra + r0 * lerp(.5, 1.1, k);
       X.save(); X.globalAlpha = (1 - E.in2(k)) * .95; X.beginPath(); X.arc(fx, fy, rb, 0, TAU); X.arc(fx, fy, ra, 0, TAU, true);
       X.fillStyle = V.ht(X, C.SPARK, .42, 8, 45); X.fill(); X.restore();
     }
-    drawTimer(X, t);
   }
   function bandBg(X, y0, y1, xa = 0, xb = W) {
     if (y1 - y0 < 1) return;
@@ -875,9 +889,12 @@
   // the night closes in (the dots grow, print-true) and the halo tightens to the band's spill
   const nightK = t => E.in2(clamp(seg(t, TM().dive[0], TM().dive[1]) * 1.25));
   function wallRow(y, c, kd) { // {base, halo, floor}: the wall's density before the night, and the sliver's light
-    const Z = c.Z, g0 = c.sy - SLIVER / 2 * Z, g1 = c.sy + SLIVER / 2 * Z, deskY = c.sy + (DESK.y0 - ANCHOR[1]) * Z;
-    if (y < g0) return { base: .5 + .1 * clamp(1 - y / 700), halo: smooth(clamp(((g0 - y) / lerp(210, 44, kd) - .08) / .75)), floor: false };
-    if (y > g1) return { base: .5, halo: smooth(clamp(((y - g1) / lerp(72, 44, kd) - .08) / .75)), floor: y > deskY };
+    // the light spills round the laptop's edge: the halo is measured from the slab's outer edges (lid top, deck
+    // bottom, and the INK extension that grows with the push), so the glow stays visible around the slab while we fly in
+    const Z = c.Z, ext = 44 * smooth(clamp((Z - 2.5) / 10)), oT = ANCHOR[1] - (HINGE - SLIVER - LID_T) + ext, oB = BASE.y1 - ANCHOR[1] + ext;
+    const g0 = c.sy - SLIVER / 2 * Z, g1 = c.sy + SLIVER / 2 * Z, h0 = c.sy - oT * Z, h1 = c.sy + oB * Z, deskY = c.sy + (DESK.y0 - ANCHOR[1]) * Z;
+    if (y < g0) return { base: .5 + .1 * clamp(1 - y / 700), halo: smooth(clamp(((Math.max(0, h0 - y)) / lerp(210, 150, kd) - .08) / .75)), floor: false };
+    if (y > g1) return { base: .5, halo: smooth(clamp(((Math.max(0, y - h1)) / lerp(72, 110, kd) - .08) / .75)), floor: y > deskY };
     return { base: 0, halo: 0, floor: false };
   }
   function wallDens(y, c, dd, kd) { const r = wallRow(y, c, kd); return (r.floor ? floorK(dd) : lerp(r.base, 1, dd)) * r.halo; }
@@ -1025,12 +1042,26 @@
     heartKnock(F, B, t, { x: 500, tEnd: bEnd });
     // as soon as the night starts reaching the subtitle band the line turns PAPER on an INK plate (the plate rule),
     // so it never sits as outlined type on a half-inked halftone
-    const dSub = wallDens(950, c, dd, kd), inkB = smooth(clamp((dSub - .1) / .1)), plB = .92 * smooth(clamp((dSub - .06) / .12));
-    const a3End = 121.4 - 10 * F1;
-    if (inkB < 1) heartKnock(F, A3, t, { color: C.INK, knock: C.PAPER, tEnd: a3End, alpha: 1 - inkB });
-    if (inkB > 0) heartKnock(F, A3, t, { color: C.PAPER, knock: C.INK, tEnd: a3End, alpha: inkB, plate: plB });
+    // the ground under the line is read back from the frame itself (the night, the slab and the deck all reach it at
+    // different moments of the push), so the colour and plate always match what is actually there
+    const dSub = t >= tm.lid[0] ? inkUnder(F, 600, 1320, [900, 925, 950, 975]) : 0;
+    // one-frame swap (a print inverts, it never crossfades: two half-alpha versions read as mud)
+    const plB = .9 * smooth(clamp((Math.min(dSub, 1 - dSub) - .04) / .1)), a3End = 121.4 - 10 * F1;
+    if (dSub < .45) heartKnock(F, A3, t, { color: C.INK, knock: C.PAPER, tEnd: a3End, plate: plB });
+    else heartKnock(F, A3, t, { color: C.PAPER, knock: C.INK, tEnd: a3End, plate: plB });
   }
 
+  // mean ink coverage (0 PAPER .. 1 INK) of a few device rows of the frame painted so far
+  function inkUnder(F, x0, x1, ys) {
+    const sc = G.scale, a = Math.round(x0 * sc), w = Math.max(1, Math.round((x1 - x0) * sc));
+    const lp = 0xF4 * .3 + 0xEE * .59 + 0xE3 * .11, li = 0x19 * .3 + 0x18 * .59 + 0x30 * .11;
+    let acc = 0, n = 0;
+    for (const y of ys) {
+      const d = F.getImageData(a, Math.round(y * sc), w, 1).data;
+      for (let i = 0; i < d.length; i += 8) { acc += d[i] * .3 + d[i + 1] * .59 + d[i + 2] * .11; n++; }
+    }
+    return clamp(1 - (acc / Math.max(1, n) - li) / (lp - li));
+  }
   function heartWidth(X, L, size = 64) {
     const ws = V.heartWords(L), f = HEARTF(size);
     X.save(); X.font = f;
@@ -1080,8 +1111,9 @@
       bandBg(F, y0, y1); bandSpill(F, y0, y1, 1 - kcl);
       F.save(); F.beginPath(); F.rect(0, y0, W, y1 - y0); F.clip();
       F.translate(960, 540); F.scale(zc, zc); F.translate(-960, -540);
-      drawBandContent(F, t);
+      drawBandContent(F, t, { noRing: true });
       F.restore();
+      F.save(); F.translate(960, 540); F.scale(zc, zc); F.translate(-960, -540); gladRing(F, t); F.restore();
     } else if (t < tm.cur) {
       // the line shrinks to the cursor's width (a CRT going out, backwards into a cursor), then stands up as the ▮
       const ks = E.io3(seg(t, tm.shrink[0], tm.shrink[1])), hw = lerp(960, 24, ks);
