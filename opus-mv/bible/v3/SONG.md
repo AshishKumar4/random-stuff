@@ -1015,3 +1015,9 @@ No fatal issues were raised in this round.
 - §7 and §8 are retimed to the expected take.
 - The chord map has the 4-bar verse 1, the 4-bar chorus 2 and the 4-bar outro.
 - §12.6's levers are rebuilt for the new length model.
+
+### Production note · 2026-09-29 · the guide → remix pipeline (main loop)
+- **`melody_id` is loose.** It sings the MIDI loosely in the first section: 37% of notes within a semitone, against 21–29% for prompt-only takes. It also truncates the song to 60–93 s. Not used.
+- **Guide → remix keeps my tune.** Test: my 30 s chorus + drop guide (musiclib, robot guide singer), uploaded as purpose `remix` and remixed with the chorus lyrics. The takes follow the guide vocal at **87% / 75% within a semitone** (prompt C), against a 60% floor for an unrelated take on the same DTW metric.
+- **The remix prompt is `remix_prompt.txt` (prompt E, "melancholic future bass").** Prompt C came back as upbeat electro-house. Prompt D drifted to bouncy pop-trap. Prompt E came back as "Future Bass: melancholic, atmospheric, introspective, dreamy, ethereal, uplifting", with 85% of the melody kept (median error 0.40 st).
+- **Full song:** `comp_v3.py` (every note mine) → `render_guide.py` → upload `guide_mix` → remix with `remix_lyrics.txt` and prompt E, n = 3 → pick.
