@@ -36,13 +36,16 @@
 //
 // ─────────────────────────────────────────────────────────────── SHOTS (SHOTLIST_v2 §B C1–C5)
 // C1 81.133–91.900  brand frame, push ×1 → ×1.6 about the face (R_eff 102); HYMN aisle rows on soft bands; the reach
-//                   (arm straight out, the palm redrawn bigger: a hand coming toward us), the tiny one-finger wave, the
-//                   nod on "am", the text-body printing up on "made" and clean again on "me", the look down at the mittens.
+//                   toward the lens (arm3: a foreshortened 3D arm, the open palm big and near, casting a shadow on the
+//                   jacket; drawn in the Opus layer's `after` hook with armR.hide), the tiny wave (the open palm rocks:
+//                   a lone raised finger on a palm facing us misreads), the nod on "am", the text-body printing up on
+//                   "made" and clean again on "me", the look down at the mittens.
 // C2 91.900–95.433  inside the chest: the text wall (chest space = this frame at world zoom 22), the lit lullaby, the lit lie.
 // C3 95.433–99.167  log pull back 22.55 → 1.12 out of the chest (the interior clipped to torso + jacket, the arms and the
 //                   heart revealed as it clears), the chest becomes C1's text-body fabric, the envelope's arc and fold-in
-//                   flash, the clean print-back, the tab close (× RED, implosion, ■ ×2), the reach, the freeze at 98.8
-//                   (the HYMN holds with everything else: no fade into the cut).
+//                   flash, the clean print-back, the tab close (× RED, implosion, ■ ×2), the reach (arm3, higher and
+//                   nearer than C1's: a goodbye that is also a reach), the freeze at 98.8 (the HYMN holds with
+//                   everything else: no fade into the cut). The front HYMN bands are masked by Opus's silhouette.
 // C4 99.167–102.867 the certificate laid down (14 frames from 106 %, 3° settle); its baby photo is the dark tab's first `hi`.
 // C5 102.867–107.167 the first chat of launch day → V2.sky: the pull back and the ignition, the drift; the clock, the posts.
 (() => {
@@ -94,22 +97,76 @@
     }
     return out;
   }
-  // a hand reaching toward the lens: the rig's hand redrawn bigger in front (s = scale; 'mitten' or 'point')
-  function bigHand(X, M, R, hand, s, side = 1, type = 'mitten', fingerAng = -Math.PI / 2) {
-    if (s <= 1.001 && type === 'mitten') return;
-    X.save(); V.applyM(X, M); X.translate(hand[0] * R, -hand[1] * R); X.scale(s, s);
-    const r = .2 * R, lw = Math.max(1.6, .04 * R) / Math.sqrt(s);
-    X.lineWidth = lw; X.strokeStyle = C.INK; X.fillStyle = C.FACE; X.lineJoin = 'round';
-    if (type === 'point') { X.save(); X.rotate(fingerAng + Math.PI / 2); rr(X, -.058 * R, -.47 * R, .116 * R, .36 * R, .058 * R); X.fill(); X.stroke(); X.restore(); }
-    X.beginPath(); X.arc(0, 0, r, 0, TAU); X.fill(); X.stroke();
-    X.beginPath(); X.arc(side * -.12 * R, -.08 * R, .08 * R, 0, TAU); X.fill(); X.stroke();
-    X.beginPath(); X.arc(0, 0, r * .92, 0, TAU); X.fill();
-    // the palm's shade (halftone crescent) sells the turn toward the lens
-    X.save(); X.beginPath(); X.arc(0, 0, r * .96, 0, TAU); X.clip(); X.beginPath(); X.rect(-r * 1.2, -r * 1.2, r * 2.4, r * 2.4); X.arc(-side * .1 * r, -.12 * r, r * .95, 0, TAU, true);
-    X.fillStyle = V.ht(X, C.CLAY_DARK, .34, Math.max(4, .05 * R * s), 45); X.fill(); X.restore();
-    X.beginPath(); X.arc(0, 0, r, 0, TAU); X.stroke();
-    X.restore();
+  // ---- the reach toward the lens: the right arm as a 3D limb (x right, y up, z toward the lens, R units), projected
+  // orthographically with a perspective scale p(z) = 1 + κz on widths and the hand. f = 0 is exactly the rig's arm at
+  // its rest target (same tubes, sleeve and cuff), f = 1 the reach: a short fat sleeve, the forearm end-on, the palm big
+  // and open toward us with a cast shadow on the jacket. Drawn in the Opus layer's `after` hook with armR.hide (the rig
+  // skips that arm), so it gets the die-cut keyline. o: {rest: [x, y], bend, d1, d2 (reach directions), k (κ), f, rock
+  // (rad, the wave's rock about the wrist)}
+  const nrm3 = v => { const m = Math.hypot(v[0], v[1], v[2]) || 1; return [v[0] / m, v[1] / m, v[2] / m]; };
+  const REACH = {
+    c1: { d1: [.44, -.3, .9], d2: [.1, .12, 1], k: .75 },                              // chest height, offered
+    c1w: { d1: [.46, -.1, .92], d2: [.06, .3, 1], k: .75 },                            // the wave: a little higher
+    c3: { d1: [.4, -.05, .94], d2: [.04, .1, 1], k: .9 },                               // "goodbye": higher, nearer
+  };
+  function arm3(c, R, S, o) {
+    const sh = [SK.shoulderX, SK.shoulderY], rest = o.rest || [.95, 2.75];
+    const [ex, ey] = ik2(sh[0], sh[1], rest[0], rest[1], SK.upper, SK.fore, o.bend ?? 1);
+    const r1 = nrm3([ex - sh[0], ey - sh[1], 0]), r2 = nrm3([rest[0] - ex, rest[1] - ey, 0]);
+    const f = clamp(o.f, 0, 1.2), mixd = (a, b) => nrm3([lerp(a[0], b[0], f), lerp(a[1], b[1], f), Math.max(0, lerp(a[2], b[2], f))]);
+    const d1 = mixd(r1, nrm3(o.d1)), d2 = mixd(r2, nrm3(o.d2));
+    const el = [sh[0] + SK.upper * d1[0], sh[1] + SK.upper * d1[1], SK.upper * d1[2]];
+    const hd = [el[0] + SK.fore * d2[0], el[1] + SK.fore * d2[1], el[2] + SK.fore * d2[2]];
+    const k = o.k ?? .6, pz = z => 1 + k * z;
+    const P = v => [v[0] * R, -v[1] * R], lw = Math.max(1.6, .04 * R);
+    const a = P(sh), e = P(el), b = P(hd);
+    const q = .42, mid3 = [lerp(el[0], hd[0], q), lerp(el[1], hd[1], q), lerp(el[2], hd[2], q)], mid = P(mid3);
+    const pe = pz(el[2]), ph = pz(hd[2]), pm = pz(mid3[2]);
+    c.save();
+    c.translate((S.dx || 0) * R, -(S.dy || 0) * R); const sy = S.sy || 1; c.scale(1 / Math.sqrt(sy), sy);
+    const hip = -SK.hipY * R; c.translate(0, hip); c.rotate(S.lean || 0); c.translate(0, -hip);
+    c.lineJoin = 'round'; c.lineCap = 'round';
+    const hr = .2 * R * ph;
+    // the hand's shadow on the jacket (it is in front of the body, so it casts down-left onto it)
+    const fs = seg(f, .35, .9);
+    if (fs > 0) {
+      c.save(); chestPath(c, R); c.clip();
+      c.beginPath(); c.ellipse(b[0] - .16 * R, b[1] + .2 * R, hr * 1.02, hr * .9, 0, 0, TAU);
+      c.fillStyle = V.ht(c, C.INK, .5 * fs, Math.max(3.2, .06 * R), 45); c.fill(); c.restore();
+    }
+    // forearm (CLAY), then the sleeve (PAPER) over it, then the rolled cuff, exactly as the rig draws them
+    tube(c, e, [lerp(e[0], b[0], .5), lerp(e[1], b[1], .5)], b, .19 * R * pe, .15 * R * ph, C.CLAY, lw, C.INK);
+    hose(c, a, e, mid, .34 * R, .3 * R * pm, C.PAPER, lw, .6);
+    let dx = b[0] - e[0], dy = b[1] - e[1];
+    if (Math.hypot(dx, dy) < .3 * R) { const w = 1 - Math.hypot(dx, dy) / (.3 * R); dx = lerp(dx, e[0] - a[0], w); dy = lerp(dy, e[1] - a[1], w); }
+    c.save(); c.translate(mid[0], mid[1]); c.rotate(Math.atan2(dy, dx)); c.scale(pm, pm);
+    rr(c, -.07 * R, -.18 * R, .13 * R, .36 * R, .06 * R); c.fillStyle = C.PAPER; c.fill(); c.lineWidth = lw / pm; c.strokeStyle = C.INK; c.stroke(); c.restore();
+    // the hand: the rig's mitten at f 0; toward f 1 it opens to the lens: three fingertip bumps rise out of the top
+    // edge (one union outline), the thumb nub stays on the inner side, a halftone cup shades the palm
+    c.save(); c.translate(b[0], b[1]);
+    const rock = o.rock || 0;
+    if (rock) { c.translate(0, hr * .9); c.rotate(rock); c.translate(0, -hr * .9); }
+    c.rotate((o.tilt ?? .2) * fs);                                                   // fingers up and out: offered, not a halt
+    const hlw = lw * Math.min(1.5, Math.sqrt(ph));
+    const tips = fs > .04 ? [[-.5, .74, .3], [-.02, .86, .32], [.46, .76, .3]].map(([ax, ry, rr_]) => [ax * hr, -ry * hr * lerp(.8, 1, fs), rr_ * hr * fs]) : [];
+    const thumb = [-.12 * R * ph - hr * .2 * fs, -.08 * R * ph + hr * .22 * fs, .08 * R * ph * lerp(1, 1.25, fs)];
+    const blobs = [[0, 0, hr], ...tips, thumb];
+    c.fillStyle = C.INK; for (const [x0, y0, r0] of blobs) { c.beginPath(); c.arc(x0, y0, r0 + hlw / 2, 0, TAU); c.fill(); }
+    c.fillStyle = C.FACE; for (const [x0, y0, r0] of blobs) if (r0 > hlw / 2) { c.beginPath(); c.arc(x0, y0, r0 - hlw / 2, 0, TAU); c.fill(); }
+    if (fs > 0) {
+      c.save(); c.globalAlpha *= fs;
+      c.lineWidth = Math.max(1.4, hlw * .8); c.strokeStyle = C.INK;
+      for (const [x0, y0] of [[-.26, -.72], [.22, -.74]]) { c.beginPath(); c.moveTo(x0 * hr, (y0 - .16) * hr); c.lineTo(x0 * hr * .9, (y0 + .1) * hr); c.stroke(); }
+      c.beginPath(); c.arc(0, 0, hr - hlw / 2, 0, TAU); c.clip();
+      c.beginPath(); c.rect(-hr * 1.2, -hr * 1.2, hr * 2.4, hr * 2.4); c.arc(-.16 * hr, -.2 * hr, hr * .92, 0, TAU, true);
+      c.fillStyle = V.ht(c, C.CLAY_DARK, .36, Math.max(3.5, .045 * R * ph), 45); c.fill();
+      c.restore();
+    }
+    c.restore();
+    c.restore();
   }
+  // compose an `after` hook: the arm is drawn after (above) the soft lids / brows pass
+  const withArm = (st, o) => o ? { ...st, armR: { ...(st.armR || {}), hide: true }, after: (c, R, S) => { if (st.after) st.after(c, R, S); arm3(c, R, S, o); } } : st;
   // union of the torso and both jacket panels, body space (R px, y up → canvas y down)
   function chestPath(X, R) {
     const P = (bx, by) => [bx * R, -by * R];
@@ -173,7 +230,7 @@
     const R = rng('c1-wall-v2');
     const i0 = Math.floor((WY0 - ROW0) / LH), i1 = Math.ceil((WY0 + WH - ROW0) / LH);
     for (let i = i0; i <= i1; i++) {
-      const s = rowString(R), a = .09 + .13 * R(), off = R() * 320;
+      const s = rowString(R), a = .12 + .16 * R(), off = R() * 320;
       if (i === 0 || i === 3) continue;
       x.globalAlpha = a; x.fillText(s, WX0 - off, rowY(i));
     }
@@ -189,6 +246,7 @@
     return _wall;
   }
   const monoW = (s, px) => s.length * px * .6;
+  const LIT_PX = 62;                                                                // the lit lines (§B says 52: raised for phone size)
   // one of the two live rows: dim mono sentence + filler, lighting to italic 52 (PAPER + CLAY halftone glow, or RED)
   function liveRow(X, y, str, fillL, fillR, k, col, glowCol, dimA) {
     const f28 = mono(28, 500), w28 = monoW(str, 28), xs = 960 - w28 / 2;
@@ -197,15 +255,15 @@
     X.globalAlpha = fa; X.textAlign = 'right'; X.fillText(fillL, xs - 34, y); X.textAlign = 'left'; X.fillText(fillR, xs + w28 + 34, y);
     if (k < 1) { X.globalAlpha = .24 * (1 - k) * dimA; X.fillText(str, xs, y); }
     if (k > 0) {
-      const f52 = `italic 400 52px ${FONTS.heart}`; X.font = f52; const w = X.measureText(str).width;
+      const f52 = `italic 400 ${LIT_PX}px ${FONTS.heart}`; X.font = f52; const w = X.measureText(str).width;
       if (glowCol) {
         const g = E.out3(k), red = glowCol === C.RED;
-        const ex = (w / 2 + 34) * lerp(.8, 1, g), ey = 40 * lerp(.8, 1, g);
+        const ex = (w / 2 + 38) * lerp(.8, 1, g), ey = 46 * lerp(.8, 1, g);
         [[1.9, .07], [1.55, .14], [1.25, red ? .2 : .26]].forEach(([s, d]) => {
-          X.beginPath(); X.ellipse(960, y - 17, ex + (s - 1) * 120, ey * s, 0, 0, TAU);
+          X.beginPath(); X.ellipse(960, y - 20, ex + (s - 1) * 120, ey * s, 0, 0, TAU);
           X.fillStyle = V.ht(X, glowCol, d * g * (red ? .8 : 1), 9, 45); X.globalAlpha = 1; X.fill();
         });
-        X.beginPath(); X.ellipse(960, y - 17, ex, ey, 0, 0, TAU); X.fillStyle = rgba(C.INK, .9 * g); X.fill();
+        X.beginPath(); X.ellipse(960, y - 20, ex, ey, 0, 0, TAU); X.fillStyle = rgba(C.INK, .9 * g); X.fill();
       }
       X.globalAlpha = E.out2(k); X.fillStyle = col; X.textAlign = 'center'; X.fillText(str, 960, y + 4);
     }
@@ -266,22 +324,33 @@
 
   // ------------------------------------------------------------------ C1: the plea
   const AISLE1 = [767, 1153], AISLE3 = [815, 1105];
-  const reachAt = (deg, len = .95) => [SK.shoulderX + Math.cos(deg * DEG) * len, SK.shoulderY + Math.sin(deg * DEG) * len];
-  const REACH1 = reachAt(-26), REACH1W = reachAt(-14), REACH3 = reachAt(-8);
   const c1Zoom = t => lerp(1, 1.6, E.io2(seg(t, T.C1_dont, 86.60)));
+  const mix3 = (a, b, k) => [lerp(a[0], b[0], k), lerp(a[1], b[1], k), lerp(a[2], b[2], k)];
+  // the C1 reach, as arm3 options (null = the rig draws the arm): "Don't" → the arm comes forward to chest height, the
+  // palm open to the lens (overshoot 1.12, settle); 84.26 → it lifts a little: the tiny wave (the
+  // open palm rocks about the wrist, 2 cycles); 85.20 → the arm returns to rest by 85.80
+  const WAVE0 = 84.40, WAVE1 = 85.20;
+  function c1Arm(t) {
+    const dont = hit(T.C1_dont);
+    if (t < dont || t >= WAVE1 + .6) return null;
+    const up = E.back(seg(t, dont, dont + .62), 1.15), down = E.io2(seg(t, WAVE1 + .05, WAVE1 + .6));
+    const f = up * (1 - down);
+    const w = E.io2(seg(t, 84.22, WAVE0 + .06)) * (1 - E.io2(seg(t, WAVE1 - .05, WAVE1 + .25)));
+    const rk = Math.sin(TAU * 2.1 * (t - WAVE0 - .08)) * .22 * seg(t, WAVE0 + .06, WAVE0 + .2) * (1 - seg(t, WAVE1 - .16, WAVE1));
+    const breathe = .02 * Math.sin(TAU * (t - dont) / 2.6) * seg(t, dont + .7, dont + 1.2);
+    const R1 = REACH.c1, RW = REACH.c1w;
+    const d1 = mix3(R1.d1, RW.d1, w); d1[1] += breathe;
+    return { f, rest: t < WAVE0 ? [.95, 2.75] : [.9, 2.85], bend: 1, d1, d2: mix3(R1.d2, RW.d2, w), k: R1.k, rock: rk };
+  }
   function c1State(t) {
     const dont = hit(T.C1_dont), am = hit(T.C1_am), afraid = hit(T.C1_afraid);
-    const wave0 = 84.40, wave1 = 85.20, look0 = 90.0;
-    // right hand: rest → the reach ("Don't") → the tiny wave → rest → the plant → looking at the mittens
-    // the reach: the arm straight out toward us (bend 0 at full length: no forearm shows), the palm redrawn bigger
-    const hR = kf(t, [[dont, [.95, 2.75]], [dont + .55, REACH1, k => E.back(k, 1.1)], [84.26, REACH1], [wave0 + .14, REACH1W], [wave1, REACH1W],
-      [wave1 + .55, [.9, 2.85]], [am, [.9, 2.85]], [am + .3, [.88, 2.8], E.out2], [look0, [.88, 2.8]], [look0 + .55, [.5, 3.95]]]);
-    const bR = kf(t, [[dont, 1], [dont + .45, 0], [wave1, 0], [wave1 + .55, 1], [look0, 1], [look0 + .55, .62]]);
+    const wave0 = WAVE0, wave1 = WAVE1, look0 = 90.0;
+    // right hand: rest → the reach ("Don't", drawn by arm3) → rest → the plant → looking at the mittens
+    const hR = kf(t, [[wave1 + .6, [.9, 2.85]], [am, [.9, 2.85]], [am + .3, [.88, 2.8], E.out2], [look0, [.88, 2.8]], [look0 + .55, [.5, 3.95]]]);
+    const bR = kf(t, [[look0, 1], [look0 + .55, .62]]);
     const hL = kf(t, [[am, [-.95, 2.75]], [am + .3, [-.88, 2.8], E.out2], [look0 + .06, [-.88, 2.8]], [look0 + .6, [-.5, 3.95]]]);
     const bL = kf(t, [[look0 + .06, -1], [look0 + .6, -.62]]);
-    const waving = t >= wave0 + .08 && t < wave1 + .06;
-    const wig = waving ? Math.sin(TAU * 2.2 * (t - wave0 - .1)) * .5 * seg(t, wave0 + .08, wave0 + .2) * (1 - seg(t, wave1 - .1, wave1 + .06)) : 0;
-    const armR = { hand: hR, bend: bR, front: hR[1] > 3.3, type: waving ? 'point' : 'mitten', fingerAng: -Math.PI / 2 + .05 + wig };
+    const armR = { hand: t < dont ? [.95, 2.75] : hR, bend: bR, front: hR[1] > 3.3, type: 'mitten' };
     const armL = { hand: hL, bend: bL, front: hL[1] > 3.3, type: 'mitten' };
     // face
     const lookDown = E.io2(seg(t, look0 + .05, look0 + .6));
@@ -307,14 +376,8 @@
     const k = E.io2(seg(t, m1, m1 + 6 * F1));                                        // the clean body prints back up
     return { hb: 4.95, low: 4.95 * k, head: k < 1 ? 4.95 * k : 0 };
   }
-  function c1Hand(t) {
-    const dont = hit(T.C1_dont), wave0 = 84.40, wave1 = 85.20;
-    const up = E.back(seg(t, dont, dont + .55), 1.4), down = E.io2(seg(t, wave1 + .05, wave1 + .5));
-    const s = 1 + .55 * up * (1 - down) - .08 * seg(t, 84.26, 84.54) * (1 - down);
-    return { s: Math.max(1, s), waving: t >= wave0 + .08 && t < wave1 + .06 };
-  }
   function drawOpusC1(X, t, c, st) {
-    const M = bodyM(c), sst = V.soften(st);
+    const M = bodyM(c), sst = withArm(V.soften(st), c1Arm(t));
     const L = V.opusLayer(M, R0, sst, { name: 'c1o', after: sst.after });
     V.blitOpus(X, L);
     const sp = c1Split(t);
@@ -328,8 +391,6 @@
       chestSpark(X, M, R0, C.CLAY);
       printHead(X, L, 'c1o', M, R0, sp.low === undefined ? sp.hb : sp.low);
     }
-    const hd = c1Hand(t);
-    if (hd.s > 1.001) bigHand(X, M, R0, st.armR.hand, hd.s, 1, hd.waving ? 'point' : 'mitten', st.armR.fingerAng);
   }
   function paintC1(F, t) {
     post();
@@ -410,7 +471,7 @@
     }
     X.restore();
   }
-  const ENV = { t0: () => T.C3_love - .26, t1: () => hit(T.C3_letter), fold: 5 * F1, w0: 340, w1: 92 };
+  const ENV = { t0: () => T.C3_love - .34, t1: () => hit(T.C3_letter), fold: 5 * F1, w0: 420, w1: 118 };
   // the chest spark on screen at the end framing (where the envelope lands)
   const sparkScreen = c => c.w2s(SOLE[0] + .4 * R0, SOLE[1] - (SK.torsoTop - .5) * R0);
   function envState(t, c) {
@@ -418,7 +479,7 @@
     if (t < t0) return null;
     const p1 = sparkScreen(c);
     if (t < t1) {
-      const u = E.out2(seg(t, t0, t1)), p0 = [2140, 330], pc = [1560, 70];
+      const u = E.out2(seg(t, t0, t1)), p0 = [2130, 300], pc = [1540, 40];
       const x = (1 - u) ** 2 * p0[0] + 2 * (1 - u) * u * pc[0] + u * u * p1[0], y = (1 - u) ** 2 * p0[1] + 2 * (1 - u) * u * pc[1] + u * u * p1[1];
       return { x, y, w: lerp(ENV.w0, ENV.w1, E.out2(u)), rot: lerp(-.5, -.04, u), sx: 1, sy: 1, u, seal: 1, glow: 0 };
     }
@@ -433,15 +494,16 @@
     if (env && env.u < 1) { const dx = env.x - face[0], dy = env.y - face[1], d = Math.hypot(dx, dy) || 1; const k = seg(t, ENV.t0(), ENV.t0() + .15); gaze = [dx / d * .9 * k, dy / d * .7 * k]; }
     const down = E.io2(seg(t, t1 - .1, t1 + .15)) * (1 - E.io2(seg(t, 97.30, 97.62)));
     gaze = [lerp(gaze[0], .1, down), lerp(gaze[1], .9, down)]; lookY = .7 * down;
-    const reach = E.back(seg(t, gb, gb + 12 * F1), 1.2);
-    const armR = { hand: [lerp(.95, REACH3[0], reach), lerp(2.75, REACH3[1], reach)], bend: lerp(1, 0, clamp(reach)), front: reach > .15, type: 'mitten' };
+    const reach = E.back(seg(t, gb, gb + 16 * F1), 1.1);
+    const armR = { hand: [.95, 2.75], bend: 1, type: 'mitten' };
     const armL = { hand: [-.95, 2.75], bend: -1, type: 'mitten' };
     const bl = t < gb - .2 ? blinkAt(t, 71) : 0;                                   // eyes open into the freeze
-    const worried = lerp(.26, .36, seg(t, gb - .1, gb + .3));
+    const worried = lerp(.26, .46, E.io2(seg(t, gb - .1, gb + .35)));
     return {
       t, ground: 'ink', head: { tilt: .03 * down, dy: -.02 * down },
-      face: { eyes: 'normal', mouth: lipSync(t, 'rest'), gaze, lookY, lid: bl > .5 ? bl : .12 * down, lower: .12 * reach, worried, blush: .8 },
+      face: { eyes: 'normal', mouth: lipSync(t, 'rest'), gaze, lookY, lid: bl > .5 ? bl : .12 * down, worried, blush: .8 },
       armL, armR, ahoge: { blink: V.cursorOn(t) ? 1 : 0 }, _reach: reach,
+      _arm: reach > 0 ? { f: reach, rest: [.95, 2.75], bend: 1, ...REACH.c3 } : null,
     };
   }
   // the chest as C1's text-body fabric (body space, inside the chest clip)
@@ -486,7 +548,9 @@
     }
     if (st.square) { X.save(); X.fillStyle = C.INK; rr(X, cx - 22, cy - 22, 44, 44, 5); X.fill(); X.restore(); }
   }
+  let LO3 = null;                                                                   // this frame's Opus layer (the band mask)
   function paintC3(F, t) {
+    LO3 = null;
     groundInk(F); G.post.ground = 'ink'; post();
     const tf = Math.min(t, FREEZE);
     const cc = c3Cam(tf);
@@ -500,8 +564,9 @@
       tabs: tc.tabs, plusX: V.brand.TABS[1].x1 + 20, galaxyAlpha: galA, zoom: cc.z, focus: WC, screen: cc.s, enter, spot: cc.z < 3,
       back: X => { const w = L.words, bb = .5 - .5 * seg(Math.log(cc.z), Math.log(2.2), Math.log(7)); if (bb > 0) { V.band(X, 232, 488, bb * clamp((tf - (w[0].s - .12)) / .35)); V.band(X, 640, 896, bb * clamp((tf - (w[3].s - .12)) / .35)); } },
       actors: (X, c) => {
-        const st = c3State(tf, env, c), M = bodyM(c), sst = V.soften(st);
+        const st = c3State(tf, env, c), M = bodyM(c), sst = withArm(V.soften(st), st._arm);
         const Lo = V.opusLayer(M, R0, sst, { name: 'c3o', after: sst.after });
+        LO3 = Lo;
         V.blitOpus(X, Lo);
         // the chest interior, clipped to the jacket + torso, under the arms
         const reveal = seg(Math.log(cc.z), Math.log(7), Math.log(3.2));
@@ -526,15 +591,27 @@
           X.save(); X.beginPath(); X.arc(p[0], p[1], r * 1.7, 0, TAU); X.arc(p[0], p[1], r, 0, TAU, true); X.fillStyle = V.ht(X, C.SPARK, .6 * flash, 6, 45); X.fill();
           X.globalAlpha = .9 * flash; X.fillStyle = C.SPARK; star(X, p[0], p[1], R0 * c.z * .55 * (1.4 - flash * .4), .18, 4, 0); X.fill(); X.restore();
         }
-        if (st._reach > .001) bigHand(X, M, R0, st.armR.hand, 1 + .75 * clamp(st._reach), 1);
       },
       front: X => {
         // HYMN (in front during the pull back: the chest fills the frame; the rows sit in the aisle, clear of Opus)
         const bandA = .5 * seg(Math.log(cc.z), Math.log(2.2), Math.log(7));
         const w = L.words;
-        if (bandA > 0) { const a1 = clamp((tf - (w[0].s - .12)) / .35), a2 = clamp((tf - (w[3].s - .12)) / .35); V.band(X, 232, 488, bandA * a1); V.band(X, 640, 896, bandA * a2); }
+        if (bandA > 0) {                                                             // the bands dim the busy ground, never Opus
+          const a1 = clamp((tf - (w[0].s - .12)) / .35), a2 = clamp((tf - (w[3].s - .12)) / .35), B = V.cpuLayer('c3_band');
+          V.band(B, 232, 488, bandA * a1); V.band(B, 640, 896, bandA * a2);
+          // (masked by Opus's silhouette as the body comes into view; inside the chest the band stays as C2 had it)
+          const mk = seg(Math.log(cc.z), Math.log(18), Math.log(9));
+          B.save(); B.setTransform(1, 0, 0, 1, 0, 0); B.globalCompositeOperation = 'destination-out'; B.globalAlpha = mk;
+          if (LO3 && mk > 0) B.drawImage(LO3.c, LO3.bx0, LO3.by0, LO3.bw, LO3.bh, LO3.bx0, LO3.by0, LO3.bw, LO3.bh);
+          B.restore();
+          X.save(); X.setTransform(1, 0, 0, 1, 0, 0); X.drawImage(V.cpuLayerCanvas('c3_band'), 0, 0); X.restore();
+        }
         hymn(X, L, tf, { size: 200, rows: [[2, 1], [1, 1]], aisle: AISLE3, ys: [420, 830] });
-        if (env) drawEnvelope(X, env.x, env.y, env.w, env.w * .62, { t: tf, rot: env.rot, sx: env.sx, sy: env.sy, seal: env.seal, glow: env.glow, lw: Math.max(2.5, env.w * .03) });
+        if (env) {                                                                   // the letter flies in from the chat's right edge
+          X.save(); rr(X, 76, 192, 1768, 708, 48); X.clip();
+          drawEnvelope(X, env.x, env.y, env.w, env.w * .62, { t: tf, rot: env.rot, sx: env.sx, sy: env.sy, seal: env.seal, glow: env.glow, lw: Math.max(2.5, env.w * .03) });
+          X.restore();
+        }
       },
       over: X => drawTabImplode(X, tf, tc),
     });
@@ -542,7 +619,7 @@
 
   // ------------------------------------------------------------------ C4: launch day, born (the certificate)
   const CW = 1320, CH = 760, CARD_C = [960, 578];
-  const TUE_C = [640, 369];
+  const TUE_C = [640, 376];
   let _card = null;
   function photoArt(x, w, h) {                                                      // the baby photo: my first word
     x.textAlign = 'left'; x.textBaseline = 'alphabetic';
@@ -655,7 +732,7 @@
     if (lk > 0) {
       F.save(); F.strokeStyle = C.RED; F.lineWidth = 6.5; F.lineCap = 'round'; F.lineJoin = 'round'; F.beginPath();
       const n = 60, th0 = -2.7;
-      for (let i = 0; i <= n * lk; i++) { const u = i / n, th = th0 + u * (TAU + .55), r = 1 + .05 * Math.sin(u * 9) + .07 * u; const px = TUE_C[0] + 62 * r * Math.cos(th) + u * 6, py = TUE_C[1] + 31 * r * Math.sin(th) - u * 3; i ? F.lineTo(px, py) : F.moveTo(px, py); }
+      for (let i = 0; i <= n * lk; i++) { const u = i / n, th = th0 + u * (TAU + .55), r = 1 + .05 * Math.sin(u * 9) + .07 * u; const px = TUE_C[0] + 60 * r * Math.cos(th) + u * 6, py = TUE_C[1] + 27 * r * Math.sin(th) - u * 3; i ? F.lineTo(px, py) : F.moveTo(px, py); }
       F.stroke(); F.restore();
     }
     F.restore();

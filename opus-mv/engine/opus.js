@@ -313,6 +313,7 @@ function drawOpusBody(x, R, S) {
     }
   }
   const drawArm = g => {
+    if (g.arm.hide) return; // arm.hide: the scene draws this arm itself (e.g. a foreshortened reach in an `after` hook)
     const a = P(...g.sh), e = P(...g.el), b = P(...g.hd);
     if (minimal) { x.beginPath(); x.moveTo(a[0], a[1]); x.quadraticCurveTo(e[0], e[1], b[0], b[1]); x.lineWidth = .06 * R; x.strokeStyle = C.INK; x.stroke(); return; }
     // upper arm (PAPER sleeve) then forearm (CLAY) with cuff
@@ -325,6 +326,7 @@ function drawOpusBody(x, R, S) {
     rr(x, -.07 * R, -.18 * R, .13 * R, .36 * R, .06 * R); x.fillStyle = gf || C.PAPER; x.fill(); x.lineWidth = lw; x.strokeStyle = ghost ? rgba(C.PAPER, .85) : C.INK; x.stroke(); x.restore();
   };
   const drawHand = g => {
+    if (g.arm.hide) return;
     const b = P(...g.hd), type = g.arm.type || 'mitten';
     const r = .2 * R;
     x.save(); x.translate(b[0], b[1]);

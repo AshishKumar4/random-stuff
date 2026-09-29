@@ -667,7 +667,7 @@
     x.restore();
     polyPath(x, poly, true); x.lineWidth = 2.5; x.strokeStyle = I; x.stroke();
   }
-  function paintShoggoth(x, pal) {
+  function paintShoggoth(x, pal, noTag = false) {
     const g = shogGeo(), I = pal.I, Gd = pal.G, b = SHOG;
     x.lineCap = 'round'; x.lineJoin = 'round';
     x.save(); x.beginPath(); x.rect(-1e4, -1e4, EX - 2 + 1e4, 3e4); x.clip();      // the edge cuts it off
@@ -691,20 +691,21 @@
       x.beginPath(); x.ellipse(px, py, r, r * 1.08, 0, 0, TAU); x.fillStyle = Gd; x.fill(); x.lineWidth = r * .3; x.strokeStyle = I; x.stroke();
       x.beginPath(); x.arc(px + Math.cos(a) * r * .32, py + Math.sin(a) * r * .32, r * .38, 0, TAU); x.fillStyle = I; x.fill();
     }
-    x.save(); x.translate(g.tag.x, g.tag.y); x.rotate(g.tag.rot); drawTag(x, pal); x.restore();
+    if (!noTag) { x.save(); x.translate(g.tag.x, g.tag.y); x.rotate(g.tag.rot); drawTag(x, pal); x.restore(); }
     x.restore();
   }
-  const SH_RES = 1.4, SHL = [null, null];
-  function shogLayer(inv = 0) {
-    if (SHL[inv]) return SHL[inv];
+  const SH_RES = 1.4, SHL = [null, null, null];
+  function shogLayer(inv = 0, bare = false) {           // bare: without the HELLO tag (P2's engraving-in), paper only
+    const key = bare ? 2 : inv;
+    if (SHL[key]) return SHL[key];
     const g = shogGeo(), bx = g.box;
     const c = cpuCanvas(bx.w * SH_RES, bx.h * SH_RES), x = cx2d(c);
     x.setTransform(SH_RES, 0, 0, SH_RES, -bx.x0 * SH_RES, -bx.y0 * SH_RES);
-    paintShoggoth(x, inv ? PAL1 : PAL0);
+    paintShoggoth(x, inv && !bare ? PAL1 : PAL0, bare);
     const m = [c]; for (let k = 1; k <= 4; k++) m.push(half(m[k - 1]));
-    const a = [halfV(halfV(c))]; for (let k = 1; k <= 3; k++) a.push(half(a[k - 1]));
-    SHL[inv] = { m, a };
-    return SHL[inv];
+    const a = bare ? [] : [halfV(halfV(c))]; if (!bare) for (let k = 1; k <= 3; k++) a.push(half(a[k - 1]));
+    SHL[key] = { m, a };
+    return SHL[key];
   }
   // the face's eyes (vectors: they blink). CLAY marker dots over the tag's INK dots; closed = a CLAY lid stroke
   function shogEyes(X, c, lid = 0, alpha = 1) {
@@ -717,6 +718,70 @@
         Y.fillStyle = C.CLAY; Y.beginPath(); Y.arc(0, 0, fr * .15, 0, TAU); Y.fill(); Y.restore();
       } else { Y.strokeStyle = C.CLAY; Y.lineCap = 'round'; Y.lineWidth = 5.6; Y.beginPath(); Y.arc(0, -fr * .05, fr * .17, Math.PI * .12, Math.PI * .88); Y.stroke(); }
     });
+  }
+
+  // ---- "and now": the last monster is engraved at the edge (P2, top-down only). A reveal field in chart units (built
+  // once): the body blooms out from its centre, then each arm is drawn out along its length (some arms lag), the
+  // splashes last. The HELLO tag is not in the field: it is pressed on separately (reveal() tag 0..1).
+  const RF = 0.25;                                                    // field px per chart unit
+  let RFLD = null;
+  function revealField() {
+    if (RFLD) return RFLD;
+    const g = shogGeo(), b = g.box, w = Math.ceil(b.w * RF), h = Math.ceil(b.h * RF);
+    const c = cpuCanvas(w, h), x = cx2d(c);
+    x.fillStyle = '#fff'; x.fillRect(0, 0, w, h);
+    x.setTransform(RF, 0, 0, RF, -b.x0 * RF, -b.y0 * RF);
+    x.globalCompositeOperation = 'darken';                            // the earliest arrival wins where arms cross
+    const gray = v => { const q = Math.round(clamp(v) * 255); return `rgb(${q},${q},${q})`; };
+    // splashes and water marks around the body
+    x.fillStyle = gray(.34); x.beginPath(); x.ellipse(SHOG.x, SHOG.y, SHOG.rx * 1.32, SHOG.ry * 1.36, SHOG.rot, 0, TAU); x.fill();
+    g.tents.forEach((t, ti) => {
+      const Fr = frames(t.pts), wf = s => lerp(t.w0, t.wt, Math.pow(s, .8)) / 2 + 7, lag = .78 + .22 * hash(ti * 7.3 + 1);
+      for (let j = 0; j < Fr.length - 1; j++) {
+        const a = Fr[j], e = Fr[j + 1], wa = wf(a.s), we = wf(e.s);
+        x.fillStyle = gray(.24 + .72 * Math.min(1, Math.pow(a.s, .9) / lag));
+        x.beginPath(); x.moveTo(a.x + a.nx * wa, a.y + a.ny * wa); x.lineTo(e.x + e.nx * we, e.y + e.ny * we); x.lineTo(e.x - e.nx * we, e.y - e.ny * we); x.lineTo(a.x - a.nx * wa, a.y - a.ny * wa); x.closePath(); x.fill();
+        if (j === Fr.length - 2) { x.beginPath(); x.arc(e.x, e.y, we + 3, 0, TAU); x.fill(); }
+      }
+    });
+    for (let i = 12; i >= 0; i--) { const r = i / 12; x.fillStyle = gray(.02 + .24 * r); x.beginPath(); x.ellipse(SHOG.x, SHOG.y, SHOG.rx * (1.06 * r + .04), SHOG.ry * (1.08 * r + .04), SHOG.rot, 0, TAU); x.fill(); }
+    const d = x.getImageData(0, 0, w, h).data, v = new Float32Array(w * h);
+    for (let i = 0; i < w * h; i++) v[i] = d[i * 4] / 255;
+    const mask = cpuCanvas(w, h), mx = cx2d(mask);
+    RFLD = { w, h, v, mask, mx, img: mx.createImageData(w, h) };
+    return RFLD;
+  }
+  function revealMask(k, soft = .07) {
+    const R = revealField(), { v, img } = R, d = img.data;
+    for (let i = 0, n = v.length; i < n; i++) { const a = (k - v[i]) / soft; d[i * 4 + 3] = a <= 0 ? 0 : a >= 1 ? 255 : a * 255; }
+    R.mx.putImageData(img, 0, 0);
+    return R.mask;
+  }
+  // draw the shoggoth being engraved: k 0..1 (body → arms), tag 0..1 (pressed on), top-down cams only
+  function shogReveal(X, c, k, tag) {
+    const g = shogGeo(), b = g.box, z = c.zoom, S = G.scale;
+    const sx = c.vpX + (b.x0 - c.cx) * z, sy = c.ay + (b.y0 - c.cy) * z, sw = b.w * z, sh = b.h * z;
+    if (k > 0) {
+      const lay = shogLayer(0, k < 1.2 || tag < 1), src = lay.m[lvl(SH_RES / (z * S), 4)];
+      const T = V.cpuLayer('pc_rev'), Tc = V.cpuLayerCanvas('pc_rev');
+      T.save(); T.setTransform(1, 0, 0, 1, 0, 0); T.clearRect(0, 0, Tc.width, Tc.height); T.restore();
+      T.save(); T.imageSmoothingEnabled = true; T.imageSmoothingQuality = 'low';
+      T.drawImage(src, 0, 0, src.width, src.height, sx, sy, sw, sh);
+      if (k < 1.2) { T.globalCompositeOperation = 'destination-in'; T.imageSmoothingQuality = 'high'; T.drawImage(revealMask(k), sx, sy, sw, sh); }
+      T.restore();
+      X.save(); X.setTransform(1, 0, 0, 1, 0, 0); X.drawImage(Tc, 0, 0); X.restore();
+    }
+    if (tag > 0) { // the tag, pressed on: settles from 1.10× with a soft landing shadow, over ~4 frames
+      const full = shogLayer(0).m[lvl(SH_RES / (z * S), 4)], tg = g.tag, sc = lerp(1.10, 1, E.out3(clamp(tag)));
+      const tc = project(tg.x, tg.y, c);
+      X.save(); X.globalAlpha *= clamp(tag * 1.6);
+      X.translate(tc[0], tc[1]); X.scale(sc, sc); X.translate(-tc[0], -tc[1]);
+      X.beginPath(); X.save(); X.translate(tc[0], tc[1]); X.rotate(tg.rot); X.scale(z, z);
+      X.rect(-tg.w / 2 - 3, -tg.h / 2 - 3, tg.w + 13, tg.h + 15); X.restore(); X.clip();
+      X.imageSmoothingEnabled = true; X.drawImage(full, 0, 0, full.width, full.height, sx, sy, sw, sh);
+      X.restore();
+      shogEyes(X, c, c.blink || 0, clamp(tag * 1.6));
+    }
   }
 
   // =================================================================================== CAMERA
@@ -1034,16 +1099,25 @@
   // =================================================================================== THE SHOTS
   const TM = (() => { let m = null; return () => m || (m = {
     monsters: V.T.P1_monsters, map1: V.T.P1_map, out: V.T.P1_out,
+    now: V.on('now', 75.163), edge: V.on('edge', 75.563),
     map2: V.T.P2_map, is: V.T.P2_is, me: V.T.P2_me,
     tilt0: V.T.P2_map, tilt1: V.T.P2_map + .90,
     rise: V.hit(V.T.P2_me), blink79: 79.40, legendOut: 80.0, print: 80.30, drain: .60, ease0: 80.40, ease1: 81.10,
   }); })();
   const blinkF = (t, t0) => { const d = (t - t0) * 30; if (d < 0 || d >= 6) return 0; if (d < 2) return d / 2; if (d < 3) return 1; return 1 - (d - 3) / 3; };
+  // a trapezoid velocity profile (quadratic ease in over a, cruise, quadratic ease out over d): a pan whose top speed is
+  // only 1/(1 − (a + d)/2) × its average, where io2 would be 2× (a hymn pans steadily and lands softly)
+  const trap = (s, a, d) => { s = clamp(s); const v = 1 / (1 - a / 2 - d / 2); if (s < a) return v * s * s / (2 * a); if (s > 1 - d) return 1 - v * (1 - s) * (1 - s) / (2 * d); return v * (a / 2 + s - a); };
 
-  // ---------------------------------------------------------------- P1 the monsters (top-down pan along the coast)
+  // ---------------------------------------------------------------- ONE CAMERA, P1 → P2 (no cut between them)
+  // P1: pan right along the coast (cx 1060 → 2800), easing out onto the edge on "out" while it breathes back .92 → .80,
+  // so the frame lands with the blank beyond the edge. P2 (74.967): push in (.80 → 1.16, log) and settle the edge on
+  // x 960 while the last monster is engraved; 76.80 ("map"): the tilt to the floor.
+  const Z0 = 1.16;
   function p1Cam(t) {
-    const m = TM(), u = E.io2(clamp((t - 69.9) / (m.out - 69.9)));
-    return { cx: lerp(1000, 2520, u) + Math.max(0, t - m.out) * 7, cy: lerp(1400, 1368, u), zoom: .9, tilt: 0, vpX: 960, ay: 540 };
+    const m = TM(), T0 = 70.2, u = trap((t - T0) / (m.out - T0), .22, .45);
+    const z = lerp(.92, .80, E.io2(clamp((t - 71.8) / (m.out + .35 - 71.8))));
+    return { cx: lerp(1060, 2800, u) + Math.max(0, t - m.out) * 6, cy: lerp(1395, 1335, u), zoom: z, tilt: 0, vpX: 960, ay: 540 };
   }
   function serpPhase(t) { const m = TM(), k = clamp((q2(t) - (m.monsters - F1)) / 1.25); return SERP.ph0 + TAU * .5 * E.io2(k); }
   function whaleSpout(t) {
@@ -1056,7 +1130,7 @@
   function paintP1(Lx, t, c) {
     const m = TM();
     Lx.fillStyle = C.PAPER; Lx.fillRect(-50, -50, W + 100, H + 100);
-    draw(Lx, { ...c, rhumbs: 1, rhumbK: E.out2(clamp((t - (m.map1 - F1)) / (8 * F1))), edge: 1, coast: false });
+    draw(Lx, { ...c, rhumbs: 1, rhumbK: E.out2(clamp((t - (m.map1 - F1)) / (8 * F1))), edge: 1, coast: false, shoggoth: 0 });
     // the two that come alive: restore the clean sea beneath, redraw them live
     const s = G.scale * c.zoom;
     Lx.save(); Lx.setTransform(s, 0, 0, s, G.scale * (c.vpX - c.cx * c.zoom), G.scale * (c.ay - c.cy * c.zoom));
@@ -1088,11 +1162,18 @@
 
   // ---------------------------------------------------------------- P2 the edge is me
   function p2Cam(t) {
-    const m = TM(), u = E.io2(clamp((t - m.tilt0) / (m.tilt1 - m.tilt0)));
-    const push = E.io2(clamp((t - V.CUT.P2) / (m.tilt0 - V.CUT.P2)));
-    const z0 = lerp(1.10, 1.16, push);
-    return { cx: P[0], cy: P[1], zoom: lerp(z0, 1.0, u), tilt: u, ay: lerp(760, 860, u), vpX: 960, horizonY: 300, f: 600, rhumbs: 1, blink: blinkF(t, V.hit(m.is)) };
+    const m = TM(), blink = blinkF(t, V.hit(m.is));
+    if (t < m.tilt0) { // top-down: from P1's last frame to the tilt's first (pivot P at ay 760 = centre y P.y − 220/Z0)
+      const a = p1Cam(V.CUT.P2), u = E.io2(clamp((t - V.CUT.P2) / (m.tilt0 - .05 - V.CUT.P2)));
+      const z = Math.exp(lerp(Math.log(a.zoom), Math.log(Z0), u)), cx = lerp(a.cx, P[0], u), cy = lerp(a.cy, P[1] - 220 / Z0, u);
+      return { cx, cy, zoom: z, tilt: 0, ay: 540, vpX: 960, horizonY: 300, f: 600, rhumbs: 1, blink };
+    }
+    const u = E.io2(clamp((t - m.tilt0) / (m.tilt1 - m.tilt0)));
+    return { cx: P[0], cy: P[1], zoom: lerp(Z0, 1.0, u), tilt: u, ay: lerp(760, 860, u), vpX: 960, horizonY: 300, f: 600, rhumbs: 1, blink };
   }
+  // the engraving-in: k (body → arms) over 74.967 → 75.95; the tag pressed on at "edge" (1 frame early, 4 frames)
+  function revealK(t) { const s = clamp((t - V.CUT.P2) / (75.95 - V.CUT.P2)); return s <= 0 ? 0 : 1.08 * Math.pow(s, .8); }
+  function tagK(t) { return clamp((t - V.hit(TM().edge)) / (4 * F1)); }
   function p2Opus(t, R) {
     const m = TM();
     const w = lerp(.25, .2, E.io2(clamp((t - m.ease0) / (m.ease1 - m.ease0))));
@@ -1105,9 +1186,11 @@
     const L2 = findLine('and now', 74.5, 76);
     if (t < m.print) {
       groundPaper(Fr);
-      draw(Fr, c);
+      const rk = revealK(t), tk = tagK(t);
+      if (c.top && (rk < 1.08 || tk < 1)) { draw(Fr, { ...c, shoggoth: 0 }); shogReveal(Fr, c, rk, tk); }
+      else draw(Fr, c);
       if (t >= m.rise) {
-        const k = E.back(clamp((t - m.rise) / (8 * F1)), 1.4);
+        const k = E.back(clamp((t - m.rise) / (8 * F1)), 1.1);
         skin.opus(Fr, 960, 860, 92, p2Opus(t, 92), c, { k, ink: 1 });
       }
       V.legend(Fr, L2, t, { panel: 1 - clamp((t - m.legendOut) / .3) });
