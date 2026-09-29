@@ -12,7 +12,8 @@ window.MANIFEST_ALL = [
  "scenes/pre1.js",
  "scenes/pre2.js",
  "scenes/verse1.js",
- "scenes/verse2.js"
+ "scenes/verse2.js",
+ "scenes/zz_v1fix.js"
 ];
 window.MANIFEST_V2 = [
  "scenes_v2/_shared.js",
