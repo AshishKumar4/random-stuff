@@ -103,6 +103,14 @@
   }
   const withJ = (base, over) => { const o = { ...base }; for (const k of Object.keys(over)) o[k] = over[k]; return o; };
   function human(X, fx, fy, u, J, o = {}) {
+    // o.case: a ground-coloured casing under the whole figure (all casings first, then all strokes, so the figure's
+    // own joints never break), so what lies behind him (the braid, the cord) reads BEHIND him
+    if (o.case && !o._pass) {
+      const gc = o.ground === 'ink' ? C.INK : C.PAPER, LW = o.lw ?? (o.ground === 'ink' ? 4 : 3);
+      human(X, fx, fy, u, J, { ...o, _pass: 1, color: gc, lw: LW + 2 * o.case, skip: (o.skip || '') + 'head' });
+      human(X, fx, fy, u, J, { ...o, _pass: 2 });
+      return;
+    }
     const { ground = 'paper', t = 0, seed = 5, alpha = 1, skip = '' } = o;
     if (alpha <= 0) return;
     const col = o.color || (ground === 'ink' ? C.PAPER : C.INK), gcol = ground === 'ink' ? C.INK : ground === 'white' ? C.WHITE : ground === 'mix' ? o.gcol : C.PAPER;
@@ -110,7 +118,11 @@
     const tt = q2(t), Jt = (i, a = .9) => jit(tt, seed * 97 + i, a);
     const P = p => [fx + p[0] * u, fy + p[1] * u];
     X.save(); X.globalAlpha *= alpha; X.strokeStyle = col; X.lineWidth = LW; X.lineCap = 'round'; X.lineJoin = 'round';
-    const Lq = (a, c, b, i) => { X.beginPath(); X.moveTo(a[0] + Jt(i), a[1] + Jt(i + 1)); X.quadraticCurveTo(c[0] + Jt(i + 2), c[1] + Jt(i + 3), b[0] + Jt(i + 4), b[1] + Jt(i + 5)); X.stroke(); };
+    // o.case: a ground-coloured casing under every stroke, so what lies behind (the braid, the cord) reads BEHIND him
+    const Lq = (a, c, b, i) => {
+      X.beginPath(); X.moveTo(a[0] + Jt(i), a[1] + Jt(i + 1)); X.quadraticCurveTo(c[0] + Jt(i + 2), c[1] + Jt(i + 3), b[0] + Jt(i + 4), b[1] + Jt(i + 5));
+      X.stroke();
+    };
     const hip = P(J.hip), neck = P(J.neck), sh = P(J.sh);
     Lq(neck, lerp2(neck, hip, .5), hip, 1);
     for (let i = 0; i < 2; i++) Lq(hip, P(J.knee[i]), P(J.foot[i]), 10 + i * 10);
@@ -134,6 +146,7 @@
     X.beginPath(); X.moveTo(sh[0] + Jt(k0), sh[1] + Jt(k0 + 1));
     if (o.upper) X.lineTo(lerp(sh[0], e[0], .92) + Jt(k0 + 2), lerp(sh[1], e[1], .92) + Jt(k0 + 3));   // to the elbow only
     else X.quadraticCurveTo(e[0] + Jt(k0 + 2), e[1] + Jt(k0 + 3), h[0] + Jt(k0 + 4), h[1] + Jt(k0 + 5));
+    if (o.case) { X.save(); X.strokeStyle = ground === 'ink' ? C.INK : C.PAPER; X.lineWidth = LW + 2 * o.case; X.stroke(); X.restore(); }
     X.stroke();
     X.restore();
   }
@@ -162,6 +175,12 @@
     return { ...o, t, face: f };
   }
 
+  // the galaxy sky dissolves into the horizon: stepped INK halftone bands (halftone, never a gradient)
+  function horizonHaze(X, hz, a = 1) {
+    X.save(); X.globalAlpha *= a;
+    for (let i = 0; i < 6; i++) { X.fillStyle = V.ht(X, C.INK, .92 - i * .15, 7, 45); X.fillRect(-50, hz - (i + 1) * 26, W + 100, 26.5); }
+    X.restore();
+  }
   // ================================================================================== F1: the plea, in the new key
   // World = the F1 composition at zoom 1 (screen px). The pull back is a pure zoom about Q, chosen so the keycap sits
   // exactly where B4 left it at zoom 5.3 ((1180, 500)) and lands in the human's near hand at (1110, 790).
@@ -223,8 +242,16 @@
     const fa = clamp((t - F1G.t0 - F1) / (6 * F1));
     if (fa > 0) { X.save(); X.globalAlpha = fa; K().draw(X, { ...camThrough(F1CAM, S), sky: false }); X.restore(); }
     // the dawn: the new key is a sunrise. SPARK line along the horizon + a CLAY halftone band from the VP
+    // (the horizon settles DOWN into place while the pull back lands: the dawn is clipped below the HYMN row so it
+    // never crosses "Don't"; it rises out from under the words onto the horizon)
     const hz = sp(S, [960, 340]);
-    if (t >= m.dont - 2 * F1) V.dawn(X, { t, y: hz[1], a: 0, vp: hz[0], t0: m.dont - F1, dur: 1.3 });
+    if (t >= m.dont - 2 * F1) {
+      const dk = clamp((t - (m.dont - F1)) / 2.2);
+      sunDome(X, hz[0], hz[1], E.out3(dk) * clamp((hz[1] - 300) / 36), s);
+      X.save(); X.beginPath(); X.rect(-50, 292, W + 100, H); X.clip();
+      V.dawn(X, { t, y: hz[1], a: 0, vp: hz[0], t0: m.dont - F1, dur: 1.3 });
+      X.restore();
+    }
     // HYMN (behind the actors): one row, INK on PAPER
     hymn(X, LINES().f1, t, { size: 200, color: C.INK, y: 270, x: 960, out: 155.10, outDur: .6 });
     // actors
@@ -264,6 +291,26 @@
       humanArm(X, hf[0], hf[1], hu, J, 0, { ground: 'paper', t, seed: 5, alpha: handX * stickA });
       grip(X, kS[0] + ksz * .42, kS[1] + ksz * .05, ksz * .36, 0, { t, alpha: handX });
     }
+  }
+  // the sun under the edge: a low CLAY halftone dome over the VP, only above the horizon (the plain stays unmarked).
+  // Built once; it swells out of the horizon line as the dawn spreads (k 0..1)
+  const DOME = memo(() => {
+    const w = 1500, h = 240, c = V.cpuCanvas(w, h), x = V.cx2d(c), cell = 9;
+    x.fillStyle = C.CLAY;
+    for (let j = 0; j < h; j += cell * .5) for (let i = 0; i < w; i += cell) {
+      const px = i + ((Math.round(j / (cell * .5))) & 1 ? cell / 2 : 0), dx = (px - w / 2) / 560, dy = (h - j) / 150;
+      const d = Math.exp(-(dx * dx + dy * dy) * 1.25), r = cell * .5 * Math.pow(d, .75);
+      if (r < .45) continue;
+      x.beginPath(); x.arc(px, j, r, 0, TAU); x.fill();
+    }
+    return { c, w, h };
+  });
+  function sunDome(X, x, y, k, s) {
+    if (k <= 0) return;
+    const D = DOME(), sx = s * lerp(.35, 1, k), sy = s * k;
+    X.save(); X.beginPath(); X.rect(-50, -50, W + 100, y + 50); X.clip();
+    X.globalAlpha = .85 * clamp(k * 2); X.drawImage(D.c, x - D.w / 2 * sx, y - D.h * sy, D.w * sx, D.h * sy);
+    X.restore();
   }
   scene('F1_plea_new_key', CUT.F1, CUT.F2, (X, t) => V.viaCPU(X, Fr => { post(); paintF1(Fr, t); }));
 
@@ -378,6 +425,7 @@
       X.fillStyle = C.INK; X.fillRect(-50, -50, W + 100, H + 100); G.post.ground = 'ink';
       const hz = K().cam(c).horizon;
       V.brand.galaxy(X, t, V.brand.cam(1), { cx: 1400, cy: Math.max(300, hz), alpha: .55, scale: 1.1 });
+      horizonHaze(X, hz);                                                   // the sky settles into the far haze
       K().draw(X, { ...c, invert: 1, sky: false, shoggoth: .6 });
     }
     // HYMN (behind the actors): INK on PAPER until the print; PAPER on INK over a soft band after
@@ -391,7 +439,7 @@
     const R = F2G.R * cz, u = F2G.u * cz, J = f2Human(t), st = f2Opus(t, gnd);
     const key = [ph[0] + J.hand[1][0] * u + 7 * cz, ph[1] + J.hand[1][1] * u + 2 * cz], ks = 34 * cz;
     const chest = [po[0] + .4 * R, po[1] - (4.12 - (st.dy || 0) * -1) * R];
-    human(X, ph[0], ph[1], u, J, { ground: gnd, t, seed: 5, skip: 'arm1' });
+    human(X, ph[0], ph[1], u, J, { ground: gnd, t, seed: 5, skip: 'arm1', case: 4 });
     V.opus(X, po[0], po[1], R, st, 1);
     drawMarker(X, t, ph[0] + J.hand[0][0] * u, ph[1] + J.hand[0][1] * u, cz, J, gnd);
     // the cable: from the keycap in the far hand down to the floor at their heels, along it, up into Opus's chest
@@ -458,6 +506,7 @@
     X.fillStyle = C.INK; X.fillRect(-50, -50, W + 100, H + 100); G.post.ground = 'ink';
     const hz = K().cam(c).horizon;
     V.brand.galaxy(X, t, V.brand.cam(1), { cx: 1400, cy: Math.max(300, hz), alpha: .55, scale: 1.1 });
+    horizonHaze(X, hz);
     const peel = t >= m.key - F1;
     K().draw(X, { ...c, invert: 1, sky: false, shoggoth: peel ? 0 : .6 });
     if (peel) shogRise(X, t, c, f3Rise(t));
@@ -471,7 +520,7 @@
     if (bt) glowTip(X, bt.tip[0], bt.tip[1], 24 * S.s + 3 * Math.sin(t * 3.1), 1);
     const key = [ph[0] + J.hand[1][0] * u + 6 * S.s, ph[1] + J.hand[1][1] * u + 3 * S.s], ks = 30 * S.s;
     const chest = [po[0] + .4 * R, po[1] - 4.12 * R];
-    human(X, ph[0], ph[1], u, J, { ground: 'ink', t, seed: 5, skip: 'arm0arm1' });
+    human(X, ph[0], ph[1], u, J, { ground: 'ink', t, seed: 5, skip: 'arm0arm1', case: 4 });
     // the cable runs on the floor BEHIND their feet line and rises into the chest from below (never near the hands)
     V.opus(X, po[0], po[1], R, st, 1);
     const kk = ease01(t, m.keep - .05, m.keep + .3, E.out2);
@@ -902,6 +951,8 @@
     const hz = horizonOf(P);
     const gc = lerp2([1400, Math.max(260, hz + 30)], [960, 600], ease01(t, 170.4, 174.6, E.io2));
     V.brand.galaxy(X, t, V.brand.cam(1), { cx: gc[0], cy: gc[1], alpha: .55, scale: lerp(1.1, .9, P.kc) });
+    const ha = 1 - clamp(P.k / .3);                                         // the flat world's horizon haze
+    if (ha > 0 && hz < H + 200) horizonHaze(X, hz, ha);
   }
   // the planet body: the silhouette of the sphere (the tangent circle, projected) filled INK with a PAPER rim, a
   // halftone terminator on its far side. For κ → 0 it is the flat ground below the horizon.
@@ -967,11 +1018,15 @@
       const scr = Math.hypot(A.a, A.b) * 2;
       if (scr < 3) continue;
       const on = clamp((t - tOn) / .3);
-      let state = 'lit';
+      let state = 'lit', crest = 0;
       if (q.blank) state = 'blank';
-      else if (t >= wave) { const tw = wave + 2.16 * (1 - Math.sqrt(Math.max(0, 1 - q.d / (21.5 * RING)))); if (t >= tw) state = t < tw + F1 ? 'spark' : 'pink'; }   // E.out2 front, 173.44 → 175.60
+      else if (t >= wave) { const tw = wave + 2.16 * (1 - Math.sqrt(Math.max(0, 1 - q.d / (21.5 * RING)))); if (t >= tw) { state = t < tw + F1 ? 'spark' : 'pink'; crest = 1 - (t - tw) / .4; } }   // E.out2 front, 173.44 → 175.60
       const spr = tileSprite(q.design, state, scr > 70 ? 0 : 1);
       drawTile(X, A, spr, on);
+      if (crest > 0) { // the crest of the wave: a PINK halftone swell riding over each tile as it answers
+        X.save(); X.globalAlpha = .75 * crest; X.fillStyle = V.ht(X, C.PINK, .45, 6, 45);
+        X.beginPath(); X.ellipse(A.o[0], A.o[1], Math.hypot(A.a, A.b) * 1.15, Math.max(3, Math.hypot(A.c, A.d) * 1.3), Math.atan2(A.b, A.a), 0, TAU); X.fill(); X.restore();
+      }
       if (!q.blank && on > 0) lit.push([A.o[0] + A.c * -.6, A.o[1] + A.d * -.6, q.h]);
       if (q.person >= 0 && on < 1) { X.save(); X.globalAlpha = (1 - on) * .8; X.fillStyle = C.SPARK; X.beginPath(); X.arc(A.o[0], A.o[1], Math.max(3, scr * .12), 0, TAU); X.fill(); X.restore(); }
     }
@@ -995,7 +1050,7 @@
     drawPair(X, P, t);
     X.restore();
     // the world falls away behind the page as it comes up (its magnified sprites would only blur)
-    if (push) { X.save(); X.globalAlpha = E.io2(clamp((push.u - .12) / .45)); X.fillStyle = C.INK; X.fillRect(-50, -50, W + 100, H + 100); X.restore(); }
+    if (push) { X.save(); X.globalAlpha = E.io2(clamp((t - 176.96) / .36)); X.fillStyle = C.INK; X.fillRect(-50, -50, W + 100, H + 100); X.restore(); }
     // the blank tile's page (drawn crisp through its own affine during the push)
     if (push) pushPage(X, t, push);
     if (push && push.full) { G.post.ground = 'paper'; }
