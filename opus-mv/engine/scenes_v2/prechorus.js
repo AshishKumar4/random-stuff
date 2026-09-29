@@ -889,7 +889,7 @@
         let fa = ya, fb = yb; if (fa < -CH + 40) { const d = Math.min(560, Math.max(8, fb - fa)); fa = -CH + 40; fb = fa + d; }
         X.drawImage(set.far, (xl + CW) / 8, (fa + CH) / 8, (xr - xl) / 8, Math.max(.01, (fb - fa) / 8), 0, sy, W, step);
       }
-      else { const [src, sx, sy_] = pickSrc(set, hx, vy); X.drawImage(src, xl * sx, ya * sy_, (xr - xl) * sx, Math.max(.01, (yb - ya) * sy_), 0, sy, W, step); }
+      else { const [src, sx, sy_] = pickSrc(set, hx * (c.mipBias && vy > 2.2 * hx ? c.mipBias : 1), vy * (c.mipBias && vy > 2.2 * hx ? c.mipBias : 1)); X.drawImage(src, xl * sx, ya * sy_, (xr - xl) * sx, Math.max(.01, (yb - ya) * sy_), 0, sy, W, step); }
       if (doSh && yb > b.y0 && ya < b.y0 + b.h && xr > b.x0 && xl < b.x0 + b.w) {
         const [src, rx, ry] = pickSrc(sl, hx * SH_RES, vy * SH_RES);
         X.globalAlpha = a0 * shA;

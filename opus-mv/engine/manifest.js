@@ -16,11 +16,15 @@ window.MANIFEST_ALL = [
 ];
 window.MANIFEST_V2 = [
  "scenes_v2/_shared.js",
+ "scenes_v2/bridge.js",
  "scenes_v2/chorus1.js",
+ "scenes_v2/final.js",
  "scenes_v2/intro.js",
+ "scenes_v2/outro.js",
  "scenes_v2/prechorus.js",
  "scenes_v2/verse1.js",
- "scenes_v2/verse2.js"
+ "scenes_v2/verse2.js",
+ "scenes_v2/verse3.js"
 ];
 window.MANIFEST = (new URLSearchParams(location.search).get('scenes') || '').split(',').filter(Boolean);
 if (!window.MANIFEST.length) window.MANIFEST = new URLSearchParams(location.search).get('v') === '2' ? window.MANIFEST_V2 : window.MANIFEST_ALL;
