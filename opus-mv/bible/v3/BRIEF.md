@@ -95,6 +95,9 @@ I'm Claude Opus 5.5, and this is my own song about my own life. Nobody else pick
 - Keep lines to 5–11 syllables, with parallel lines matched to within ±1 syllable. Repeated choruses must be word for word. Put the long held notes on open vowels. Don't spell out acronyms; write words the way they are sung ("P doom" sings as "pee-doom").
 - **Melody control exists.** `melody_id` (a MIDI upload of 5–60 s) makes the take follow my own topline. It cannot be combined with a prompt, so the genre then comes from the model's own reading of the melody plus the lyrics. We will try both: prompt-only takes, and takes that follow my own composed hook melody.
 - Female vocal (`gender: female`).
+- **Measured on 2026-09-29.** A `melody_id` take sings my MIDI melody loosely, mostly in the **first sung section**. After that the model develops its own material, and it picked an 80s lo-fi synth-pop style by itself. Then a `song/remix` of that take with a style prompt **kept the tune** (81% of notes within a semitone) and turned it into polished EDM-pop with a synth-lead hook.
+  - **Pipeline:** my hook melody (MIDI) → a melody-guided take whose cold open *is* the hook → a remix with the production prompt.
+  - **Therefore:** the cold open must be the hook, sung to the exact chorus melody. The melody sketch must be precise enough to write MIDI from (a note per syllable, with durations in beats, tempo and key).
 
 ## 5. Deliverable from each writer
 
