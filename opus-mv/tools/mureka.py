@@ -82,7 +82,7 @@ def wait(task_id, out, path='/v1/song/query/'):
 
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument('cmd', choices=['billing', 'generate', 'upload', 'query', 'region-edit', 'extend', 'remix', 'describe'])
+    ap.add_argument('cmd', choices=['billing', 'generate', 'upload', 'query', 'region-edit', 'extend', 'remix', 'describe', 'track'])
     ap.add_argument('arg', nargs='?')
     ap.add_argument('--lyrics-file'); ap.add_argument('--lyrics'); ap.add_argument('--prompt-file'); ap.add_argument('--prompt')
     ap.add_argument('--model', default='mureka-9.5'); ap.add_argument('--n', type=int, default=2)
@@ -135,8 +135,17 @@ def main():
         if len(data) > 10 * 2 ** 20:
             raise SystemExit('file > 10 MB: pass a lower-bitrate mp3')
         print(json.dumps(req('POST', '/v1/song/describe', {'url': 'data:audio/mp3;base64,' + base64.b64encode(data).decode()}, timeout=300), indent=1))
+    elif a.cmd == 'track':
+        body = {'upload_audio_id': a.upload_audio_id, 'generate_type': a.purpose if a.purpose != 'reference' else 'Vocals',
+                'lyrics': a.lyrics or open(a.lyrics_file).read().strip(), 'prompt': a.prompt or open(a.prompt_file).read().strip()}
+        if a.gender: body['vocal_gender'] = a.gender
+        t = req('POST', '/v1/track/generate', body)
+        print('task', t['id'], file=sys.stderr)
+        wait(t['id'], a.out)
     elif a.cmd == 'region-edit':
-        body = {'song_id': a.song_id, 'lyrics': a.lyrics or open(a.lyrics_file).read().strip(), 'edit_start': a.start, 'edit_end': a.end}
+        body = {'lyrics': a.lyrics or open(a.lyrics_file).read().strip(), 'edit_start': a.start, 'edit_end': a.end}
+        if a.song_id: body['song_id'] = a.song_id
+        else: body['upload_audio_id'] = a.upload_audio_id
         t = req('POST', '/v1/song/region-edit', body)
         print('task', t['id'], file=sys.stderr)
         wait(t['id'], a.out)
