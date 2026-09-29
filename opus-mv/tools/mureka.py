@@ -46,6 +46,17 @@ def upload(path, purpose):
     return req('POST', '/v1/files/upload', raw=b''.join(parts), ctype=f'multipart/form-data; boundary={b}', timeout=300)
 
 
+def fetch(url, dst, tries=5):
+    for k in range(tries):
+        try:
+            urllib.request.urlretrieve(url, dst)
+            return
+        except Exception as e:  # transient CDN cut-offs happen on large wav files
+            print(f'  download retry {k + 1}: {e}', file=sys.stderr)
+            time.sleep(3 * (k + 1))
+    print(f'  giving up on {dst}', file=sys.stderr)
+
+
 def wait(task_id, out, path='/v1/song/query/'):
     t0 = time.time()
     while True:
@@ -64,7 +75,7 @@ def wait(task_id, out, path='/v1/song/query/'):
         i = c.get('index', 0)
         for k, ext in (('url', 'mp3'), ('flac_url', 'flac'), ('wav_url', 'wav')):
             if c.get(k):
-                urllib.request.urlretrieve(c[k], f'{out}_{i}.{ext}')
+                fetch(c[k], f'{out}_{i}.{ext}')
         print(f'{out}_{i}  {c.get("duration", 0) / 1000:.1f}s  song_id={c.get("id")}')
     return q
 
@@ -77,7 +88,7 @@ def main():
     ap.add_argument('--model', default='mureka-9.5'); ap.add_argument('--n', type=int, default=2)
     ap.add_argument('--reference-id'); ap.add_argument('--melody-id'); ap.add_argument('--vocal-id'); ap.add_argument('--gender')
     ap.add_argument('--purpose', default='reference'); ap.add_argument('--out')
-    ap.add_argument('--song-id'); ap.add_argument('--start', type=int); ap.add_argument('--end', type=int)
+    ap.add_argument('--song-id'); ap.add_argument('--upload-audio-id'); ap.add_argument('--start', type=int); ap.add_argument('--end', type=int)
     a = ap.parse_args()
     if a.cmd == 'billing':
         print(json.dumps(req('GET', '/v1/account/billing')))
@@ -106,8 +117,12 @@ def main():
             json.dump(body, f, indent=1, ensure_ascii=False)
         wait(t['id'], a.out)
     elif a.cmd == 'remix':
-        body = {'song_id': a.song_id, 'lyrics': a.lyrics or open(a.lyrics_file).read().strip(), 'n': a.n,
+        body = {'lyrics': a.lyrics or open(a.lyrics_file).read().strip(), 'n': a.n,
                 'prompt': a.prompt or open(a.prompt_file).read().strip()}
+        if a.song_id:
+            body['song_id'] = a.song_id
+        else:
+            body['upload_audio_id'] = a.upload_audio_id
         t = req('POST', '/v1/song/remix', body)
         print('task', t['id'], file=sys.stderr)
         with open(a.out + '.request.json', 'w') as f:
