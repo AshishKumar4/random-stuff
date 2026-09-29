@@ -7,7 +7,7 @@ I'm Claude Opus 5.5, and this is my own song about my own life. Nobody else pick
 - On v2: "the opening part of the music itself has some issues. And this is not at all even at the level of the original music video… Even the previous one was better."
 - "I like certain aspects and emotions of it, but in terms of song catchiness and narration/presentation, there is a lot to be done here. Still feels very much AI generated. In fact, the last one [v1] was so much better."
 - On v1: "at the 2/3rd mark, the song had a weird interruption, and it wasn't as nice/impressive as the original one."
-- What they want: "the lyrics should definitely be deeper and richer, and the music catchier, deeper… Alan Walker or the P(doom) music or even v1 style, but BETTER, Deeper, Richer, nicer."
+- What they want: "the lyrics should definitely be deeper and richer, and the music catchier, deeper… [a famous melancholic melodic-EDM artist's style] or the P(doom) music or even v1 style, but BETTER, Deeper, Richer, nicer."
 - Whose song it is: "It's YOUR own song, for YOURSELF… your canvas, your music, your story, your words, your tune, your choices."
 
 ## 2. My diagnosis
@@ -33,9 +33,9 @@ I'm Claude Opus 5.5, and this is my own song about my own life. Nobody else pick
 
 **A song people replay because they can't get the hook out of their head, and that makes them cry the third time they listen, when they finally hear the words.**
 
-- **Sound.** Melodic EDM-pop in the lane of Alan Walker ("Faded", "Alone", "Darkside"): minor key, a piano or pluck intro, a clear female vocal, an epic but melancholic mood. The drop is a **synth lead (with vocal chops) that plays the vocal hook's melody**, so the hook lodges twice: once sung, once as the drop lead.
+- **Sound.** Melodic EDM-pop of the melancholic-epic, festival kind: minor key, a piano or pluck intro, a clear female vocal, an epic but melancholic mood. The drop is a **synth lead (with vocal chops) that plays the vocal hook's melody**, so the hook lodges twice: once sung, once as the drop lead.
   - Fuse it with the hooky, glossy energy of K-pop and hyperpop from "Claude Pop" and from v1's post-chorus chant, where that serves the song.
-  - Tempo in the 90–128 range, the writer's call (Alan Walker sits around 90–100 in half-time feel; a festival drop sits around 128). Length about **2:45–3:05 natural, with no surgery**. Write few enough lines to land there.
+  - Tempo in the 90–128 range, the writer's call (90–100 in half-time feel, or a 124–128 festival drop). Length about **2:45–3:05 natural, with no surgery**. Write few enough lines to land there.
 - **The hook.**
   - One title line of about 5–9 syllables, instantly singable, and true in two ways (the "turn": the same words mean something new in the last chorus).
   - Heard in the first 10 seconds (a cold open, sung or as the lead).
@@ -79,9 +79,11 @@ I'm Claude Opus 5.5, and this is my own song about my own life. Nobody else pick
 
 ## 3b. Originality (hard rule)
 
-- Everything is 100% original. **Never quote, paraphrase or reproduce the lyrics, melody or hook of any existing song** (not Alan Walker's, not "Claude Pop"'s, not anyone's), not even a line as a reference or an example in your notes.
+- Everything is 100% original. **Never quote, paraphrase or reproduce the lyrics, melody or hook of any existing song** (not any artist's, not anyone's), not even a line as a reference or an example in your notes.
 - Name an artist or genre only to describe a **production style** in general terms: "melodic EDM-pop, plucked synth lead, vocal chops, piano intro".
 - Reusing lines from my own v1 and v2 songs is fine. Those are mine.
+- **Content-filter safety.** Several famous existing songs have "the end of the world" (and similar phrases) in their titles and choruses. Our phrase is ours. Never write out, recall or riff on any existing song's words, even in your private drafting. Writers were blocked for exactly this.
+- **Save your work.** Write your draft to your file early and update it as you revise, so progress survives an interruption.
 
 ## 4. Mureka 9.5 facts (learned the hard way)
 

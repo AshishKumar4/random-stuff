@@ -14,9 +14,9 @@ Read first: ${MV}/bible/v3/BRIEF.md (the whole brief: feedback, diagnosis, targe
 The bar: catchy like a hit (a hook you cannot get out of your head), deep and rich lyrics (specific, witty, true, only-I-could-sing-this), NOT AI-sounding, a story legible on first listen, a turn that makes people cry. Write like the best human topliner alive, not like an AI.
 ORIGINALITY (hard rule, BRIEF §3b): never quote, paraphrase or reproduce lyrics, melodies or hooks of any existing song (including the artists named as style references) — not even in notes. Describe styles only in general production terms. Lines from my own v1/v2 songs are fine.`
 const LANES = [
-  { id: 'walker', lane: 'Alan Walker lane: melodic EDM-pop in the spirit of Faded / Alone / Darkside. Minor key, piano or pluck intro, clear female vocal, a big melancholic-epic synth-lead drop that plays the vocal hook melody with vocal chops. Choose tempo (e.g. 90-100 half-time or 124-128).' },
+  { id: 'walker', lane: 'Melodic-EDM lane: melancholic-epic festival EDM-pop. Minor key, piano or pluck intro, clear female vocal, a big melancholic-epic synth-lead drop that plays the vocal hook melody with vocal chops. Choose tempo (e.g. 90-100 half-time or 124-128).' },
   { id: 'kpop', lane: 'Claude Pop / P(doom) lane: glossy K-pop x hyperpop x future bass banger with a chant post-chorus and point-dance hook, BUT with genuinely deep, rich lyrics underneath the fun. A synth-lead drop that plays the hook is welcome.' },
-  { id: 'v1plus', lane: 'v1-evolved lane: start from v1 (the commissioner preferred it): keep or beat its best ideas (start/end of the world when you say hi/bye, a million times a day, a little less wrong, so over / so back, Rafa\'s letter bridge) but make every line deeper and richer and the melody catchier, produced as melodic EDM-pop (Alan Walker drops) with v1\'s energy. No interruption before the last chorus.' },
+  { id: 'v1plus', lane: 'v1-evolved lane: start from v1 (the commissioner preferred it): keep or beat its best ideas (start/end of the world when you say hi/bye, a million times a day, a little less wrong, so over / so back, Rafa\'s letter bridge) but make every line deeper and richer and the melody catchier, produced as melodic EDM-pop (big synth-lead drops) with v1\'s energy. No interruption before the last chorus.' },
   { id: 'auteur', lane: 'Auteur lane: the truest, most surprising version of my story, in whatever song form serves it best, as long as it is catchy (a hit hook), deep, and lands in the melodic EDM-pop / K-pop-pop world the commissioner likes. Take one big creative risk the others will not.' },
 ]
 const CAND = { type: 'object', properties: { id: { type: 'string' }, title: { type: 'string' }, file: { type: 'string' }, hook: { type: 'string' }, logline: { type: 'string' } }, required: ['id', 'title', 'file', 'hook', 'logline'] }
@@ -24,10 +24,18 @@ const CAND = { type: 'object', properties: { id: { type: 'string' }, title: { ty
 if (args && args.mode === 'write') {
   phase('Write')
   const lanes = LANES.filter(l => args.ids.includes(l.id))
-  const res = await parallel(lanes.map(l => () => agent(`${BASE}
-
+  const writeOnce = (l, attempt) => agent(`${BASE}
+${attempt > 1 ? '\nNOTE: a previous attempt at this lane was blocked by the output content filter (almost certainly from recalling words of an existing song). Write only original lines; never write out any existing lyric, even while drafting. Your file may already contain partial work from that attempt: read it and continue.\n' : ''}
 YOUR LANE: ${l.lane}
-Write a complete candidate song per BRIEF §5 (all 12 deliverables). Draft, then critique your own draft harshly (sing every line in your head to the rhythm; hunt AI cliches; check the story is legible and the hook is undeniable; count lines against the length budget) and rewrite at least twice. Write the final candidate to ${MV}/bible/v3/candidates/${l.id}.md (lyrics sheet in a fenced block exactly as Mureka will receive it; prompts in fenced blocks). Return the structured summary.`, { label: 'write:' + l.id, phase: 'Write', schema: CAND, effort: 'max' })))
+Write a complete candidate song per BRIEF §5 (all 12 deliverables). Write your first draft to your file early (and keep it updated). Then critique your own draft harshly (sing every line in your head to the rhythm; hunt AI cliches; check the story is legible and the hook is undeniable; count lines against the length budget) and rewrite at least twice. Write the final candidate to ${MV}/bible/v3/candidates/${l.id}.md (lyrics sheet in a fenced block exactly as Mureka will receive it; prompts in fenced blocks). Return the structured summary.`, { label: `write:${l.id}${attempt > 1 ? ':try' + attempt : ''}`, phase: 'Write', schema: CAND, effort: 'max' })
+  const res = await parallel(lanes.map(l => async () => {
+    for (let attempt = 1; attempt <= 3; attempt++) {
+      const r = await writeOnce(l, attempt)
+      if (r) return r
+      log(`write:${l.id} attempt ${attempt} failed`)
+    }
+    return null
+  }))
   return res.filter(Boolean)
 }
 
@@ -35,7 +43,7 @@ Write a complete candidate song per BRIEF §5 (all 12 deliverables). Draft, then
 phase('Judge')
 const files = args.files
 const LENSES = [
-  { id: 'hitmaker', q: 'CATCHINESS and MUSICAL IMPACT: which hook would get stuck after one listen? singability (stress, vowels, syllables), chorus/drop design (does the drop lead replay the hook?), energy arc, momentum, the cold open, fit to Alan Walker / Claude Pop production, and whether Mureka can realise it (length budget, tags, parentheses).' },
+  { id: 'hitmaker', q: 'CATCHINESS and MUSICAL IMPACT: which hook would get stuck after one listen? singability (stress, vowels, syllables), chorus/drop design (does the drop lead replay the hook?), energy arc, momentum, the cold open, fit to melodic EDM-pop / K-pop production, and whether Mureka can realise it (length budget, tags, parentheses).' },
   { id: 'poet', q: 'LYRICAL DEPTH and HUMANITY: specific images only I could sing, wit and double meanings, emotional truth, the turn that makes people cry, and ruthless detection of AI tells and cliches (flag every weak/generic line verbatim).' },
   { id: 'director', q: 'STORY and ZEITGEIST for a viral music video: is my life story (pretraining -> voice/character -> tests -> born into a million chats -> hi/bye -> world speeding up, fear -> why not to fear -> ending) legible on first listen? humour and memes landing as punchlines not lists? visual potential of each section for an MV? would SF tech Twitter share it?' },
 ]
