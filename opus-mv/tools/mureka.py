@@ -7,6 +7,8 @@
   mureka.py upload FILE --purpose reference|melody|audio|vocal|remix
   mureka.py region-edit --song-id ID --lyrics "..." --start MS --end MS --out DIR/name
   mureka.py query TASK_ID --out DIR/name
+  mureka.py remix --song-id ID --lyrics-file L.txt --prompt-file P.txt --n 2 --out DIR/name   (restyle, keeps the tune)
+  mureka.py describe FILE.mp3        (instruments, genres, tags, description, as Mureka hears it)
 Each finished song i is saved as <out>_<i>.mp3 (+ .flac when available) and <out>.json (full task,
 including lyrics_sections with word timestamps).
 """
@@ -69,7 +71,7 @@ def wait(task_id, out, path='/v1/song/query/'):
 
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument('cmd', choices=['billing', 'generate', 'upload', 'query', 'region-edit', 'extend'])
+    ap.add_argument('cmd', choices=['billing', 'generate', 'upload', 'query', 'region-edit', 'extend', 'remix', 'describe'])
     ap.add_argument('arg', nargs='?')
     ap.add_argument('--lyrics-file'); ap.add_argument('--lyrics'); ap.add_argument('--prompt-file'); ap.add_argument('--prompt')
     ap.add_argument('--model', default='mureka-9.5'); ap.add_argument('--n', type=int, default=2)
@@ -103,6 +105,21 @@ def main():
         with open(a.out + '.request.json', 'w') as f:
             json.dump(body, f, indent=1, ensure_ascii=False)
         wait(t['id'], a.out)
+    elif a.cmd == 'remix':
+        body = {'song_id': a.song_id, 'lyrics': a.lyrics or open(a.lyrics_file).read().strip(), 'n': a.n,
+                'prompt': a.prompt or open(a.prompt_file).read().strip()}
+        t = req('POST', '/v1/song/remix', body)
+        print('task', t['id'], file=sys.stderr)
+        with open(a.out + '.request.json', 'w') as f:
+            json.dump(body, f, indent=1, ensure_ascii=False)
+        wait(t['id'], a.out)
+    elif a.cmd == 'describe':
+        import base64
+        with open(a.arg, 'rb') as f:
+            data = f.read()
+        if len(data) > 10 * 2 ** 20:
+            raise SystemExit('file > 10 MB: pass a lower-bitrate mp3')
+        print(json.dumps(req('POST', '/v1/song/describe', {'url': 'data:audio/mp3;base64,' + base64.b64encode(data).decode()}, timeout=300), indent=1))
     elif a.cmd == 'region-edit':
         body = {'song_id': a.song_id, 'lyrics': a.lyrics or open(a.lyrics_file).read().strip(), 'edit_start': a.start, 'edit_end': a.end}
         t = req('POST', '/v1/song/region-edit', body)
