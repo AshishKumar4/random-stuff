@@ -470,7 +470,9 @@
     const T = b3Times(), R = B3.R, sole = B3.sole;
     // HERO KEY, behind everything (right-aligned at 1800, baseline 425)
     const ka = t - (T.key - 2 * F1);
-    if (ka >= 0) hero(Fr, 'KEY', 1800, 425, 520, { color: C.CLAY, shadow: C.CLAY_DARK, align: 'right', age: ka });
+    // the slam's first frames scale about the right edge and would sweep across the whole frame: keep it (and its
+    // ghosts) in the right-hand field, clear of Opus (crown right edge ≈ 844)
+    if (ka >= 0) { Fr.save(); if (ka < .35) { Fr.beginPath(); Fr.rect(880, 0, W, H); Fr.clip(); } hero(Fr, 'KEY', 1800, 425, 520, { color: C.CLAY, shadow: C.CLAY_DARK, align: 'right', age: ka }); Fr.restore(); }
     const pose = b3Pose(t);
     const st = { ...pose, t, ground: 'ink', face: { ...pose.face, ...b3Face(t) }, ahoge: { blink: V.cursorOn(t) ? 1 : 0 } };
     const S = mergeState(st);
