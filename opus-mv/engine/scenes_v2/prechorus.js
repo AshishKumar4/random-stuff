@@ -11,7 +11,7 @@
 // that asks for invert > 0 the same set is printed PAPER-on-INK (≈1.5 s more). Charted world at x < EDGE_X (3000);
 // beyond it the sheet is blank PAPER and nothing is ever drawn there (the future has no picture).
 // Geography: a southern land (coast ≈ y 1560–1790, ending mid-stroke on the edge at coastEnd()), a sea (y ≈ 800–1650)
-// with the serpent, whale, many-armed thing + ship, rose (2150, 1050) and cartouche (2560, 955); the engraved
+// with the serpent, whale, many-armed thing + ship, rose (2075, 1150) and cartouche (2468, 930); the engraved
 // shoggoth lies at ≈(2585, 1318) just north-west of P; a northern land beyond y ≈ 770 (the far shore in floor views).
 //
 //   V2.chart.draw(X, cam)   paints the floor into X (a CPU frame ctx, logical 1920×1080 space), plus the ground colour
@@ -31,7 +31,8 @@
 //     invert     0..1   PAPER linework on INK (F2 "MAKE" onward). 0 < k < 1 cross-fades (2× cost)
 //     rhumbs     0..1   RED rhumb lines (projected vectors, multiply), rhumbK 0..1 = their draw-on from the rose
 //     shoggoth   0..1   the engraved shoggoth layer's alpha (0 when final peels it up and draws it itself)
-//     haze       0..1   ground-coloured halftone haze over the last 18% of the floor before the horizon
+//     haze       0..1   ground-coloured halftone haze (aerial perspective) over the far floor before the horizon
+//     hazeBand   .34    how deep that haze reaches, as a fraction of the floor's screen height below the horizon
 //     sky        true   fill above the horizon with the ground colour (false: leave it for your own sky)
 //     edge       0..1   the edge line (a 3-unit projected vector) with its degree ticks
 //     coast      auto   the coastlines re-drawn as crisp projected vectors (auto: on when tilted or zoom > 1.05)
@@ -64,10 +65,14 @@
 //                            o = {at: {x, y, R, k} REQUIRED (soles, R, pop-up height 0..1), ink 0..1, drain 0..1 (the ink
 //                            runs down and off), fill 0..1 (colour spreads across the right half), keyline: 'ink' | false
 //                            (the PAPER die-cut ring on INK grounds), line: [[x, y] near, [x, y] far] (the split; default
-//                            edgeScreen(cam); the charted side is the left of near→far)}
+//                            edgeScreen(cam); the charted side is the left of near→far), meridian 0..1 (default 1: the
+//                            edge line ruled up through the body, graduated on the charted side; it fades with drain)}
 //   V2.chart.skin.opus(X, x, y, R, state, cam, o)  renders the rig into a layer (state.ground picks the rig style)
 //                            and composes it; o.k = pop-up height (vertical scale about the soles)
 //   V2.chart.build(inv)      forces the build (normally lazy, ≈1–2 s once per page)
+// THE SHOTS (bottom of the file) run ONE continuous camera: P1 pans the coast with the shoggoth hidden (shoggoth: 0), so
+// the pan lands on "here be dragons" over empty sea and the blank; at P2 ("and now") the camera pushes in while the
+// shoggoth is engraved in place (shogReveal: a reveal field, body → arms) and its HELLO tag is pressed on at "edge".
 // PERF (1080p, one worker, full frame incl. JPEG): top-down ≈ 220 ms, floor ≈ 210–350 ms (≈390 two-device-px strips
 // + the shoggoth's rows + vectors), P1 with its live monsters and 5–7 tap pan blur ≈ 500–660 ms. Chunk average ≈ 390 ms.
 // Treat a solved cam (from cam()/draw()) as immutable: spread it ({...cam, x}) to change it (spreads re-solve).
@@ -83,8 +88,8 @@
   const CW = 4000, CH = 2400, EX = 3000;
   const P = [3000, 1480];
   const COAST_END = [3000, 1560];
-  const ROSE = { x: 2150, y: 1050, r: 150 };
-  const CART = { x: 2560, y: 955, w: 560, h: 116 };
+  const ROSE = { x: 2075, y: 1150, r: 150 };
+  const CART = { x: 2468, y: 930, w: 536, h: 116 };
   const SERP = { x0: 170, x1: 880, yw: 1385, A: 60, lam: 210, ph0: .55 };
   const WHALE = { x: 1335, y: 1112 };
   const KRAK = { x: 1705, y: 1238 };
@@ -188,7 +193,7 @@
       [2210, 764], [2410, 726], [2600, 786], [2790, 748], [2920, 770], [3000, 762]];
     const north = fractal(crs(northC, 4), 3, .34, R);
     const isl = (cx, cy, r, n = 9) => { const pts = []; for (let i = 0; i < n; i++) { const a = i / n * TAU; const rr_ = r * (.72 + .5 * R()); pts.push([cx + Math.cos(a) * rr_ * 1.25, cy + Math.sin(a) * rr_]); } const f = fractal(crs(pts, 3, true), 2, .3, R, true); f.closed = true; return f; };
-    const islands = [isl(1010, 1478, 58, 11), isl(1088, 1552, 20, 7), isl(2330, 1500, 30), isl(2455, 842, 26), isl(1590, 1585, 17, 7), isl(430, 1590, 24, 8)];
+    const islands = [isl(1010, 1478, 58, 11), isl(1088, 1552, 20, 7), isl(2330, 1500, 30), isl(1590, 1585, 17, 7), isl(430, 1590, 24, 8)];
     const southLand = south.concat([[EX, CH + 20], [-60, CH + 20]]);
     const northLand = north.concat([[EX, -20], [-60, -20]]);
     // hills: on land, well inland, west of the fade
@@ -525,7 +530,7 @@
     drawWhale(x, pal, .28);
     drawSerpent(x, pal, SERP.ph0, 0);
   }
-  const ART_BOX = [1360, 870, 1580, 710];                                            // cartouche, kraken, ship
+  const ART_BOX = [1360, 850, 1580, 730];                                            // cartouche, kraken, ship
   const PATCHBOX = { serp: [60, 1010, 1180, 470], whale: [1000, 700, 640, 560] };   // [x, y, w, h] chart units
   function half(c) { const o = cpuCanvas(Math.ceil(c.width / 2), Math.ceil(c.height / 2)), g = cx2d(o); g.imageSmoothingEnabled = true; g.imageSmoothingQuality = 'high'; g.drawImage(c, 0, 0, o.width, o.height); return o; }
   function halfV(c) { const o = cpuCanvas(c.width, Math.ceil(c.height / 2)), g = cx2d(o); g.imageSmoothingEnabled = true; g.imageSmoothingQuality = 'high'; g.drawImage(c, 0, 0, o.width, o.height); return o; }
@@ -714,9 +719,9 @@
       Y.globalAlpha *= alpha; Y.rotate(g.tag.rot);
       if (lid < .5) {
         const sy = 1 - lid * 1.4;
-        Y.save(); Y.scale(1, Math.max(.25, sy)); Y.fillStyle = C.INK; Y.beginPath(); Y.arc(0, 0, 3.6, 0, TAU); Y.fill();
-        Y.fillStyle = C.CLAY; Y.beginPath(); Y.arc(0, 0, fr * .15, 0, TAU); Y.fill(); Y.restore();
-      } else { Y.strokeStyle = C.CLAY; Y.lineCap = 'round'; Y.lineWidth = 5.6; Y.beginPath(); Y.arc(0, -fr * .05, fr * .17, Math.PI * .12, Math.PI * .88); Y.stroke(); }
+        Y.save(); Y.scale(1, Math.max(.25, sy)); Y.fillStyle = C.INK; Y.beginPath(); Y.arc(0, 0, 4.4, 0, TAU); Y.fill();
+        Y.fillStyle = C.CLAY; Y.beginPath(); Y.arc(0, 0, fr * .18, 0, TAU); Y.fill(); Y.restore();
+      } else { Y.strokeStyle = C.CLAY; Y.lineCap = 'round'; Y.lineWidth = 7; Y.beginPath(); Y.arc(0, -fr * .06, fr * .2, Math.PI * .1, Math.PI * .9); Y.stroke(); }
     });
   }
 
@@ -1028,8 +1033,8 @@
       const fc = [ox, oy - SK.headC * R * k], fr = .98 * R, Pc = V.cpuLayerCanvas('pc_skP'), neck = oy - SK.neckTop * R * k;
       const pass = (a, clipFn) => { A.save(); clipFn(); A.globalAlpha = ink * a; A.setTransform(1, 0, 0, 1, 0, 0); A.drawImage(Pc, bx, by, bw, bh, bx, by, bw, bh); A.restore(); };
       pass(1, () => { A.beginPath(); A.rect(-1e4, neck, 3e4, 3e4); A.clip(); });                                         // the body
-      pass(.62, () => { A.beginPath(); A.rect(-1e4, -1e4, 3e4, neck + 1e4); A.ellipse(fc[0], fc[1], fr, fr * k, 0, 0, TAU); A.clip('evenodd'); }); // the crown
-      pass(.5, () => { A.beginPath(); A.rect(-1e4, -1e4, 3e4, neck + 1e4); A.clip(); A.beginPath(); A.ellipse(fc[0], fc[1], fr, fr * k, 0, 0, TAU); A.clip(); });  // the face
+      pass(.55, () => { A.beginPath(); A.rect(-1e4, -1e4, 3e4, neck + 1e4); A.ellipse(fc[0], fc[1], fr, fr * k, 0, 0, TAU); A.clip('evenodd'); }); // the crown
+      pass(.28, () => { A.beginPath(); A.rect(-1e4, -1e4, 3e4, neck + 1e4); A.clip(); A.beginPath(); A.ellipse(fc[0], fc[1], fr, fr * k, 0, 0, TAU); A.clip(); });  // the face (light: it stays a face)
       A.restore();
     }
     // ---- RIGHT: blank PAPER, a bare keyline, the features whole
@@ -1071,6 +1076,26 @@
     if (o.keyline === 'ink') { tintInto(Tt, Lc, bx, by, bw, bh, C.PAPER); X.save(); ringUnder(X, Tc, bx, by, bw, bh, Math.max(3, .035 * R + 1.5) * S); X.restore(); }
     X.save(); halfPlane(X, e0, e1, 1); X.clip(); X.setTransform(1, 0, 0, 1, 0, 0); X.drawImage(V.cpuLayerCanvas('pc_skA'), bx - pad, by - pad, bw + 2 * pad, bh + 2 * pad, bx - pad, by - pad, bw + 2 * pad, bh + 2 * pad); X.restore();
     X.save(); halfPlane(X, e0, e1, -1); X.clip(); X.setTransform(1, 0, 0, 1, 0, 0); X.drawImage(V.cpuLayerCanvas('pc_skB'), bx - pad, by - pad, bw + 2 * pad, bh + 2 * pad, bx - pad, by - pad, bw + 2 * pad, bh + 2 * pad); X.restore();
+    // the survey meridian: the chart's edge line ruled straight up through the body, graduated on the charted side
+    const ma = (o.meridian ?? 1) * ink * (1 - clamp(drain * 1.7)) * (1 - fill);
+    if (ma > .01) {
+      const Mm = V.cpuLayer('pc_skM'), Mc = V.cpuLayerCanvas('pc_skM');
+      Mm.save(); Mm.setTransform(1, 0, 0, 1, 0, 0); Mm.clearRect(bx - pad, by - pad, bw + 2 * pad, bh + 2 * pad); Mm.restore();
+      let dx = e1[0] - e0[0], dy = e1[1] - e0[1]; const mm = Math.hypot(dx, dy) || 1; dx /= mm; dy /= mm;
+      const nx = dy, ny = -dx;                                            // toward the charted side
+      // the point of the line nearest the soles, then R-spaced ticks up the figure
+      const s0 = (ox - e0[0]) * dx + (oy - e0[1]) * dy, p0 = [e0[0] + dx * s0, e0[1] + dy * s0];
+      Mm.save(); Mm.strokeStyle = C.INK; Mm.lineCap = 'butt';
+      Mm.lineWidth = Math.max(2.2, .03 * R); Mm.beginPath(); Mm.moveTo(p0[0] - dx * R, p0[1] - dy * R); Mm.lineTo(p0[0] + dx * 9 * R * k, p0[1] + dy * 9 * R * k); Mm.stroke();
+      for (let i = 0; i <= 36; i++) {
+        const d = i * .25 * R * k, big = i % 4 === 0, L = (big ? .2 : .1) * R;
+        const q = [p0[0] + dx * d, p0[1] + dy * d];
+        Mm.lineWidth = Math.max(1.6, (big ? .026 : .018) * R); Mm.beginPath(); Mm.moveTo(q[0], q[1]); Mm.lineTo(q[0] + nx * L, q[1] + ny * L); Mm.stroke();
+      }
+      Mm.restore();
+      Mm.save(); Mm.setTransform(1, 0, 0, 1, 0, 0); Mm.globalCompositeOperation = 'destination-in'; Mm.drawImage(Lc, bx, by, bw, bh, bx, by, bw, bh); Mm.restore();
+      X.save(); X.setTransform(1, 0, 0, 1, 0, 0); X.globalAlpha *= ma; X.drawImage(Mc, bx - pad, by - pad, bw + 2 * pad, bh + 2 * pad, bx - pad, by - pad, bw + 2 * pad, bh + 2 * pad); X.restore();
+    }
     X.restore();
   }
   let _feat = null; const featCanvas = (w, h) => { if (!_feat || _feat.width < w || _feat.height < h) _feat = cpuCanvas(Math.max(w, _feat ? _feat.width : 0), Math.max(h, _feat ? _feat.height : 0)); cx2d(_feat).clearRect(0, 0, _feat.width, _feat.height); return _feat; };
@@ -1119,9 +1144,9 @@
   // P1: pan right along the coast (cx 1060 → 2800), easing out onto the edge on "out" while it breathes back .92 → .80,
   // so the frame lands with the blank beyond the edge. P2 (74.967): push in (.80 → 1.16, log) and settle the edge on
   // x 960 while the last monster is engraved; 76.80 ("map"): the tilt to the floor.
-  const Z0 = 1.16;
+  const Z0 = 1.14;
   function p1Cam(t) {
-    const m = TM(), T0 = 70.2, u = trap((t - T0) / (m.out - T0), .22, .45);
+    const m = TM(), T0 = 70.2, u = trap((t - T0) / (m.out - T0), .4, .4);
     const z = lerp(.92, .80, E.io2(clamp((t - 71.8) / (m.out + .35 - 71.8))));
     return { cx: lerp(1060, 2800, u) + Math.max(0, t - m.out) * 6, cy: lerp(1395, 1335, u), zoom: z, tilt: 0, vpX: 960, ay: 540 };
   }
@@ -1180,11 +1205,19 @@
   // the engraving-in: k (body → arms) over 74.967 → 75.95; the tag pressed on at "edge" (1 frame early, 4 frames)
   function revealK(t) { const s = clamp((t - V.CUT.P2) / (75.95 - V.CUT.P2)); return s <= 0 ? 0 : 1.08 * Math.pow(s, .8); }
   function tagK(t) { return clamp((t - V.hit(TM().edge)) / (4 * F1)); }
+  // the pop-up figure's contact with the paper: a soft INK halftone pool under the soles (no gradient)
+  function footShadow(X, x, y, R, k = 1, a = 1) {
+    if (k <= 0 || a <= 0) return;
+    X.save(); X.globalAlpha *= a * Math.min(1, k);
+    for (const [rx, d] of [[1.05, .12], [.8, .2], [.55, .3]]) { X.beginPath(); X.ellipse(x, y + .02 * R, rx * R * k, .13 * R * (rx / 1.05) * k, 0, 0, TAU); X.fillStyle = V.ht(X, C.INK, d, 5, 45); X.fill(); }
+    X.restore();
+  }
   function p2Opus(t, R) {
     const m = TM();
     const w = lerp(.25, .2, E.io2(clamp((t - m.ease0) / (m.ease1 - m.ease0))));
     const sung = t >= m.me - .05 && t < 78.75;
-    return { t, ground: 'paper', face: { worried: w, mouth: sung ? lipSync(t) : 'rest', eyes: 'normal', lid: blinkF(t, m.blink79), gaze: [0, 0] } };
+    // held still for the confession; only the cursor ahoge breathes (a slow sway, never on the beat)
+    return { t, ground: 'paper', ahoge: { sway: .045 * Math.sin((t - m.me) * 2.3) * clamp((t - m.me - .3) / .6) }, face: { worried: w, mouth: sung ? lipSync(t) : 'rest', eyes: 'normal', lid: blinkF(t, m.blink79), gaze: [0, 0] } };
   }
   scene('P2_edge_is_me', V.CUT.P2, V.CUT.C1, (X, t) => V.viaCPU(X, Fr => {
     G.post.edgeSeed = 4; G.post.sliver = 'br';
@@ -1197,6 +1230,7 @@
       else draw(Fr, c);
       if (t >= m.rise) {
         const k = E.back(clamp((t - m.rise) / (8 * F1)), 1.1);
+        footShadow(Fr, 960, 860, 92, clamp(k));
         skin.opus(Fr, 960, 860, 92, p2Opus(t, 92), c, { k, ink: 1 });
       }
       V.legend(Fr, L2, t, { panel: 1 - clamp((t - m.legendOut) / .3) });
