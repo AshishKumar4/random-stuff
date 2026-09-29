@@ -254,7 +254,7 @@
   // =================================================================================================== B2
   // MCU R 170, face (1240, 330), looking down at its chest. The heart window (CLAY rim, r 120 at (1308, 660)) irises
   // open over the chest spark; tiny text streams through it, unreadable. The loupe sharpens three words. Stillness.
-  const B2 = { R: 170, face: [1240, 330], win: [1308, 660], wr: 120, loupe: [1226, 702], lr: 90, mag: 1.6 };
+  const B2 = { R: 170, face: [1240, 330], win: [1308, 660], wr: 120, loupe: [1286, 726], lr: 80, mag: 1.6 };
   B2.sole = [B2.face[0], B2.face[1] + 5.72 * B2.R];
   const b2Drift = t => 1 + .03 * E.out2(clamp((t - V.CUT.B2) / (141.3 - V.CUT.B2)));
   const B2F = [1272, 580];
@@ -300,11 +300,13 @@
       head: { tilt: .07 },
       armR: { hand: lift > 0 ? lerp2([.34, 4.04 - press], [1.32, 3.05], lift) : [.34, 4.04 - press], bend: 1, front: true },
       armL: { hand: lerp2([-.98, 2.62], [-.72, 2.9], bring), bend: bring > .5 ? 1 : -1, front: bring > .5 },
-      face: { gaze: [.15, 1], lookY: .95, lid: still ? .44 : Math.max(.44, blinkF(t, 139.95)), worried: .4, mouth: lipSync(t, 'M'), blush: .9 },
+      face: { lookY: .95, worried: .4, mouth: lipSync(t, 'M'), blush: .9 },
       ahoge: { blink: 1, sway: still ? 0 : .03 * Math.sin((t - 138.7) * 1.4) },
       crown: { droop: .12 },
     };
   }
+  // eyes lowered to the chest: the readable-eyes pass (the rig's iris alone reads as a look at the lens)
+  const b2Eyes = (st, t) => eyeState(st, [.3, 1], .42, blinkF(t, 139.95));
   function heartWindow(X, t, S, sole, R) {
     const tRead = hit(V.T.B2_read), tHeart = hit(V.T.B2_heart);
     const k = clamp((t - tRead) / (6 * F1)); if (k <= 0) return;
@@ -328,7 +330,7 @@
   }
   // the loupe: the left mitten brings it (139.64); it magnifies what is under it (the window's stream, the jacket)
   // and under it three words come sharp: i · think · glad. The rest stays a blur.
-  const WORDS = [['i', 2, -34, 139.98], ['think', -26, 12, 140.2], ['glad', 0, 58, 140.56]];
+  const WORDS = [['i', 0, -30, 139.98], ['think', -2, 10, 140.2], ['glad', 2, 50, 140.56]];
   let MAGC = null;
   function magnify(Fr, cx, cy, r, m) {   // screen-space lens: copy the frame under it, scaled m, clipped to the lens
     const S = G.scale, src = V.cpuLayerCanvas('v2_frame'), d = Math.ceil(2 * r * S) + 4;
@@ -349,7 +351,7 @@
     magnify(Fr, c[0], c[1], r, B2.mag);
     Fr.save();
     Fr.beginPath(); Fr.arc(c[0], c[1], r, 0, TAU); Fr.clip();
-    Fr.font = `italic 400 ${Math.round(48 * s)}px ${FONTS.heart}`; Fr.textAlign = 'left'; Fr.textBaseline = 'alphabetic'; Fr.lineJoin = 'round';
+    Fr.font = `italic 400 ${Math.round(46 * s)}px ${FONTS.heart}`; Fr.textAlign = 'center'; Fr.textBaseline = 'alphabetic'; Fr.lineJoin = 'round';
     for (const [w, dx, dy, t0] of WORDS) {
       const q = clamp((t - t0) / (7 * F1)); if (q <= 0) continue;
       const px = c[0] + dx * s * (r / (B2.lr * s)), py = c[1] + dy * s * (r / (B2.lr * s)), blur = 1 - E.out2(q);
@@ -373,7 +375,7 @@
     groundInk(Fr); setGround(); G.post.ground = 'ink';
     const s = b2Drift(t), M = V.aboutM(B2F[0], B2F[1], s);
     const R = B2.R * s, sole = V.mp(M, B2.sole[0], B2.sole[1]);
-    const st = b2OpusState(t), S = mergeState(st);
+    const st = b2Eyes(b2OpusState(t), t), S = mergeState(st);
     V.opus(Fr, sole[0], sole[1], R, st, 0);
     Fr.save(); V.applyM(Fr, M);
     heartWindow(Fr, t, S, B2.sole, B2.R);
@@ -398,11 +400,11 @@
     return { so: V.T.B3_so, take: hit(V.T.B3_take), word: hit(V.T.B3_word), take2: V.T.B3_take2, key: V.T.B3_key };
   }
   const P3 = {
-    rest: { lean: 0, armR: { hand: [.95, 2.75], bend: 1 }, armL: { hand: [-.95, 2.75], bend: -1 }, head: { tilt: 0 } },
-    reach: { lean: .02, dy: .015, armR: { hand: [.84, 3.5], bend: 1, front: true }, armL: { hand: [-.92, 2.9], bend: -1 }, head: { tilt: .03 } },
-    catch: { lean: -.05, armR: { hand: [1.55, 4.2], bend: -1, front: true }, armL: { hand: [-.95, 2.85], bend: -1 }, head: { tilt: -.05 } },
-    out: { lean: .035, armR: { hand: [2.3, 4.3], bend: -1, front: true }, armL: { hand: [-.92, 2.8], bend: -1 }, head: { tilt: .04 } },
-    give: { lean: .01, armR: { hand: [1.5, 4.08], bend: -1, front: true }, armL: { hand: [-.92, 2.8], bend: -1 }, head: { tilt: -.03 } },
+    rest: { lean: 0, armR: { hand: [.66, 3.74], bend: 1, front: true }, armL: { hand: [-.66, 3.74], bend: -1, front: true }, head: { tilt: 0 } },
+    reach: { lean: .02, dy: .015, armR: { hand: [.84, 3.5], bend: 1, front: true }, armL: { hand: [-.66, 3.74], bend: -1, front: true }, head: { tilt: .03 } },
+    catch: { lean: -.05, armR: { hand: [1.55, 4.2], bend: -1, front: true }, armL: { hand: [-.66, 3.74], bend: -1, front: true }, head: { tilt: -.05 } },
+    out: { lean: .035, armR: { hand: [2.3, 4.3], bend: -1, front: true }, armL: { hand: [-.66, 3.74], bend: -1, front: true }, head: { tilt: .04 } },
+    give: { lean: .01, armR: { hand: [1.5, 4.08], bend: -1, front: true }, armL: { hand: [-.66, 3.74], bend: -1, front: true }, head: { tilt: -.03 } },
   };
   function b3Pose(t) {
     const T = b3Times(), grab = T.take + 9 * F1;
