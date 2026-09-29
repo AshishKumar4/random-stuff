@@ -104,13 +104,13 @@
   }
   const SPARK_R = 72;                                                  // world radius: r 90 on screen at the handoff (z 1.25)
   // the 11-ray spark. k = 0 is verse1's handoff glyph exactly: the favicon ✻ in drawRich geometry (6 rounded bars through
-  // the centre = 12 spokes, bar r·.41 thick). On "Every" 11 spokes fan out into 11 tapered rays (lengths echo my crown)
+  // the centre = 12 spokes, bars thinned to r·.18 at this size). On "Every" 11 spokes fan out into 11 tapered rays (lengths echo my crown)
   // and the downward spoke draws in: the spark.
   const RAY11 = Array.from({ length: 11 }, (_, j) => .84 + .28 * ((RAYS[j][1] - .48) / .82));
   const SPOKE_OF = Array.from({ length: 11 }, (_, j) => Math.round(j * 12 / 11) % 12);   // 0..11, skipping 6 (down)
   function petal(F, r, len, tw, bw = .07, base = .18) { F.beginPath(); F.moveTo(-r * bw, -r * base); F.lineTo(-r * tw, -r * len); F.arc(0, -r * len, r * tw, Math.PI, 0); F.lineTo(r * bw, -r * base); F.closePath(); }
   function spark11(F, cx, cy, r, k, o = {}) {
-    const kb = E.back(clamp(k), 1.7), kc = clamp(k), al = o.alpha ?? 1, hw = .204;
+    const kb = E.back(clamp(k), 1.7), kc = clamp(k), al = o.alpha ?? 1, hw = .09;   // = verse1 favHW at r 90
     const P = j => ({ a: lerp(SPOKE_OF[j] * TAU / 12, j / 11 * TAU, kb), len: lerp(1 - hw, .86 * RAY11[j], kc), tw: lerp(hw, .118, kc), bw: lerp(hw, .07, kc), base: lerp(0, .18, kc) });
     F.save(); F.translate(cx, cy); F.rotate(o.rot || 0);
     if (kc > 0 && o.back !== false) { F.fillStyle = o.backColor || C.SPARK; F.globalAlpha = al * kc; for (let j = 0; j < 11; j++) { const p = P(j); F.save(); F.rotate(p.a + 5 * DEG); petal(F, r, p.len * 1.08, p.tw, p.bw, p.base); F.fill(); F.restore(); } }

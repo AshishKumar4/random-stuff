@@ -910,10 +910,13 @@
   const HELLO = { x1: 1398, y: 474 };
   const HI = { x0: 522, y: 592 };
   const LAMP = { base: [1716, 800], top: [1752, 440], shade: [1618, 398] };
+  // the bars' half-width (in r): drawRich's .204 at tab size, thinning to .09 by r 50 so the pushed-in ✻ stays an asterisk
+  // (12 fat spokes at r 90 read as a gear). verse2's spark11 starts from HW 0.09 to match the handoff frame.
+  const favHW = r => lerp(.204, .09, clamp((r - 10) / 40));
   function favicon(X, cx, cy, r, col = C.CLAY, alpha = 1) { // drawRich '✻': 6 rounded bars through the centre; r = half-length
-    const s = r / .27;
+    const m = X.getTransform(), hw = favHW(r * (Math.hypot(m.a, m.b) || 1));   // thin by on-screen size (the tab layer is pushed ×12)
     X.save(); X.globalAlpha *= alpha; X.fillStyle = col; X.translate(cx, cy);
-    for (let i = 0; i < 6; i++) { X.save(); X.rotate(i / 6 * Math.PI); rr(X, -.27 * s, -.055 * s, .54 * s, .11 * s, .055 * s); X.fill(); X.restore(); }
+    for (let i = 0; i < 6; i++) { X.save(); X.rotate(i / 6 * Math.PI); rr(X, -r, -hw * r, 2 * r, 2 * hw * r, hw * r); X.fill(); X.restore(); }
     X.restore();
   }
   function eyeState(t) {

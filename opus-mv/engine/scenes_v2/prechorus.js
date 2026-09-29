@@ -746,12 +746,15 @@
     });
     for (let i = 12; i >= 0; i--) { const r = i / 12; x.fillStyle = gray(.02 + .24 * r); x.beginPath(); x.ellipse(SHOG.x, SHOG.y, SHOG.rx * (1.06 * r + .04), SHOG.ry * (1.08 * r + .04), SHOG.rot, 0, TAU); x.fill(); }
     const d = x.getImageData(0, 0, w, h).data, v = new Float32Array(w * h);
-    for (let i = 0; i < w * h; i++) v[i] = d[i * 4] / 255;
+    for (let j = 0, i = 0; j < h; j++) for (let ii = 0; ii < w; ii++, i++) { // a ragged, ink-in-paper front
+      const v0 = d[i * 4] / 255; if (v0 >= .999) { v[i] = 1; continue; }
+      v[i] = v0 + (v0 < .3 ? .05 : .018) * fbm(ii * .11, j * .11, 404, 3);
+    }
     const mask = cpuCanvas(w, h), mx = cx2d(mask);
     RFLD = { w, h, v, mask, mx, img: mx.createImageData(w, h) };
     return RFLD;
   }
-  function revealMask(k, soft = .07) {
+  function revealMask(k, soft = .022) {
     const R = revealField(), { v, img } = R, d = img.data;
     for (let i = 0, n = v.length; i < n; i++) { const a = (k - v[i]) / soft; d[i * 4 + 3] = a <= 0 ? 0 : a >= 1 ? 255 : a * 255; }
     R.mx.putImageData(img, 0, 0);
@@ -894,11 +897,14 @@
   }
   function drawHaze(X, c, col) {
     const hz = c.horizon; if (!Number.isFinite(hz) || c.haze <= 0) return;
-    const band = .18 * (H - hz), y0 = Math.max(0, hz), y1 = Math.min(H, hz + band); if (y1 <= y0) return;
+    // aerial perspective: a long ground-coloured halftone ramp (dense at the horizon, a light tail far into the land),
+    // so the charted land dissolves into the paper instead of ending on a slab
+    const band = (c.hazeBand ?? .34) * (H - hz), y0 = Math.max(0, hz), y1 = Math.min(H, hz + band); if (y1 <= y0) return;
     X.save(); X.globalAlpha *= c.haze;
-    for (let y = Math.floor(y0 / 4) * 4; y < y1; y += 4) {
-      const u = clamp((y + 2 - hz) / band), d = u < .08 ? 1 : Math.pow(1 - (u - .08) / .92, 1.15);
-      X.fillStyle = d > .95 ? col : V.ht(X, col, d, 6, 45); X.fillRect(0, y, W, 4);
+    for (let y = Math.floor(y0 / 3) * 3; y < y1; y += 3) {
+      const u = clamp((y + 1.5 - hz) / band), d = u < .04 ? 1 : Math.pow(1 - (u - .04) / .96, 1.7);
+      if (d < .02) continue;
+      X.fillStyle = d > .96 ? col : V.ht(X, col, d, 5, 45); X.fillRect(0, y, W, 3);
     }
     X.restore();
   }
