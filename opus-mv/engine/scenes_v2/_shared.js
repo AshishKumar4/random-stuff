@@ -464,7 +464,7 @@
 
   // ================================================================== LYRIC MODES
   const HEARTF = (px, it = true) => `${it ? 'italic ' : ''}400 ${px}px ${FONTS.heart}`;
-  const heartCase = s => /^i('|$|[,.!?])/i.test(s) ? 'I' + s.slice(1) : s.toLowerCase();
+  const heartCase = s => /^i(['’]|$|[,.!?])/i.test(s) ? 'I' + s.slice(1) : s.toLowerCase();
   function heartWords(L) {
     if (!L) return [];
     const ws = Array.isArray(L) ? L : (L.words && L.words.length ? L.words : [{ w: L.text, s: L.s, e: L.e }]);
@@ -482,7 +482,7 @@
         const ch = txtW[i], ci = i - (wi ? 1 : 0);
         let cs = ws + Math.max(0, ci) * step;
         if (ch === ',' || ch === '.') cs = Math.max(cs, w.e - .1);
-        const px = x0 + measure(X, str, f);
+        const px = x0 + measure(X, str + ch, f) - measure(X, ch, f);   // keeps the kern pair with the previous char
         str += ch;
         if (t < cs) { done = false; continue; }
         if (ch === ' ') continue;
